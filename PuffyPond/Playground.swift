@@ -233,8 +233,8 @@ final class Playground {
             critterPots.append(pot)
         }
         // A row of template bubbles on the tray: rub one to get a dotted animal to trace.
-        for (k, kind) in TemplateKind.allCases.enumerated() {
-            let x = (Float(k) - Float(TemplateKind.allCases.count - 1) / 2) * 0.9
+        for (k, kind) in TemplateKind.legacyTray.enumerated() {
+            let x = (Float(k) - Float(TemplateKind.legacyTray.count - 1) / 2) * 0.9
             let pot = TemplatePot(kind: kind, at: SIMD3(x, Self.templateRowY, 0.3))
             scene.rootNode.addChildNode(pot.root)
             templatePots.append(pot)

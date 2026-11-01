@@ -1,60 +1,53 @@
 import SceneKit
 import simd
 
-// MARK: - Templates (a faint dotted pond animal to trace)
+// MARK: - Outline art (dotted shapes to trace)
 
-/// A shape kids can trace when they don't know what to draw. Only a guide: it never goes into the
-/// gallery photo, only their own paint does.
-enum TemplateKind: CaseIterable {
-    case fish, turtle, duck
-
+/// Line art kids can trace when they don't know what to draw: SVG-style path data plus eye dots.
+/// Shared by the template list and the daily quests. Only a guide: it never goes into the gallery
+/// photo, only their own paint does.
+struct OutlineArt: Equatable {
     /// Outline as SVG-style path data (absolute M, L, C, Z) in a 300×220 sketch space, y down.
-    private var paths: [String] {
-        switch self {
-        case .fish:
-            return ["M60 110 C90 50 190 50 220 110 C190 170 90 170 60 110 Z",     // body
-                    "M220 110 L270 70 L262 110 L270 150 Z",                       // tail
-                    "M130 62 C140 35 170 35 175 60"]                              // fin
-        case .turtle:
-            return ["M80 140 C80 70 220 70 220 140 Z",                            // shell
-                    "M220 125 C250 110 270 120 265 140 C258 155 235 150 222 140", // head
-                    "M95 140 L90 170 L115 170 L115 142",                          // legs
-                    "M185 142 L185 170 L210 170 L205 140",
-                    "M120 100 L150 85 L180 100 L170 128 L130 128 Z"]              // shell pattern
-        case .duck:
-            return ["M70 130 C70 175 220 180 235 135 C240 115 210 110 190 120 C170 95 175 60 150 55 "
-                        + "C120 50 110 85 125 110 C100 105 70 110 70 130 Z",      // body and neck
-                    "M112 72 L85 78 L112 86"]                                     // beak
-        }
-    }
-
-    private var eyeSpots: [SIMD2<Float>] {
-        switch self {
-        case .fish: return [SIMD2(100, 100)]
-        case .turtle: return [SIMD2(252, 128)]
-        case .duck: return [SIMD2(138, 72)]
-        }
-    }
-
-    /// Bubble icon color.
-    var signatureColor: SIMD3<Float> {
-        switch self {
-        case .fish: return Paint.colors[0]     // tangerine
-        case .turtle: return Paint.colors[4]   // mint
-        case .duck: return Paint.colors[2]     // lemon
-        }
-    }
+    let paths: [String]
+    let eyes: [SIMD2<Float>]
+    /// Icon color.
+    let color: SIMD3<Float>
 
     /// Outline polylines and eye dots, scaled to fit `size` around `center` (world units, y up).
     func shape(center: SIMD2<Float>, size: SIMD2<Float>) -> (lines: [[SIMD2<Float>]], eyes: [SIMD2<Float>]) {
         let lines = paths.flatMap { Self.polylines($0) }
-        let all = lines.flatMap { $0 } + eyeSpots
+        let all = lines.flatMap { $0 } + eyes
         let lo = all.reduce(all[0], simd_min)
         let hi = all.reduce(all[0], simd_max)
         let scale = min(size.x / (hi.x - lo.x), size.y / (hi.y - lo.y))
         let mid = (lo + hi) * 0.5
         func place(_ p: SIMD2<Float>) -> SIMD2<Float> { center + SIMD2(p.x - mid.x, mid.y - p.y) * scale }
-        return (lines.map { $0.map(place) }, eyeSpots.map(place))
+        return (lines.map { $0.map(place) }, eyes.map(place))
+    }
+
+    /// The outline drawn solid in the art's color, on a transparent square.
+    func iconImage(side: Int = 256) -> CGImage? {
+        let shape = shape(center: SIMD2(0.5, 0.5), size: SIMD2(0.86, 0.86))
+        let c = color
+        let ink = CGColor(red: CGFloat(c.x) * 0.8, green: CGFloat(c.y) * 0.8, blue: CGFloat(c.z) * 0.8, alpha: 1)
+        let unit = CGFloat(side) / 256
+        return Toybox.image(width: side, height: side) { ctx in
+            func px(_ p: SIMD2<Float>) -> CGPoint { CGPoint(x: CGFloat(p.x) * CGFloat(side), y: CGFloat(p.y) * CGFloat(side)) }
+            ctx.setStrokeColor(ink)
+            ctx.setFillColor(ink)
+            ctx.setLineWidth(14 * unit)
+            ctx.setLineCap(.round)
+            ctx.setLineJoin(.round)
+            for line in shape.lines {
+                ctx.move(to: px(line[0]))
+                for p in line.dropFirst() { ctx.addLine(to: px(p)) }
+                ctx.strokePath()
+            }
+            for eye in shape.eyes {
+                let e = px(eye)
+                ctx.fillEllipse(in: CGRect(x: e.x - 10 * unit, y: e.y - 10 * unit, width: 20 * unit, height: 20 * unit))
+            }
+        }
     }
 
     /// Flattens path data into polylines (curves sampled into short straight pieces).
@@ -98,6 +91,124 @@ enum TemplateKind: CaseIterable {
         }
         if current.count > 1 { lines.append(current) }
         return lines
+    }
+}
+
+// MARK: - Templates (a faint dotted pond animal to trace)
+
+enum TemplateDifficulty: Int, Comparable {
+    case easy, medium, hard
+
+    static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
+
+    var title: String {
+        switch self {
+        case .easy: return "Easy"
+        case .medium: return "Medium"
+        case .hard: return "Hard"
+        }
+    }
+}
+
+/// A shape to trace. The raw value is the id stored with saved paintings, so fish/turtle/duck keep theirs.
+enum TemplateKind: String, CaseIterable {
+    case fish, turtle, duck
+    case sun, snail, cat
+    case octopus, seahorse, butterfly
+
+    var id: String { rawValue }
+
+    var title: String { rawValue.capitalized }
+
+    var difficulty: TemplateDifficulty {
+        switch self {
+        case .fish, .duck, .sun: return .easy
+        case .turtle, .snail, .cat: return .medium
+        case .octopus, .seahorse, .butterfly: return .hard
+        }
+    }
+
+    /// The three bubbles of the legacy tray on the easel.
+    static let legacyTray: [TemplateKind] = [.fish, .turtle, .duck]
+
+    /// Bubble icon color.
+    var signatureColor: SIMD3<Float> { art.color }
+
+    func shape(center: SIMD2<Float>, size: SIMD2<Float>) -> (lines: [[SIMD2<Float>]], eyes: [SIMD2<Float>]) {
+        art.shape(center: center, size: size)
+    }
+
+    var art: OutlineArt {
+        switch self {
+        case .fish:
+            return OutlineArt(paths: ["M60 110 C90 50 190 50 220 110 C190 170 90 170 60 110 Z",     // body
+                                      "M220 110 L270 70 L262 110 L270 150 Z",                       // tail
+                                      "M130 62 C140 35 170 35 175 60"],                             // fin
+                              eyes: [SIMD2(100, 100)], color: Paint.colors[0])    // tangerine
+        case .turtle:
+            return OutlineArt(paths: ["M80 140 C80 70 220 70 220 140 Z",                            // shell
+                                      "M220 125 C250 110 270 120 265 140 C258 155 235 150 222 140", // head
+                                      "M95 140 L90 170 L115 170 L115 142",                          // legs
+                                      "M185 142 L185 170 L210 170 L205 140",
+                                      "M120 100 L150 85 L180 100 L170 128 L130 128 Z"],             // shell pattern
+                              eyes: [SIMD2(252, 128)], color: Paint.colors[4])    // mint
+        case .duck:
+            return OutlineArt(paths: ["M70 130 C70 175 220 180 235 135 C240 115 210 110 190 120 C170 95 175 60 150 55 "
+                                          + "C120 50 110 85 125 110 C100 105 70 110 70 130 Z",      // body and neck
+                                      "M112 72 L85 78 L112 86"],                                    // beak
+                              eyes: [SIMD2(138, 72)], color: Paint.colors[2])     // lemon
+        case .sun:
+            return OutlineArt(paths: ["M205 110 C205 140.4 180.4 165 150 165 C119.6 165 95 140.4 95 110 "
+                                          + "C95 79.6 119.6 55 150 55 C180.4 55 205 79.6 205 110 Z", // face
+                                      "M222 110 L250 110", "M78 110 L50 110", "M150 38 L150 10", "M150 182 L150 210",
+                                      "M200.9 59.1 L220.7 39.3", "M99.1 59.1 L79.3 39.3",         // rays
+                                      "M200.9 160.9 L220.7 180.7", "M99.1 160.9 L79.3 180.7",
+                                      "M130 125 C140 140 160 140 170 125"],                         // smile
+                              eyes: [SIMD2(133, 100), SIMD2(167, 100)], color: Paint.colors[2])
+        case .snail:
+            return OutlineArt(paths: ["M175 90 C175 120.4 150.4 145 120 145 C89.6 145 65 120.4 65 90 "
+                                          + "C65 59.6 89.6 35 120 35 C150.4 35 175 59.6 175 90 Z",   // shell
+                                      "M120 90 C120 75 140 75 140 92 C140 112 105 115 100 88 C95 62 135 52 152 78", // spiral
+                                      "M30 150 C100 160 200 160 245 150 C270 145 268 115 258 100 C254 85 256 70 250 55", // body
+                                      "M30 150 C70 140 95 144 118 145", "M170 138 C205 140 235 135 247 112", // body top
+                                      "M262 100 C268 85 272 70 278 58"],                            // feelers
+                              eyes: [SIMD2(258, 122)], color: Paint.colors[4])
+        case .cat:
+            return OutlineArt(paths: ["M235 125 C235 163.7 197 195 150 195 C103 195 65 163.7 65 125 "
+                                          + "C65 86.3 103 55 150 55 C197 55 235 86.3 235 125 Z",     // head
+                                      "M82 85 L72 30 L120 62", "M218 85 L228 30 L180 62",           // ears
+                                      "M142 138 L158 138 L150 148 Z",                               // nose
+                                      "M150 148 C150 160 138 162 130 156", "M150 148 C150 160 162 162 170 156",
+                                      "M60 135 L100 140", "M60 155 L100 150",                       // whiskers
+                                      "M240 135 L200 140", "M240 155 L200 150"],
+                              eyes: [SIMD2(118, 115), SIMD2(182, 115)], color: Paint.colors[3])
+        case .octopus:
+            return OutlineArt(paths: ["M90 100 C80 20 220 20 210 100 Z",                            // head
+                                      "M135 88 C145 96 155 96 165 88",                              // smile
+                                      "M100 100 C90 130 70 140 60 165 C55 180 70 190 80 180",       // arms
+                                      "M125 100 C120 135 105 150 105 180 C105 195 120 195 122 182",
+                                      "M150 100 C150 135 140 160 145 190 C147 205 162 203 160 188",
+                                      "M175 100 C180 135 195 150 195 180 C195 195 180 195 178 182",
+                                      "M200 100 C210 130 230 140 240 165 C245 180 230 190 220 180"],
+                              eyes: [SIMD2(125, 70), SIMD2(175, 70)], color: Paint.colors[5])
+        case .seahorse:
+            return OutlineArt(paths: ["M130 30 C150 15 175 25 175 50 C175 70 160 80 165 100 C172 125 150 140 150 160 "
+                                          + "C150 185 175 195 190 180 C205 165 190 150 175 158",   // back and curled tail
+                                      "M130 30 C115 35 105 50 100 58 L72 55 L74 68 L102 75 "
+                                          + "C96 100 135 108 132 135 C130 158 140 172 152 182",         // snout and belly
+                                      "M172 92 C194 84 200 112 170 118",                            // fin
+                                      "M140 22 L145 8", "M155 20 L162 6"],                          // crown
+                              eyes: [SIMD2(128, 48)], color: Paint.colors[1])
+        case .butterfly:
+            return OutlineArt(paths: ["M155 105 C170 40 260 15 270 55 C275 85 200 115 155 110",     // right wings
+                                      "M155 112 C200 118 245 140 232 175 C220 200 170 175 155 125",
+                                      "M145 105 C130 40 40 15 30 55 C25 85 100 115 145 110",        // left wings
+                                      "M145 112 C100 118 55 140 68 175 C80 200 130 175 145 125",
+                                      "M150 85 C156 85 158 95 158 115 C158 135 155 150 150 150 "
+                                          + "C145 150 142 135 142 115 C142 95 144 85 150 85 Z",     // body
+                                      "M147 88 C140 65 135 55 128 45", "M153 88 C160 65 165 55 172 45"],
+                              eyes: [SIMD2(205, 60), SIMD2(95, 60)], color: Paint.colors[3])
+        }
     }
 }
 
@@ -239,7 +350,7 @@ final class TemplatePot {
     init(kind: TemplateKind, at position: SIMD3<Float>) {
         self.kind = kind
         root.simdPosition = position
-        clock = Float(TemplateKind.allCases.firstIndex(of: kind) ?? 0) * 1.7
+        clock = Float(TemplateKind.legacyTray.firstIndex(of: kind) ?? 0) * 1.7
 
         let glass = SCNMaterial()
         glass.lightingModel = .blinn
@@ -304,27 +415,5 @@ final class TemplatePot {
         halo.simdEulerAngles = SIMD3(0.25, clock, 0)
     }
 
-    private static func iconImage(_ kind: TemplateKind) -> CGImage? {
-        let side = 256
-        let shape = kind.shape(center: SIMD2(0.5, 0.5), size: SIMD2(0.86, 0.86))
-        let c = kind.signatureColor
-        let ink = CGColor(red: CGFloat(c.x) * 0.8, green: CGFloat(c.y) * 0.8, blue: CGFloat(c.z) * 0.8, alpha: 1)
-        return Toybox.image(width: side, height: side) { ctx in
-            func px(_ p: SIMD2<Float>) -> CGPoint { CGPoint(x: CGFloat(p.x) * CGFloat(side), y: CGFloat(p.y) * CGFloat(side)) }
-            ctx.setStrokeColor(ink)
-            ctx.setFillColor(ink)
-            ctx.setLineWidth(14)
-            ctx.setLineCap(.round)
-            ctx.setLineJoin(.round)
-            for line in shape.lines {
-                ctx.move(to: px(line[0]))
-                for p in line.dropFirst() { ctx.addLine(to: px(p)) }
-                ctx.strokePath()
-            }
-            for eye in shape.eyes {
-                let e = px(eye)
-                ctx.fillEllipse(in: CGRect(x: e.x - 10, y: e.y - 10, width: 20, height: 20))
-            }
-        }
-    }
+    static func iconImage(_ kind: TemplateKind) -> CGImage? { kind.art.iconImage() }
 }

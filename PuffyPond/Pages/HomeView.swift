@@ -20,9 +20,8 @@ struct HomeView: View {
                         .font(.system(size: 20 * scale, weight: .bold, design: .rounded))
                         .foregroundStyle(Color(red: 0.25, green: 0.2, blue: 0.35).opacity(0.7))
                 }
-                // Start drawing goes straight to the canvas until the mode picker lands.
                 HomeButton(title: "Start drawing", symbol: "paintbrush.pointed.fill", tint: .pink) {
-                    router.go(.canvas(nil))
+                    router.go(.modePicker)
                 }
                 HStack(spacing: 20 * scale) {
                     HomeButton(title: "View gallery", symbol: "building.columns.fill", tint: .orange) {
@@ -85,6 +84,7 @@ struct PageBackground: View {
 struct PlaceholderPage: View {
     let title: String
     let router: AppRouter
+    var next: (title: String, route: Route)?
     @Environment(\.uiScale) private var scale
 
     var body: some View {
@@ -97,6 +97,9 @@ struct PlaceholderPage: View {
                 Text("Coming soon")
                     .font(.system(size: 18 * scale, weight: .bold, design: .rounded))
                     .foregroundStyle(.secondary)
+                if let next {
+                    HomeButton(title: next.title, symbol: "arrow.right.circle.fill", tint: .pink) { router.go(next.route) }
+                }
                 HomeButton(title: "Home", symbol: "house.fill", tint: .green) { router.home() }
             }
         }

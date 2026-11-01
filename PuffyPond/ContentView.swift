@@ -75,11 +75,13 @@ struct ContentView: View {
                 .id(start)
                 .transition(.opacity)
         case .modePicker:
-            PlaceholderPage(title: "Choose a mode", router: router).transition(.opacity)
+            ModePickerView(router: router).transition(.opacity)
         case .templates:
-            PlaceholderPage(title: "Templates", router: router).transition(.opacity)
-        case .instruction:
-            PlaceholderPage(title: "Get ready", router: router).transition(.opacity)
+            TemplatesView(router: router, gallery: gallery).transition(.opacity)
+        case let .instruction(choice):
+            // The distance check arrives with the instruction page; until then go straight on.
+            PlaceholderPage(title: "Get ready", router: router, next: ("Start", .canvas(choice)))
+                .transition(.opacity)
         case .review:
             PlaceholderPage(title: "Review", router: router).transition(.opacity)
         case .gallery2D:
