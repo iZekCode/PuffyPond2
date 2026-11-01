@@ -1,74 +1,123 @@
 # Puffy Pond
 
-Draw in the air with both hands. Your strokes puff up into glossy balloon lines, then the whole drawing inflates into a jiggly 3D creature that floats around, dances to the music, watches your hands and boings when you bump it.
+Paint in the air with your hands. Make a fist and sweep your arm: a little paint character follows each hand and lays real-looking wet oil paint on an easel. Pick a template or paint freely, play with the finished painting on a wobbly sheet, hang it in a walkable 3D gallery, and look back at a calendar of what you painted and how your arms moved.
 
-## Run it (Mac)
+## Run it
 
-1. Open `PuffyPond.xcodeproj` in Xcode 26, choose **My Mac** as the run destination.
-2. Signing & Capabilities → pick your team. Press **⌘R** and allow camera access.
-3. Stand or sit back so the camera sees both hands (about an arm's length or more).
+1. Open `PuffyPond.xcodeproj` in Xcode 26.
+2. Signing & Capabilities → pick your team.
+3. Choose an **iPad** (landscape is the main layout) or **My Mac** as the run destination, press **⌘R** and allow camera access.
+4. Stand or sit about 1 m from the camera so it sees your shoulders and both hands.
 
-It also runs on iPhone/iPad (portrait). No camera? Drag with the mouse/finger to draw.
+No camera (or the simulator)? Every step also works by touch or mouse: see "Without a camera" below.
 
-## How to play
+## The flow
+
+```
+Home ──► Start drawing ──► Freeform ─────────────────────────┐
+  │                   └──► Templates (daily quest on top,    ▼
+  │                        easy → hard, progressive unlock)  Get ready (distance check)
+  │                                                          ▼
+  │                                                          Canvas (fist paints, "Save image")
+  │                                                          ▼
+  │                                                          Review (push & grab, "Save to gallery")
+  │                                                          ▼
+  ├──► View gallery ────────────────────────────────────►  3D gallery (paddle to walk) ◄──► 2D grid
+  └──► Report (calendar + the day's paintings and movement stats)
+```
+
+| Page | What happens |
+|---|---|
+| **Home** | Start drawing, View gallery or Report. |
+| **Freeform or template** | A blank canvas, or pick a dotted outline to trace. |
+| **Templates** | The **daily quest** sits on top: a random subject rolled once per day from its own pool (rocket, house, flower, …). Below it, nine templates from easy to hard (fish, duck, sun · turtle, snail, cat · octopus, seahorse, butterfly). A template unlocks once a painting of the one before it is in the gallery, so deleting that painting locks it again. |
+| **Get ready** | A skeleton outline shows where to stand. Step back until your shoulders fit the band (about 1 m) and hold still while the ring fills; the canvas opens by itself. **Skip** is always there. |
+| **Canvas** | Paint with your fists (see below). The chosen template shows as a dotted guide. **Save image** takes you to the review; the house button goes Home (it asks first if the painting isn't saved). |
+| **Review** | The painting hangs on an elastic, glossy sheet. Fist = grab and pull, two fists = stretch and twist, a moving open palm = push ripples with a splash. Let go and it springs back. The play never changes the saved picture. **Save to gallery** or **Keep drawing** (back to the same canvas). |
+| **3D gallery** | A museum hall with your paintings along the wall, newest first, and the brush animals visiting. Paddle with an open hand: sweep down on the right side to walk to the next painting, on the left to go back. Arrows and swipes work too. **View gallery in 2D** (bottom left) shows a grid grouped by day; tap one to walk to it. |
+| **Report** | A month calendar on the left: days with paintings get a dot, a star when the daily quest was done. The selected day on the right: its paintings, **Highest ROM** (shoulder abduction, left and right), elbow extension, reach height and area, grip cycles, a lean flag, a **heatmap** of where you painted on the canvas, and **hand dominance** (share of painting time per hand). |
+
+The movement stats are 2D estimates from the front camera (Vision body and hand pose), not clinical measurements. They are recorded only on the canvas page and only from camera hands; a painting made by touch or mouse shows "No movement data". Left and right are always the person's own sides.
+
+## Painting on the canvas
 
 | Move | What happens |
 |---|---|
-| Open hand | Your hand's **brush animal** swims along with you (no ink). Its soft parts (tentacles, tail, shell, spikes) are springy: they trail, swing and wobble whenever you move. |
-| **Pinch** (thumb + index) | Keep pinching and sweep your arm to paint — every brush animal paints its own way (see below). The paint is real-looking: flat wet strokes with ragged edges and bristle grooves; hold still and it pools into a blob, move fast for a dry streaky brush. Wet paint levels out, blends with neighbouring colors and thick blobs drip a little before drying. Let go to stop. |
-| Rub your animal in a **paint pot** | The pots stand in a column down the right side of the canvas. Swipe it back and forth through one: it slowly turns that color while a ring fills around the pot, then *splash!* — new color. Chips under the hint show each hand's color and animal. |
-| Rub a critter in a **bubble** | Bubbles in a column down the left side of the canvas hold little brush animals. Rub yours in one until the ring fills and it turns into that animal. |
-| Rub a critter in a **template bubble** | Three bubbles stand on the easel tray (fish, turtle, duck). Rub one until the ring fills and a big dotted outline of that animal appears on the canvas to trace. It's only a guide: paint over it, outside it, add a hat — when you clap, the creature is made from your own strokes exactly as drawn, and the outline fades away. |
-| Fist | Your animal spins into a **Starfish** that scrubs paint away (and wipes a template's dotted line). |
-| Clap | The drawing jiggles, inflates into a 3D creature, then shrinks to a cute half size and floats off the canvas. |
-| Bump a creature with your animal | It boings away, surprised. |
-| Starfish into a creature | It swells, trembles and **POPS**: rubber shards in its colors, flying googly eyes, a shockwave ring, sparkles, confetti and a puffy "POP!". |
+| Open hand | Your hand's paint character swims along with you. No paint. |
+| **Fist** | Paint with the character's tool. Keep the fist closed and sweep your arm; open the hand to stop. A loosening fist keeps painting for a moment, so strokes don't break. |
+| Rub a **paint pot** | Pots stand in a column on the right. Swipe your character back and forth through one until the ring fills: new color. |
+| Rub a **tool bubble** | Bubbles in a column on the left hold the five paint characters. Rub one to switch to its tool. |
 
-The brush animals are expressive: calm while swimming, puffed-cheek and determined while blowing ink, wide-eyed and excited when drawing fast, surprised when they soak up a color or bump a creature, and happy (eyes closed, blushing) after finishing a line or when a creature is born.
-
-### Brush animals
-
-| Animal | Brush | How it paints |
+| Tool | Character | How it paints |
 |---|---|---|
-| Octopus | Bundle brush | The mouth paints the main stroke; all eight tentacle tips trail thin lines. |
-| Snail | Palette knife | Slow and heavy. Lays wide flat sheets with ridged edges and shoves wet paint along. |
-| Pufferfish | Splatter | Swells up while you pinch (dribbling drops); let go and it bursts into a blob and a spray of dots — bigger the longer you held. |
-| Seahorse | Calligraphy nib | A flat nib at 45°: thick or thin depending on the direction you move. |
-| Jellyfish | Watercolor | Pale transparent washes that bloom outward, a bigger wash on every beat, and thin drips from the tentacles. |
-| Frog | Dot prints | Hops after your hand; every landing stamps a round print with four toe dots. |
+| Thick oil | Snail | Heavy impasto: a wide knife-like sheet, piled high with ridged edges. |
+| Liquid oil | Jellyfish | Thinned oil: a translucent glaze that spreads and runs downhill while wet. |
+| Brush | Octopus | A regular bristle brush line. |
+| Eraser | Starfish | Scrubs paint away and wipes the template's dotted guide. |
+| Blender | Sponge | Lays no paint; smudges and mixes the wet paint underneath. |
 
-Up to 5 creatures live in the pond. When a 6th arrives, the oldest floats away like a lost balloon.
+The paint is simulated: flat wet strokes with bristle grooves and ragged edges, it levels out, blends with wet neighbours, thick blobs sag a little, and it dries over time.
 
-Mac extras: mouse-drag draws, double-click = bring to life, ⌥-drag or right-drag = erase.
+The buttons down the left side: Home, eraser for touch (iPad only), music, camera preview, help card, clear canvas.
+
+### Legacy controls
+
+The original controls are still in the code: pinch to paint with six brush animals (octopus, snail, pufferfish, seahorse, jellyfish, frog), fist turns into the starfish, and template bubbles on the easel tray. Start the playground with `Playground(controlScheme: .legacy)` in `ContentView` to use them.
+
+## Without a camera
+
+| Step | Touch / mouse |
+|---|---|
+| Home, mode, templates, report, 2D gallery | Tap / click. |
+| Get ready | Tap **Skip**. |
+| Canvas | Drag to paint with the current tool; drag through a pot or bubble to change color or tool. To erase: the eraser button on iPad, ⌥-drag or right-drag on Mac. |
+| Review | Drag the sheet to grab and pull it. |
+| 3D gallery | Arrow buttons, or swipe left/right. |
+
+## Your data
+
+Everything stays on the device in `Application Support/Gallery/`: one PNG per painting plus a JSON sidecar with the template it was made from and the movement stats of that session. Paintings saved before sidecars existed get an empty one on first launch and still show everywhere. Unlocks and the report are worked out from these files; nothing else is stored except today's daily quest (`UserDefaults`). No network, no accounts.
 
 ## Under the hood
 
 | File | Role |
 |---|---|
-| `HandTracker.swift` | Camera + Vision hand pose (2 hands, 720p, on device) |
-| `HandInput.swift` | Palm tracking (big moves, not fingertips), open/fist with forgiving hysteresis, clap detection, smoothing + prediction |
-| `Playground.swift` | The game: world, buddies, painting, erasing, transform, creature lifecycle, beat sync |
-| `Template.swift` | Trace templates: the dotted outlines (fish, turtle, duck), the starfish wiping them, and the template bubbles on the tray |
-| `Critter.swift` | Brush animal base: follow spring, lean, squash, face and moods; each animal decides its own `dabs` (while pinching) and `released` (on letting go) |
-| `Tentacles.swift` | Verlet-chain limbs (shape memory, lag, flare) rebuilt as tapered tubes every frame — octopus tentacles, jellyfish tentacles, seahorse tail |
-| `Octopus.swift`, `Snail.swift`, `Pufferfish.swift`, `Seahorse.swift`, `Jellyfish.swift`, `Frog.swift` | The six brush animals |
-| `Characters.swift` | Springs, faces/moods, Starfish rig, paint pots, critter bubbles, buddy (animal ↔ starfish) |
-| `Strokes.swift` | Stroke paths that get inflated into creatures |
-| `PaintLayer.swift`, `PaintShaders.metal` | Wet paint simulated on the GPU (Metal compute): brush dabs with rims and bristle grooves, the brush drags wet paint (advection), leveling, color mixing, drips and drying; drawn as one plane with a per-pixel normal map |
-| `Inflator.swift` | Drawing → 3D balloon: fills closed shapes, solves ∇²u = −1, height = √(2u) for round cross-sections; picks where the face goes |
-| `Creature.swift` | Living creatures: inflate, wander, bob, wiggle, dance on the beat, look at hands, boing, pop |
-| `Studio.swift` | The painter's studio: generated out-of-focus room backdrop and lighting environment, primed linen (weave normal map) and wooden easel textures |
-| `Toybox.swift` | Glossy balloon material with a jiggle vertex shader, eyes/lips, backdrop, particles |
-| `GrooveDSP.swift` | 118 BPM toy-pop groove synthesized live (kick, claps, hats, bass, stabs, lead over I–V–vi–IV) + all sound effects + beat clock |
-| `HUDView.swift`, `Platform.swift` | Overlay and Mac/iOS differences |
+| `ContentView.swift` | Owns the long-lived `Playground`, `HandTracker` and `Gallery` and swaps the full-screen page for the current route |
+| `App/AppRouter.swift` | The routes (`Route`) and the router that moves between pages |
+| `Pages/HomeView.swift`, `ModePickerView.swift`, `TemplatesView.swift` | Home, freeform-or-template choice, template list with the daily quest and unlocks |
+| `Pages/InstructionView.swift` | Get ready page: skeleton outline and distance ring |
+| `Pages/ReviewView.swift`, `Review/ReviewStage.swift` | Review page and its 3D stage (orthographic camera, sheet mesh rebuilt every frame) |
+| `Review/SheetSolver.swift`, `Review/SheetGestures.swift` | The painting as one elastic grid that always springs back to rest; hands → grab, stretch, push |
+| `Gallery.swift` | Saved paintings with their records, the 3D museum hall, and the gallery screen |
+| `Pages/Gallery2DView.swift` | Flat grid of every painting grouped by day |
+| `Pages/ReportView.swift`, `Stats/DayReport.swift` | Report page; one day's paintings and their merged stats |
+| `Stats/SessionRecorder.swift`, `Stats/SessionStats.swift` | Records painting time, heatmap, grip cycles and ROM during a canvas session; the saved stats |
+| `Templates/TemplateCatalog.swift`, `Templates/DailyQuest.swift` | Template order and unlocks; the daily quest pool and the roll of the day |
+| `Template.swift` | Outline art (SVG-style paths), the nine templates and the dotted guide on the canvas |
+| `Input/DistanceGate.swift` | Shoulder width in the camera image → too close / too far / good, with the hold timer |
+| `Input/PaddleDetector.swift` | Open hand sweeping down → walk on or back in the 3D gallery |
+| `Input/HandFrameRelay.swift` | Passes camera hand frames to the review page and the 3D gallery |
+| `HandTracker.swift` | Camera + Vision hand pose (2 hands) and body pose (only while a page needs it), on device |
+| `HandInput.swift`, `OneEuroFilter.swift` | Palm tracking, open/pinch/fist with hysteresis, smoothing + prediction |
+| `Canvas/ControlScheme.swift`, `Canvas/PaintTool.swift` | Fist vs legacy controls; the five tools and the dabs each one lays |
+| `Playground.swift` | The easel: world, buddies, painting, erasing, pots and bubbles, stats recording |
+| `Critter.swift`, `Characters.swift`, `Tentacles.swift` | Character base (springs, faces, moods), starfish rig, pots, bubbles, buddies, springy limbs |
+| `Octopus.swift`, `Snail.swift`, `Jellyfish.swift`, `Sponge.swift`, `Pufferfish.swift`, `Seahorse.swift`, `Frog.swift` | The paint characters and legacy brush animals |
+| `Strokes.swift` | Stroke paths (what's been drawn, for erasing) and geometry helpers |
+| `PaintLayer.swift`, `PaintShaders.metal` | Wet paint simulated on the GPU (Metal compute): dabs, advection, leveling, mixing, drips, drying, normal map |
+| `Studio.swift`, `Toybox.swift`, `Effects.swift` | Studio backdrop, linen and easel textures; glossy materials; particles |
+| `GrooveDSP.swift` | Live-synthesized music, sound effects and beat clock |
+| `HUDView.swift`, `Platform.swift` | Canvas overlay and Mac/iOS differences (mouse, views, camera preview) |
+
+Tests live in `PuffyPondTests/` (Swift Testing): run them on **My Mac** with **⌘U**.
 
 ## Tuning
-- Hands don't reach the edges: `HandInput.reachMin/reachMax`.
-- Pinch/fist detection: thresholds in `HandInput.update` (pinch enters below 0.33 hand-sizes, releases above 0.55).
-- Creature size: `Creature.finalSize` (0.5). Color pick speed: `rubPots` in `Playground`.
-- Clap too sensitive / not sensitive: distances in `HandInput.detectClap`.
+
+- Distance check band: shoulder-width limits in `DistanceGate` (estimated for the iPad front camera at about 1 m).
+- Paddle stroke length, time and cooldown: constants at the top of `PaddleDetector`.
+- Review sheet feel: `SheetSolver.Parameters` (stiffness, damping), palm radius and push speed in `SheetGestures`.
+- Hands don't reach the edges: `HandInput.reachMin/reachMax`. Fist detection and hysteresis: `HandInput` / `PoseFilter`.
+- Tool feel: `PaintTool.dabs` and the `BrushStyle` each tool uses. Color pick speed: `rubPots` in `Playground`.
 - Paint feel: constants at the top of `PaintLayer` (dry rate, leveling, drag damping, gravity, normal strength).
-- Tentacle feel: `TentacleBundle.Shape` (stiffness = shape memory, drag, segment length) per animal. Each animal's brush: its `dabs` / `released` and the `BrushStyle` it uses (push, bristles, nib, watery, knife).
-- Studio look: window light (`key` spot) and camera exposure/vignette/AO in `Playground.buildWorld`; linen weave size `Studio.weaveTileSize`; weave under thin paint `PaintLayer.weaveDepth`.
-- Puffier creatures: `Inflator.puff`. Thicker lines: `Playground.strokeRadius`.
+- Studio look: lights and camera in `Playground.buildWorld`; linen weave `Studio.weaveTileSize`.
 - Tempo/melody: top of `GrooveDSP`.
