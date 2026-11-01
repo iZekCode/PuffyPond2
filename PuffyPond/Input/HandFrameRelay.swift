@@ -1,5 +1,5 @@
-/// Passes camera hand frames to whichever page outside the canvas is listening (the review page now,
-/// the gallery later). The canvas gets its frames from `Playground` directly.
+/// Passes camera hand frames to whichever page outside the canvas is listening (the review page and
+/// the 3D gallery). The canvas gets its frames from `Playground` directly.
 final class HandFrameRelay {
     var listener: ((HandFrame) -> Void)?
 

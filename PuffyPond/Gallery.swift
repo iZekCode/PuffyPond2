@@ -104,6 +104,16 @@ final class Gallery {
         Set(paintings.compactMap(\.record.templateID))
     }
 
+    /// Reads a saved PNG, scaled down to fit `maxPixels` on its long side when given. Safe off the main thread.
+    nonisolated static func loadImage(at url: URL, maxPixels: Int? = nil) -> CGImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        guard let maxPixels else { return CGImageSourceCreateImageAtIndex(source, 0, nil) }
+        let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
+                                        kCGImageSourceThumbnailMaxPixelSize: maxPixels,
+                                        kCGImageSourceCreateThumbnailWithTransform: true]
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+    }
+
     static func image(of painting: Painting) -> PlatformImage? {
         #if os(macOS)
         return NSImage(contentsOf: painting.url)
@@ -125,20 +135,70 @@ extension PlatformImage {
 
 // MARK: - The museum hall
 
-/// A quiet museum room: one painting hangs in a white frame on a grey partition wall, lit from above,
-/// and the brush animals line up in front of it to admire the work.
+/// A quiet museum walk: every painting hangs in a white frame on its own grey partition, the partitions
+/// stand in one long row with a lamp over each, and the camera walks along the row on a rail. The brush
+/// animals tag along at the bottom and cheer a fresh painting. Open-hand paddle strokes in front of the
+/// camera walk to the next or previous painting.
+@Observable
 final class GalleryHall {
-    let scene = SCNScene()
-    let cameraNode = SCNNode()
-    private let canvasMaterial = SCNMaterial()
-    private let artwork = SCNNode()
-    private var visitors: [(critter: Critter, home: SIMD3<Float>)] = []
-    private let frameDriver = FrameDriver()
-    private var clock: Float = 0
-    private let tanHalfFOV = Float(tan(17.0 * Double.pi / 180))
-    private var cameraDistance: Float = 9.2
+    /// One hand as drawn on top of the page, in view UV (0…1, y down).
+    struct Cursor: Equatable, Identifiable {
+        var slot: Int
+        var position: SIMD2<Float>
+        var fist: Bool
+        var id: Int { slot }
+    }
+
+    /// How sharp a hung painting's texture is; far ones get a thumbnail or nothing, to keep memory down.
+    private enum Detail: Int {
+        case none, thumbnail, full
+    }
+
+    private struct Slot {
+        let url: URL
+        let center: SIMD3<Float>
+        let material: SCNMaterial
+        var detail = Detail.none
+        /// Bumped on each texture request, so a slow load can't overwrite a newer one.
+        var generation = 0
+    }
+
+    /// Camera hands on screen, for the small hand indicators.
+    private(set) var cursors: [Cursor] = []
+    /// Called on a paddle stroke.
+    @ObservationIgnored var onPaddle: ((PaddleDetector.Stroke) -> Void)?
+
+    @ObservationIgnored let scene = SCNScene()
+    @ObservationIgnored let cameraNode = SCNNode()
+    @ObservationIgnored private let row = SCNNode()
+    @ObservationIgnored private let rig = SCNNode()
+    @ObservationIgnored private var slots: [Slot] = []
+    @ObservationIgnored private var visitors: [(critter: Critter, home: SIMD3<Float>)] = []
+    @ObservationIgnored private let frameDriver = FrameDriver()
+    @ObservationIgnored private let hands = HandInput()
+    @ObservationIgnored private var paddle = PaddleDetector()
+    @ObservationIgnored private var clock: Float = 0
+    @ObservationIgnored private let tanHalfFOV = Float(tan(17.0 * Double.pi / 180))
+    @ObservationIgnored private var cameraDistance: Float = 9.2
+    @ObservationIgnored private var focused = 0
+    // The walk along the rail: from, to, seconds so far, seconds in all.
+    @ObservationIgnored private var railX: Float = 0
+    @ObservationIgnored private var walkFrom: Float = 0
+    @ObservationIgnored private var walkTo: Float = 0
+    @ObservationIgnored private var walkTime: Float = 0
+    @ObservationIgnored private var walkDuration: Float = 0
+    @ObservationIgnored private var bob: Float = 0
+
     private static let cameraY: Float = 0.15
     private static let visitorZ: Float = 2.6
+    /// Distance between neighbouring paintings along the row.
+    static let spacing: Float = 6
+    static let walkDuration: Float = 1.2
+    /// Paintings this close to the one in front of the camera get the full image; up to `thumbnailReach`
+    /// a small one; the rest stay blank until the camera comes near.
+    static let fullReach = 1
+    static let thumbnailReach = 4
+    static let thumbnailPixels = 384
 
     /// The painting keeps the easel canvas's shape.
     static let artSize = SIMD2<Float>(4.2, 4.2 * Playground.canvasSize.y / Playground.canvasSize.x)
@@ -150,7 +210,15 @@ final class GalleryHall {
     }
 
     func start() { frameDriver.start() }
-    func stop() { frameDriver.stop() }
+
+    func stop() {
+        frameDriver.stop()
+        hands.reset()
+        paddle.reset()
+        cursors = []
+    }
+
+    func ingest(_ frame: HandFrame) { hands.ingest(frame) }
 
     /// Keeps the framed painting and the row of visitors in view for any screen shape; the visitors
     /// stand along the bottom edge, cut off a little like people in front of you at a museum.
@@ -160,7 +228,7 @@ final class GalleryHall {
         let needHalfW: Float = 3.1
         let needHalfH: Float = 2.75
         cameraDistance = max(needHalfH / tanHalfFOV, needHalfW / (tanHalfFOV * aspect))
-        cameraNode.simdPosition = SIMD3(0, Self.cameraY, cameraDistance)
+        placeCamera()
         let halfH = (cameraDistance - Self.visitorZ) * tanHalfFOV
         let halfW = halfH * aspect
         let bottom = Self.cameraY - halfH
@@ -172,19 +240,159 @@ final class GalleryHall {
         }
     }
 
-    /// Puts a painting in the frame. A fresh one gets a cheer from the visitors.
-    func show(_ image: PlatformImage?, cheer: Bool) {
-        canvasMaterial.diffuse.contents = image
-        artwork.removeAllActions()
-        artwork.opacity = 0
-        artwork.runAction(.fadeIn(duration: 0.35))
+    /// Hangs these paintings (newest first) along the row, replacing what hung before.
+    func hang(_ urls: [URL]) {
+        row.childNodes.forEach { $0.removeFromParentNode() }
+        slots = urls.enumerated().map { k, url in
+            let x = Float(k) * Self.spacing
+            let material = Self.canvasMaterial()
+            row.addChildNode(Self.partition(at: x, canvas: material))
+            return Slot(url: url, center: SIMD3(x, Self.artY, 0), material: material)
+        }
+        focused = min(focused, max(slots.count - 1, 0))
+        loadTextures()
+    }
+
+    /// Walks to stand in front of painting `index`; jumps there without walking when not animated.
+    func focus(_ index: Int, animated: Bool = true) {
+        guard slots.indices.contains(index) else { return }
+        let steps = abs(index - focused)
+        focused = index
+        walkFrom = railX
+        walkTo = Float(index) * Self.spacing
+        walkTime = 0
+        // Longer jumps (from the 2D list) walk a little longer, not proportionally longer.
+        walkDuration = animated && steps > 0 ? min(Self.walkDuration + 0.15 * Float(steps - 1), 2.4) : 0
+        if walkDuration == 0 { railX = walkTo; bob = 0; placeCamera() }
+        loadTextures()
+    }
+
+    /// The visitors cheer the painting in front of them, with confetti.
+    func cheer() {
         for (k, visitor) in visitors.enumerated() {
             visitor.critter.squash.velocity += SIMD3(-2, 3, 0)
-            visitor.critter.react(cheer ? .happy : .surprised, for: cheer ? 1.6 + Float(k) * 0.1 : 0.6)
+            visitor.critter.react(.happy, for: 1.6 + Float(k) * 0.1)
         }
-        if cheer {
-            Toybox.confetti(in: scene, at: SIMD3(0, Self.artY + Self.artSize.y * 0.5, 0.6))
+        guard slots.indices.contains(focused) else { return }
+        let art = slots[focused].center
+        Toybox.confetti(in: scene, at: SIMD3(art.x, art.y + Self.artSize.y * 0.5, 0.6))
+    }
+
+    // MARK: - Textures
+
+    private func wantedDetail(_ index: Int) -> Detail {
+        let distance = abs(index - focused)
+        if distance <= Self.fullReach { return .full }
+        return distance <= Self.thumbnailReach ? .thumbnail : .none
+    }
+
+    private func loadTextures() {
+        for k in slots.indices {
+            let want = wantedDetail(k)
+            guard want != slots[k].detail else { continue }
+            slots[k].detail = want
+            slots[k].generation += 1
+            let generation = slots[k].generation
+            let url = slots[k].url
+            guard want != .none else {
+                slots[k].material.diffuse.contents = Self.blankCanvas
+                continue
+            }
+            let maxPixels = want == .thumbnail ? Self.thumbnailPixels : nil
+            Task.detached(priority: .userInitiated) {
+                let image = Gallery.loadImage(at: url, maxPixels: maxPixels)
+                await MainActor.run { [weak self] in
+                    guard let self, self.slots.indices.contains(k), self.slots[k].url == url,
+                          self.slots[k].generation == generation, let image else { return }
+                    self.slots[k].material.diffuse.contents = image
+                }
+            }
         }
+    }
+
+    // MARK: - Scene
+
+    private static let blankCanvas = PlatformColor(white: 0.97, alpha: 1)
+
+    private static func canvasMaterial() -> SCNMaterial {
+        let material = SCNMaterial()
+        material.lightingModel = .lambert
+        material.diffuse.mipFilter = .linear
+        material.diffuse.contents = blankCanvas
+        return material
+    }
+
+    private static let wallMaterial: SCNMaterial = {
+        let wall = SCNMaterial()
+        wall.lightingModel = .physicallyBased
+        wall.diffuse.contents = PlatformColor(red: 0.5, green: 0.5, blue: 0.51, alpha: 1)
+        wall.roughness.contents = NSNumber(value: 0.95)
+        wall.metalness.contents = NSNumber(value: 0.0)
+        return wall
+    }()
+
+    private static let frameMaterial: SCNMaterial = {
+        let paint = SCNMaterial()
+        paint.lightingModel = .physicallyBased
+        paint.roughness.contents = NSNumber(value: 0.25)
+        paint.metalness.contents = NSNumber(value: 0.0)
+        paint.diffuse.contents = PlatformColor(white: 0.97, alpha: 1)
+        return paint
+    }()
+
+    private static let lampMaterial: SCNMaterial = {
+        let lamp = SCNMaterial()
+        lamp.lightingModel = .physicallyBased
+        lamp.diffuse.contents = PlatformColor(white: 0.12, alpha: 1)
+        lamp.metalness.contents = NSNumber(value: 0.6)
+        lamp.roughness.contents = NSNumber(value: 0.35)
+        return lamp
+    }()
+
+    private static let glowMaterial: SCNMaterial = {
+        let glow = SCNMaterial()
+        glow.lightingModel = .constant
+        glow.diffuse.contents = PlatformColor(red: 1, green: 0.95, blue: 0.82, alpha: 1)
+        return glow
+    }()
+
+    /// One grey partition, floor to ceiling, with a white-framed canvas and a little lamp over it.
+    private static func partition(at x: Float, canvas: SCNMaterial) -> SCNNode {
+        let node = SCNNode()
+        node.simdPosition = SIMD3(x, 0, 0)
+        node.addChildNode(Toybox.node(SCNBox(width: 5.2, height: 16, length: 0.3, chamferRadius: 0),
+                                      wallMaterial, at: SIMD3(0, 0.5, -0.15)))
+
+        let artwork = SCNNode()
+        let size = artSize
+        let bar: Float = 0.1
+        let depth: Float = 0.12
+        func piece(_ w: Float, _ h: Float, at p: SIMD2<Float>) {
+            artwork.addChildNode(Toybox.node(SCNBox(width: CGFloat(w), height: CGFloat(h), length: CGFloat(depth),
+                                                    chamferRadius: 0.012), frameMaterial, at: SIMD3(p.x, p.y, depth / 2)))
+        }
+        let outer = size + SIMD2(repeating: bar * 2)
+        piece(outer.x, bar, at: SIMD2(0, (size.y + bar) / 2))
+        piece(outer.x, bar, at: SIMD2(0, -(size.y + bar) / 2))
+        piece(bar, size.y, at: SIMD2(-(size.x + bar) / 2, 0))
+        piece(bar, size.y, at: SIMD2((size.x + bar) / 2, 0))
+        let plane = SCNNode(geometry: SCNPlane(width: CGFloat(size.x), height: CGFloat(size.y)))
+        plane.geometry?.materials = [canvas]
+        plane.simdPosition = SIMD3(0, 0, 0.03)
+        artwork.addChildNode(plane)
+        artwork.simdPosition = SIMD3(0, artY, 0)
+        node.addChildNode(artwork)
+
+        // A slim picture lamp on an arm above the frame, its bulb glowing.
+        let lampY = artY + size.y / 2 + 0.45
+        node.addChildNode(Toybox.node(SCNBox(width: 0.06, height: 0.06, length: 0.5, chamferRadius: 0.02),
+                                      lampMaterial, at: SIMD3(0, lampY, 0.25)))
+        node.addChildNode(Toybox.node(SCNCapsule(capRadius: 0.07, height: 1.4), lampMaterial,
+                                      at: SIMD3(0, lampY - 0.05, 0.5)))
+        node.childNodes.last?.simdEulerAngles = SIMD3(0, 0, .pi / 2)
+        node.addChildNode(Toybox.node(SCNBox(width: 1.2, height: 0.02, length: 0.05, chamferRadius: 0.01),
+                                      glowMaterial, at: SIMD3(0, lampY - 0.12, 0.5)))
+        return node
     }
 
     private func build() {
@@ -204,10 +412,11 @@ final class GalleryHall {
         camera.vignettingIntensity = 0.3
         camera.vignettingPower = 0.8
         cameraNode.camera = camera
-        cameraNode.simdPosition = SIMD3(0, Self.cameraY, cameraDistance)
         scene.rootNode.addChildNode(cameraNode)
+        scene.rootNode.addChildNode(row)
 
-        // Track light from the ceiling: a soft pool on the painting, the visitors' shadows on the wall.
+        // Track light from the ceiling, walking with the camera: a soft pool on the painting in front,
+        // the visitors' shadows on the wall. One shadow-casting light keeps a long row cheap.
         let track = SCNLight()
         track.type = .spot
         track.intensity = 1100
@@ -226,7 +435,8 @@ final class GalleryHall {
         trackNode.light = track
         trackNode.simdPosition = SIMD3(-1.5, 5.5, 7)
         trackNode.simdLook(at: SIMD3(0, Self.artY - 0.3, 0))
-        scene.rootNode.addChildNode(trackNode)
+        rig.addChildNode(trackNode)
+        scene.rootNode.addChildNode(rig)
 
         let fill = SCNLight()
         fill.type = .ambient
@@ -235,43 +445,6 @@ final class GalleryHall {
         let fillNode = SCNNode()
         fillNode.light = fill
         scene.rootNode.addChildNode(fillNode)
-
-        // Grey partition wall, floor to ceiling.
-        let wall = SCNMaterial()
-        wall.lightingModel = .physicallyBased
-        wall.diffuse.contents = PlatformColor(red: 0.5, green: 0.5, blue: 0.51, alpha: 1)
-        wall.roughness.contents = NSNumber(value: 0.95)
-        wall.metalness.contents = NSNumber(value: 0.0)
-        scene.rootNode.addChildNode(Toybox.node(SCNBox(width: 5.2, height: 16, length: 0.3, chamferRadius: 0),
-                                                wall, at: SIMD3(0, 0.5, -0.15)))
-
-        // White gallery frame around a canvas plane.
-        let size = Self.artSize
-        let paint = SCNMaterial()
-        paint.lightingModel = .physicallyBased
-        paint.roughness.contents = NSNumber(value: 0.25)
-        paint.metalness.contents = NSNumber(value: 0.0)
-        paint.diffuse.contents = PlatformColor(white: 0.97, alpha: 1)
-        let bar: Float = 0.1
-        let depth: Float = 0.12
-        func piece(_ w: Float, _ h: Float, at p: SIMD2<Float>) {
-            artwork.addChildNode(Toybox.node(SCNBox(width: CGFloat(w), height: CGFloat(h), length: CGFloat(depth),
-                                                    chamferRadius: 0.012), paint, at: SIMD3(p.x, p.y, depth / 2)))
-        }
-        let outer = size + SIMD2(repeating: bar * 2)
-        piece(outer.x, bar, at: SIMD2(0, (size.y + bar) / 2))
-        piece(outer.x, bar, at: SIMD2(0, -(size.y + bar) / 2))
-        piece(bar, size.y, at: SIMD2(-(size.x + bar) / 2, 0))
-        piece(bar, size.y, at: SIMD2((size.x + bar) / 2, 0))
-
-        canvasMaterial.lightingModel = .lambert
-        canvasMaterial.diffuse.mipFilter = .linear
-        let canvas = SCNNode(geometry: SCNPlane(width: CGFloat(size.x), height: CGFloat(size.y)))
-        canvas.geometry?.materials = [canvasMaterial]
-        canvas.simdPosition = SIMD3(0, 0, 0.03)
-        artwork.addChildNode(canvas)
-        artwork.simdPosition = SIMD3(0, Self.artY, 0)
-        scene.rootNode.addChildNode(artwork)
 
         // The brush animals, shoulder to shoulder along the bottom, looking up at the painting.
         for kind in CritterKind.legacyBrushes {
@@ -284,13 +457,34 @@ final class GalleryHall {
         layout(size: CGSize(width: 16, height: 10))
     }
 
+    private func placeCamera() {
+        cameraNode.simdPosition = SIMD3(railX, Self.cameraY + bob, cameraDistance)
+        rig.simdPosition = SIMD3(railX, 0, 0)
+    }
+
     private func tick(dt: Float) {
         clock += dt
+        if walkTime < walkDuration {
+            walkTime = min(walkTime + dt, walkDuration)
+            let t = walkTime / walkDuration
+            let eased = t * t * (3 - 2 * t)
+            railX = walkFrom + (walkTo - walkFrom) * eased
+            // A slight head bob: a few footsteps that fade in and out with the walk.
+            bob = abs(sin(t * .pi * 4)) * sin(t * .pi) * 0.06
+            placeCamera()
+        }
+
+        let states = hands.advance(dt: dt, now: CACurrentMediaTime())
+        if let stroke = paddle.feed(states, now: CACurrentMediaTime()) { onPaddle?(stroke) }
+        let next = states.filter(\.tracking).map { Cursor(slot: $0.slot, position: $0.position, fist: $0.pose == .fist) }
+        if next != cursors { cursors = next }
+
         let pulse = exp(-(clock * 2).truncatingRemainder(dividingBy: 1) * 6)
+        let walk = SIMD3<Float>(railX, 0, 0)
         for (k, visitor) in visitors.enumerated() {
             let t = clock * 0.8 + Float(k) * 1.3
             let sway = SIMD3<Float>(sin(t) * 0.05, sin(t * 1.7) * 0.03, 0)
-            visitor.critter.update(dt: dt, target: visitor.home + sway, visible: true, painting: false,
+            visitor.critter.update(dt: dt, target: visitor.home + walk + sway, visible: true, painting: false,
                                    beatPulse: pulse * 0.4)
         }
     }
@@ -363,16 +557,23 @@ final class GalleryHall {
 
 struct GalleryView: View {
     let gallery: Gallery
-    let close: () -> Void
+    let relay: HandFrameRelay
+    let home: () -> Void
+    let show2D: () -> Void
+    let startDrawing: () -> Void
     @State private var index: Int
     @State private var hall = GalleryHall()
     @State private var confirmingRemoval = false
     @Environment(\.uiScale) private var scale
     private let cheerOnOpen: Bool
 
-    init(gallery: Gallery, startAt index: Int = 0, justHung: Bool = false, close: @escaping () -> Void) {
+    init(gallery: Gallery, relay: HandFrameRelay, startAt index: Int = 0, justHung: Bool = false,
+         home: @escaping () -> Void, show2D: @escaping () -> Void, startDrawing: @escaping () -> Void) {
         self.gallery = gallery
-        self.close = close
+        self.relay = relay
+        self.home = home
+        self.show2D = show2D
+        self.startDrawing = startDrawing
         _index = State(initialValue: index)
         cheerOnOpen = justHung
     }
@@ -384,19 +585,30 @@ struct GalleryView: View {
     var body: some View {
         ZStack {
             GeometryReader { proxy in
-                SceneView(scene: hall.scene, pointOfView: hall.cameraNode, options: [.rendersContinuously],
-                          antialiasingMode: .multisampling4X)
-                    .onAppear { hall.layout(size: proxy.size) }
-                    .onChange(of: proxy.size) { _, size in hall.layout(size: size) }
+                ZStack {
+                    SceneView(scene: hall.scene, pointOfView: hall.cameraNode, options: [.rendersContinuously],
+                              antialiasingMode: .multisampling4X)
+                    // Small hand markers, so the person sees the camera has their hands.
+                    ForEach(hall.cursors) { cursor in
+                        HandCursor(fist: cursor.fist)
+                            .scaleEffect(0.6)
+                            .opacity(0.8)
+                            .position(x: CGFloat(cursor.position.x) * proxy.size.width,
+                                      y: CGFloat(cursor.position.y) * proxy.size.height)
+                    }
+                    .allowsHitTesting(false)
+                }
+                .onAppear { hall.layout(size: proxy.size) }
+                .onChange(of: proxy.size) { _, size in hall.layout(size: size) }
             }
             .ignoresSafeArea()
-                .gesture(DragGesture(minimumDistance: 30).onEnded { drag in
-                    if drag.translation.width < -60 { step(1) } else if drag.translation.width > 60 { step(-1) }
-                })
+            .gesture(DragGesture(minimumDistance: 30).onEnded { drag in
+                if drag.translation.width < -60 { step(1) } else if drag.translation.width > 60 { step(-1) }
+            })
 
             VStack {
                 HStack(alignment: .top) {
-                    RoundButton(symbol: "paintbrush.pointed.fill", tint: .blue, action: close)
+                    RoundButton(symbol: "house.fill", tint: .blue, action: home)
                     Spacer()
                     VStack(spacing: 4) {
                         Text("Puffy Pond Gallery")
@@ -417,6 +629,18 @@ struct GalleryView: View {
                         .opacity(current == nil ? 0 : 1)
                 }
                 Spacer()
+                HStack(alignment: .bottom) {
+                    PillButton(title: "View gallery in 2D", symbol: "square.grid.2x2.fill", tint: .orange,
+                               action: show2D)
+                    Spacer()
+                    if gallery.paintings.count > 1 {
+                        PaddleHint()
+                    }
+                    Spacer()
+                    // Balances the 2D button so the hint stays centered.
+                    PillButton(title: "View gallery in 2D", symbol: "square.grid.2x2.fill", tint: .orange) {}
+                        .hidden()
+                }
             }
             .padding(16 * scale)
 
@@ -429,36 +653,97 @@ struct GalleryView: View {
                     .opacity(index < gallery.paintings.count - 1 ? 1 : 0)
             }
             .padding(.horizontal, 16 * scale)
+
+            if gallery.paintings.isEmpty {
+                VStack(spacing: 20 * scale) {
+                    Text("No paintings yet")
+                        .font(.system(size: 34 * scale, weight: .black, design: .rounded))
+                        .foregroundStyle(Color(red: 0.25, green: 0.2, blue: 0.35))
+                    HomeButton(title: "Start drawing", symbol: "paintbrush.pointed.fill", tint: .pink,
+                               action: startDrawing)
+                }
+                .padding(32 * scale)
+                .background(.white.opacity(0.85), in: RoundedRectangle(cornerRadius: 36 * scale, style: .continuous))
+            }
         }
         .confirmationDialog("Take this painting down?", isPresented: $confirmingRemoval, titleVisibility: .visible) {
             Button("Take it down", role: .destructive, action: removeCurrent)
         }
         .onAppear {
+            hall.hang(gallery.paintings.map(\.url))
+            hall.focus(index, animated: false)
+            if cheerOnOpen { hall.cheer() }
+            hall.onPaddle = { stroke in step(stroke == .next ? 1 : -1) }
+            let hall = hall
+            relay.listener = { frame in hall.ingest(frame) }
             hall.start()
-            showCurrent(cheer: cheerOnOpen)
         }
-        .onDisappear { hall.stop() }
+        .onDisappear {
+            relay.listener = nil
+            hall.onPaddle = nil
+            hall.stop()
+        }
     }
 
     private func step(_ delta: Int) {
         let next = index + delta
         guard gallery.paintings.indices.contains(next) else { return }
         index = next
-        showCurrent(cheer: false)
+        hall.focus(index)
     }
 
     private func removeCurrent() {
         guard let current else { return }
         gallery.remove(current)
-        if gallery.paintings.isEmpty {
-            close()
-            return
-        }
-        index = min(index, gallery.paintings.count - 1)
-        showCurrent(cheer: false)
+        index = min(index, max(gallery.paintings.count - 1, 0))
+        hall.hang(gallery.paintings.map(\.url))
+        hall.focus(index, animated: false)
     }
+}
 
-    private func showCurrent(cheer: Bool) {
-        hall.show(current.flatMap(Gallery.image(of:)), cheer: cheer)
+/// A rounded pill with an icon and a label, smaller than the home page's buttons.
+struct PillButton: View {
+    let title: String
+    let symbol: String
+    let tint: Color
+    let action: () -> Void
+    @Environment(\.uiScale) private var scale
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: symbol)
+                .font(.system(size: 17 * scale, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 18 * scale)
+                .frame(minHeight: 50 * scale)
+                .background(tint.gradient, in: Capsule())
+                .overlay(Capsule().stroke(.white, lineWidth: 3))
+                .shadow(color: tint.opacity(0.4), radius: 8, y: 4)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Shows how to walk with the hands: an open hand paddling down on either side.
+private struct PaddleHint: View {
+    @Environment(\.uiScale) private var scale
+    @State private var down = false
+
+    var body: some View {
+        HStack(spacing: 10 * scale) {
+            Text("🖐️")
+                .font(.system(size: 24 * scale))
+                .offset(y: down ? 6 * scale : -6 * scale)
+            Text("Paddle down on the right to walk on, on the left to go back")
+                .font(.system(size: 14 * scale, weight: .bold, design: .rounded))
+                .foregroundStyle(Color(red: 0.25, green: 0.2, blue: 0.35))
+        }
+        .padding(.horizontal, 16 * scale)
+        .padding(.vertical, 10 * scale)
+        .background(.white.opacity(0.85), in: Capsule())
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) { down = true }
+        }
     }
 }

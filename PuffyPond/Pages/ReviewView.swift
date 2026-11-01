@@ -163,7 +163,7 @@ private struct DwellButton: View {
 }
 
 /// Where a camera hand is: an open hand or a fist in a soft bubble.
-private struct HandCursor: View {
+struct HandCursor: View {
     let fist: Bool
     @Environment(\.uiScale) private var scale
 

@@ -76,7 +76,9 @@ struct ContentView: View {
         case .home:
             HomeView(router: router).transition(.opacity)
         case let .gallery3D(start, justHung):
-            GalleryView(gallery: gallery, startAt: start, justHung: justHung, close: router.home)
+            GalleryView(gallery: gallery, relay: pageHands, startAt: start, justHung: justHung,
+                        home: router.home, show2D: { router.go(.gallery2D) },
+                        startDrawing: { router.go(.modePicker) })
                 .id(start)
                 .transition(.opacity)
         case .modePicker:
@@ -92,7 +94,7 @@ struct ContentView: View {
                 .id(draft.id)
                 .transition(.opacity)
         case .gallery2D:
-            PlaceholderPage(title: "Gallery", router: router).transition(.opacity)
+            Gallery2DView(gallery: gallery, router: router).transition(.opacity)
         case .report:
             PlaceholderPage(title: "Report", router: router).transition(.opacity)
         }
