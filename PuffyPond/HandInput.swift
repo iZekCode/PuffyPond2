@@ -4,9 +4,9 @@ import simd
 
 /// Big, forgiving poses only — no fiddly finger gestures.
 enum HandPose: Equatable {
-    case open   // fish swims along with you (and can dip into paint pots)
-    case pinch  // thumb + index together: the fish blows ink
-    case fist   // starfish erases
+    case open   // the character swims along with you (and can dip into paint pots)
+    case pinch  // thumb + index together: paints in the legacy controls, reads as open otherwise
+    case fist   // paints with the current tool (legacy: the starfish erases)
 }
 
 /// One hand as the game sees it, in view UV (0…1, y down).
@@ -27,6 +27,13 @@ struct PalmReading {
     var pinchRatio: Float = 10
     /// Index tip to wrist, in hand sizes (a curled index in a fist sits close to the palm).
     var indexReach: Float = 0
+
+    init(palm: SIMD2<Float>, extendedFingers: Int, pinchRatio: Float = 10, indexReach: Float = 0) {
+        self.palm = palm
+        self.extendedFingers = extendedFingers
+        self.pinchRatio = pinchRatio
+        self.indexReach = indexReach
+    }
 
     init?(_ hand: HandObservation, aspect: Float) {
         guard let wrist = hand[.wrist] else { return nil }
@@ -56,13 +63,63 @@ struct PalmReading {
     }
 }
 
+/// Turns each frame's finger reading into a steady pose, with hysteresis so it doesn't flicker.
+struct PoseFilter {
+    private(set) var pose: HandPose
+    private var candidateFrames = 0
+
+    init(pose: HandPose) { self.pose = pose }
+
+    mutating func feed(_ reading: PalmReading, scheme: ControlScheme) {
+        let raw: HandPose
+        let needed: Int
+        switch scheme {
+        case .legacy:
+            // Pinch wins first (with hysteresis so it doesn't flicker while drawing).
+            // In a fist the thumb also rests on the index, but the index tip is tucked near the palm.
+            let pinchThreshold: Float = pose == .pinch ? 0.55 : 0.33
+            let pinching = reading.pinchRatio < pinchThreshold && reading.indexReach > 0.95
+            if pinching {
+                raw = .pinch
+            } else if pose == .fist {
+                raw = reading.extendedFingers >= 2 ? .open : .fist
+            } else {
+                raw = reading.extendedFingers == 0 ? .fist : .open
+            }
+            switch raw {
+            case .pinch: needed = 1
+            case .open: needed = 2
+            case .fist: needed = 3
+            }
+        case .fist:
+            // The fist paints, so it holds on: a loose fist (one finger creeping out) or one noisy
+            // frame keeps painting. No pinch at all, it just reads as an open hand.
+            if pose == .fist {
+                raw = reading.extendedFingers >= 2 ? .open : .fist
+            } else {
+                raw = reading.extendedFingers == 0 ? .fist : .open
+            }
+            needed = raw == .fist ? 2 : 3
+        }
+        if raw != pose {
+            candidateFrames += 1
+            if candidateFrames >= needed {
+                pose = raw
+                candidateFrames = 0
+            }
+        } else {
+            candidateFrames = 0
+        }
+    }
+}
+
 /// Turns camera frames into two smooth, predicted hands.
 final class HandInput {
     struct Tracked {
         let id: Int
         var slot: Int
-        var pose: HandPose = .open
-        var candidateFrames = 0
+        var poseFilter = PoseFilter(pose: .open)
+        var pose: HandPose { poseFilter.pose }
         var filter = OneEuroFilter2D(minCutoff: 1.2, beta: 0.7, derivativeCutoff: 1.2)
         var palmImage: SIMD2<Float> = .zero
         var target: SIMD2<Float> = .zero
@@ -78,6 +135,7 @@ final class HandInput {
     static let reachMax = SIMD2<Float>(0.92, 0.86)
 
     private(set) var tracked: [Tracked] = []
+    var scheme: ControlScheme = .fist
     private var nextID = 1
 
     private func viewUV(fromImage p: SIMD2<Float>) -> SIMD2<Float> {
@@ -106,7 +164,7 @@ final class HandInput {
                 if used.contains(slot) { slot = 1 - slot }
                 var hand = Tracked(id: nextID, slot: slot)
                 nextID += 1
-                hand.pose = reading.extendedFingers == 0 ? .fist : .open
+                hand.poseFilter = PoseFilter(pose: reading.extendedFingers == 0 ? .fist : .open)
                 update(&hand, with: reading, now: now)
                 tracked.append(hand)
             }
@@ -116,33 +174,7 @@ final class HandInput {
 
     private func update(_ hand: inout Tracked, with reading: PalmReading, now: Double) {
         let dt = Float(min(max(now - hand.lastSample, 1.0 / 120.0), 0.1))
-        // Pinch wins first (with hysteresis so it doesn't flicker while drawing).
-        // In a fist the thumb also rests on the index, but the index tip is tucked near the palm.
-        let pinchThreshold: Float = hand.pose == .pinch ? 0.55 : 0.33
-        let pinching = reading.pinchRatio < pinchThreshold && reading.indexReach > 0.95
-        let raw: HandPose
-        if pinching {
-            raw = .pinch
-        } else if hand.pose == .fist {
-            raw = reading.extendedFingers >= 2 ? .open : .fist
-        } else {
-            raw = reading.extendedFingers == 0 ? .fist : .open
-        }
-        if raw != hand.pose {
-            hand.candidateFrames += 1
-            let needed: Int
-            switch raw {
-            case .pinch: needed = 1
-            case .open: needed = 2
-            case .fist: needed = 3
-            }
-            if hand.candidateFrames >= needed {
-                hand.pose = raw
-                hand.candidateFrames = 0
-            }
-        } else {
-            hand.candidateFrames = 0
-        }
+        hand.poseFilter.feed(reading, scheme: scheme)
         let filtered = hand.filter.filter(reading.palm, dt: dt)
         let span = Self.reachMax - Self.reachMin
         hand.palmImage = reading.palm

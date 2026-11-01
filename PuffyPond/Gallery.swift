@@ -274,7 +274,7 @@ final class GalleryHall {
         scene.rootNode.addChildNode(artwork)
 
         // The brush animals, shoulder to shoulder along the bottom, looking up at the painting.
-        for kind in CritterKind.allCases {
+        for kind in CritterKind.legacyBrushes {
             let home = SIMD3<Float>(0, -2, Self.visitorZ)
             let critter = kind.make(color: kind.signatureColor, at: home)
             critter.sizeScale = 1.7

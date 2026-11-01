@@ -104,6 +104,8 @@ final class Starfish {
     private var surprised: Float = 0
 
     var speed: Float { simd_length(position.velocity) }
+    /// Overall size (the little one sitting in the eraser bubble is smaller).
+    var sizeScale: Float = 1
     static let eraseRadius: Float = 0.26
 
     init(at start: SIMD3<Float>) {
@@ -186,7 +188,7 @@ final class Starfish {
 
         root.simdPosition = position.value
         squashNode.simdScale = squash.value
-        root.simdScale = SIMD3(repeating: max(presence.value, 0.001))
+        root.simdScale = SIMD3(repeating: max(presence.value * sizeScale, 0.001))
         root.isHidden = presence.value < 0.01 && !visible
     }
 }
@@ -275,11 +277,14 @@ final class PaintPot {
 
 // MARK: - Critter pots (rub one to become that brush animal)
 
-/// A glass bubble with a little brush animal inside. Rub your critter in it to turn into that animal.
+/// A glass bubble with a little brush animal inside. Rub your critter in it to turn into that animal
+/// (legacy controls), or to pick up that paint tool (fist controls; the eraser bubble holds a starfish).
 final class CritterPot {
     let root = SCNNode()
-    let kind: CritterKind
-    let resident: Critter
+    /// `.critter(kind)` or `.tool(tool)`.
+    let target: PotTarget
+    let resident: Critter?
+    let starfish: Starfish?
     private let bubble: SCNNode
     private let progressRing: SCNNode
     private let halo: SCNNode
@@ -287,8 +292,16 @@ final class CritterPot {
     private var ringScale = Spring1(0)
     private var clock: Float = 0
 
-    init(kind: CritterKind, at position: SIMD3<Float>) {
-        self.kind = kind
+    convenience init(kind: CritterKind, at position: SIMD3<Float>) {
+        self.init(target: .critter(kind), kind: kind, at: position)
+    }
+
+    convenience init(tool: PaintTool, at position: SIMD3<Float>) {
+        self.init(target: .tool(tool), kind: tool.critterKind, at: position)
+    }
+
+    private init(target: PotTarget, kind: CritterKind?, at position: SIMD3<Float>) {
+        self.target = target
         root.simdPosition = position
         // Thin clear glass: a faint tint with a shiny highlight, so the resident shows through.
         let glass = SCNMaterial()
@@ -319,13 +332,30 @@ final class CritterPot {
         root.addChildNode(halo)
 
         // The little resident swims around inside the bubble (added to the scene by the playground).
-        resident = kind.make(color: kind.signatureColor, at: position)
-        resident.sizeScale = 0.5
+        if let kind {
+            let critter = kind.make(color: kind.signatureColor, at: position)
+            critter.sizeScale = 0.5
+            resident = critter
+            starfish = nil
+        } else {
+            let star = Starfish(at: position)
+            star.sizeScale = 0.55
+            resident = nil
+            starfish = star
+        }
+    }
+
+    /// The resident's scene node.
+    var residentRoot: SCNNode { resident?.root ?? starfish!.root }
+
+    private var signatureColor: SIMD3<Float> {
+        resident.map { $0.kind.signatureColor } ?? SIMD3(1, 1, 1)
     }
 
     func bounce(_ strength: Float = 1) {
         squash.velocity += SIMD3(3, -5, 3) * strength
-        resident.react(.surprised, for: 0.5)
+        resident?.react(.surprised, for: 0.5)
+        starfish?.scrubbed()
     }
 
     /// - Parameters:
@@ -345,11 +375,14 @@ final class CritterPot {
         halo.simdScale = SIMD3(repeating: 1 + Float(max(selectedCount - 1, 0)) * 0.15 + sin(clock * 4) * 0.04)
         halo.simdEulerAngles = SIMD3(0.25, clock, 0)
 
-        let shown = color ?? kind.signatureColor
-        if simd_distance(shown, resident.color) > 0.01 { resident.setColor(shown) }
         let c = root.simdPosition
         let swim = SIMD3(sin(clock * 0.9) * 0.04, sin(clock * 1.3) * 0.03 - 0.02, 0.02)
-        resident.update(dt: dt, target: c + swim, visible: true, painting: false, beatPulse: beatPulse)
+        if let resident {
+            let shown = color ?? signatureColor
+            if simd_distance(shown, resident.color) > 0.01 { resident.setColor(shown) }
+            resident.update(dt: dt, target: c + swim, visible: true, painting: false, beatPulse: beatPulse)
+        }
+        starfish?.update(dt: dt, target: c + swim, visible: true, beatPulse: beatPulse)
     }
 }
 
@@ -357,10 +390,12 @@ final class CritterPot {
 
 enum BuddyMode: Equatable { case idle, swim, paint, erase }
 
-/// What a buddy is rubbing: a paint pot (new color) or a critter bubble (new brush animal).
+/// What a buddy is rubbing: a paint pot (new color), a critter bubble (new brush animal),
+/// a tool bubble (new paint tool) or a template bubble.
 enum PotTarget: Equatable {
     case color(Int)
     case critter(CritterKind)
+    case tool(PaintTool)
     case template(TemplateKind)
 }
 
@@ -370,10 +405,15 @@ final class Buddy {
     let starfish: Starfish
     private(set) var mode: BuddyMode = .idle
     private(set) var colorIndex: Int
+    /// The paint tool in the fist controls (the legacy controls never pick the eraser, so it stays a brush).
+    private(set) var tool: PaintTool = .brush
+    /// The starfish is out instead of the brush animal: erasing, or holding the eraser tool.
+    private(set) var showsStarfish = false
     var rubbingPot: PotTarget?
     var rubAmount: Float = 0
 
-    init(slot: Int, colorIndex: Int, kind: CritterKind, start: SIMD3<Float>) {
+    init(slot: Int, colorIndex: Int, kind: CritterKind, start: SIMD3<Float>, tool: PaintTool = .brush) {
+        self.tool = tool
         self.slot = slot
         self.colorIndex = colorIndex
         critter = kind.make(color: Paint.colors[colorIndex % Paint.colors.count], at: start)
@@ -384,18 +424,41 @@ final class Buddy {
     @discardableResult
     func setMode(_ newMode: BuddyMode) -> Bool {
         guard newMode != mode else { return false }
-        let swapped = (newMode == .erase) != (mode == .erase)
-        if newMode == .erase { starfish.appear(at: critter.position.value) }
-        if mode == .erase && newMode != .erase { critter.position = Spring3(starfish.position.value) }
         mode = newMode
-        return swapped
+        return updateStarfish()
+    }
+
+    /// Brings the starfish out (or back in) right where the other one was. True when it swapped.
+    @discardableResult
+    private func updateStarfish() -> Bool {
+        let wanted = mode == .erase || tool == .eraser
+        guard wanted != showsStarfish else { return false }
+        if wanted {
+            starfish.appear(at: critter.position.value)
+        } else {
+            critter.position = Spring3(starfish.position.value)
+        }
+        showsStarfish = wanted
+        return true
     }
 
     var toolPosition: SIMD3<Float> {
-        mode == .erase ? starfish.position.value : critter.position.value
+        showsStarfish ? starfish.position.value : critter.position.value
     }
 
-    var toolSpeed: Float { mode == .erase ? starfish.speed : critter.speed }
+    var toolSpeed: Float { showsStarfish ? starfish.speed : critter.speed }
+
+    /// Picks up another paint tool. Returns the brush animal it replaced, if any (to remove from the scene).
+    func equip(_ newTool: PaintTool) -> Critter? {
+        tool = newTool
+        var old: Critter?
+        if let kind = newTool.critterKind, kind != critter.kind {
+            old = become(kind)
+            if showsStarfish { critter.position = Spring3(starfish.position.value) }
+        }
+        updateStarfish()
+        return old
+    }
 
     func pick(_ index: Int) {
         colorIndex = index

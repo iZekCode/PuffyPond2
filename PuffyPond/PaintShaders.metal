@@ -12,7 +12,7 @@ struct PaintStamp {
     float4 brush;     // radius, amount, dryness, seed
     float4 motion;    // brush velocity (texels/s) xy, erase rate, push
     float4 shape;     // nib angle, nib aspect (1 = round), bristles (0…1), watery (0…1)
-    float4 extra;     // palette knife (0…1), unused…
+    float4 extra;     // palette knife, impasto, runs, blend (each 0…1)
 };
 
 struct PaintParams {
@@ -148,12 +148,13 @@ kernel void paintStep(texture2d<float, access::sample> paintIn [[texture(0)]],
         if (x >= 1.15) continue;
 
         const float bristles = st.shape.z, watery = st.shape.w, knife = st.extra.x;
+        const float impasto = st.extra.y, runs = st.extra.z, blender = st.extra.w;
         // Flat top (a brush lays a sheet, not a tube) with paint pushed up into a rim at the edges.
         // A knife leaves a crisper edge and a taller ridge; watercolor fades out softly.
         float edge = mix(mix(0.7, 0.88, knife), 0.35, watery);
         float profile = 1.0 - smoothstep(edge, 1.0, x);
         float rim = (x - 0.9) / 0.1;
-        float rimLift = (0.45 + 0.7 * knife) * (1.0 - watery) * exp(-rim * rim);
+        float rimLift = (0.45 + 0.7 * knife) * (1.0 + impasto) * (1.0 - watery) * exp(-rim * rim);
 
         // Bristle grooves running along the stroke; a fast brush goes dry and streaky.
         float len = sqrt(len2);
@@ -172,14 +173,35 @@ kernel void paintStep(texture2d<float, access::sample> paintIn [[texture(0)]],
         // The brush drags whatever wet paint it passes through, and combs its own bristle marks into it.
         float push = saturate(1.1 - x);
         velocity = mix(velocity, st.motion.xy, push * st.motion.w);
+        // Runny paint slides downhill (texture y points down) while the brush keeps it wet.
+        velocity.y += runs * 160.0 * push;
         wet = max(wet, push);
-        float comb = saturate(push * 2.0) * saturate(len * 400.0 + 0.15) * (1.0 - watery);
+        float comb = saturate(push * 2.0) * saturate(len * 400.0 + 0.15) * (1.0 - watery) * (1.0 - blender);
         relief = mix(relief, groove * 0.6 * max(bristles, knife) + rimLift, comb);
 
+        if (blender > 0.5) {
+            // Blender: no new paint. Mix the paint under it with the paint a few texels around,
+            // and soften the bristle marks, so colors smudge into each other.
+            float k = push;
+            float sumA = 0.0, painted = 0.0;
+            float3 sumC = float3(0);
+            for (int n = 0; n < 4; n++) {
+                float2 o = n == 0 ? float2(4, 0) : n == 1 ? float2(-4, 0) : n == 2 ? float2(0, 4) : float2(0, -4);
+                float4 q = paintIn.sample(lin, from + o);
+                if (q.a > 0.02) { sumA += q.a; sumC += q.rgb * q.a; painted += 1.0; }
+            }
+            if (painted > 0.0 && thickness > 0.02) {
+                color = mix(color, sumC / sumA, 0.5 * k);
+                thickness = mix(thickness, sumA / painted, 0.25 * k);
+            }
+            relief *= 1.0 - 0.4 * k;
+            continue;
+        }
         if (deposit <= 1e-6) continue;
         // A brush lays a coat of paint, it doesn't build a mound: thickness tops out at a cap.
         // Watercolor is a thin glaze, so washes build up layer by layer.
         float cap = mix(0.55 + 0.1 * ragged, 0.12 + 0.03 * ragged, watery);
+        cap = mix(cap, 0.95 + 0.05 * ragged, impasto);
         float add = deposit * max(0.0, cap - thickness);
         // Wet-on-wet: new paint blends into what's there.
         float blend = thickness < 1e-3 ? 1.0 : min(1.0, add / (thickness * 0.5 + add) + 0.12 + 0.3 * watery);

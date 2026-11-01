@@ -9,7 +9,7 @@ private struct PaintStamp {
     var brush: SIMD4<Float>     // radius, amount, dryness, seed
     var motion: SIMD4<Float>    // brush velocity (texels/s) xy, erase rate, push
     var shape: SIMD4<Float>     // nib angle, nib aspect, bristles, watery
-    var extra: SIMD4<Float>     // palette knife, unused…
+    var extra: SIMD4<Float>     // palette knife, impasto, runs, blend
 }
 
 /// How one dab behaves: every brush animal paints with its own style.
@@ -21,8 +21,12 @@ struct BrushStyle {
     var nibAspect: Float = 1    // 1 = round brush, > 1 = flat nib: thick across the edge, thin along it
     var watery: Float = 0       // 0 = oil paint, 1 = runny watercolor wash that blooms outward
     var knife: Float = 0        // 1 = palette knife: a flat sheet with paint ridged up at its edges
+    var impasto: Float = 0      // 1 = thick oil: paint piles much higher, with taller ridges
+    var runs: Float = 0         // 1 = liquid oil: the wet paint under the brush slides downhill
+    var blend: Float = 0        // 1 = blender: lays nothing, smudges and mixes the paint under it
 
     static let brush = BrushStyle()
+    static let blend = BrushStyle(amount: 0, push: 0.9, bristles: 0, blend: 1)
 }
 
 /// Mirrors `PaintParams` in PaintShaders.metal.
@@ -149,7 +153,7 @@ final class PaintLayer {
                                  brush: SIMD4(radius, amount, dry, seed),
                                  motion: SIMD4(drag.x, drag.y, 0, style.push),
                                  shape: SIMD4(style.nibAngle, style.nibAspect, style.bristles, style.watery),
-                                 extra: SIMD4(style.knife, 0, 0, 0)))
+                                 extra: SIMD4(style.knife, style.impasto, style.runs, style.blend)))
         settleTime = max(settleTime, 5 + style.watery * 3)
     }
 

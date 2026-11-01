@@ -44,7 +44,10 @@ final class Playground {
     var pointerErases = false
     var buddyColors: [Int] = [0, 1]
     var buddyKinds: [CritterKind] = [.octopus, .seahorse]
+    var buddyTools: [PaintTool] = [.brush, .brush]
     var colorFlash: ColorFlash?
+    /// Fist paints with five tools (default), or the original pinch + six brush animals.
+    let controlScheme: ControlScheme
 
     // MARK: World
     @ObservationIgnored let effects = Effects(scene: SCNScene())
@@ -102,7 +105,10 @@ final class Playground {
     @ObservationIgnored private var pointer: SIMD2<Float>?
     @ObservationIgnored private var pointerPrevious: SIMD2<Float>?
 
-    init() {
+    init(controlScheme: ControlScheme = .fist) {
+        self.controlScheme = controlScheme
+        input.scheme = controlScheme
+        if controlScheme == .fist { buddyKinds = [.octopus, .octopus] }
         buildWorld()
         frameDriver.onFrame = { [weak self] dt in self?.tick(dt: Float(dt)) }
     }
@@ -217,7 +223,7 @@ final class Playground {
         scene.rootNode.addChildNode(paintLayer.node)
         // Two columns just outside the canvas, so dipping never smears the painting:
         // paint pots down the right (rub a critter in one to pick up its color),
-        // critter bubbles down the left (rub one to become that brush animal).
+        // critter bubbles down the left (rub one to become that brush animal, or to pick up that paint tool).
         func columnY(_ k: Int, of count: Int) -> Float {
             0.1 + (Float(count - 1) / 2 - Float(k)) * Self.shelfSpacing
         }
@@ -226,11 +232,21 @@ final class Playground {
             scene.rootNode.addChildNode(pot.root)
             pots.append(pot)
         }
-        for (k, kind) in CritterKind.allCases.enumerated() {
-            let pot = CritterPot(kind: kind, at: SIMD3(-Self.shelfX, columnY(k, of: CritterKind.allCases.count), 0.3))
+        switch controlScheme {
+        case .legacy:
+            for (k, kind) in CritterKind.legacyBrushes.enumerated() {
+                let y = columnY(k, of: CritterKind.legacyBrushes.count)
+                critterPots.append(CritterPot(kind: kind, at: SIMD3(-Self.shelfX, y, 0.3)))
+            }
+        case .fist:
+            for (k, tool) in PaintTool.allCases.enumerated() {
+                let y = columnY(k, of: PaintTool.allCases.count)
+                critterPots.append(CritterPot(tool: tool, at: SIMD3(-Self.shelfX, y, 0.3)))
+            }
+        }
+        for pot in critterPots {
             scene.rootNode.addChildNode(pot.root)
-            scene.rootNode.addChildNode(pot.resident.root)
-            critterPots.append(pot)
+            scene.rootNode.addChildNode(pot.residentRoot)
         }
         // A row of template bubbles on the tray: rub one to get a dotted animal to trace.
         for (k, kind) in TemplateKind.legacyTray.enumerated() {
@@ -318,7 +334,8 @@ final class Playground {
         if let p = pointer {
             let previous = pointerPrevious ?? p
             hands.removeAll { $0.slot == 0 }
-            hands.append(HandState(slot: 0, pose: pointerErases ? .fist : .pinch, position: p,
+            let pose: HandPose = controlScheme == .fist || pointerErases ? .fist : .pinch
+            hands.append(HandState(slot: 0, pose: pose, position: p,
                                    velocity: (p - previous) / dt, tracking: true, isPointer: true))
             pointerPrevious = p
         }
@@ -328,13 +345,9 @@ final class Playground {
         var erasingNow = false
         for buddy in buddies {
             let hand = hands.first { $0.slot == buddy.slot && $0.tracking }
-            let mode: BuddyMode
-            switch hand?.pose {
-            case nil: mode = .idle
-            case .open?: mode = .swim
-            case .pinch?: mode = .paint
-            case .fist?: mode = .erase
-            }
+            // The touch/mouse eraser button makes the pointer scrub, whatever tool the buddy holds.
+            let tool: PaintTool = hand?.isPointer == true && pointerErases ? .eraser : buddy.tool
+            let mode = controlScheme.mode(for: hand?.pose, tool: tool)
             if buddy.setMode(mode) {
                 audio.play(.swap, pan: buddy.slot == 0 ? -0.5 : 0.5)
             }
@@ -350,9 +363,9 @@ final class Playground {
                 let t = clock * 0.35 + Float(buddy.slot) * 3.1
                 target = SIMD3(sin(t) * h.x * 0.6, cameraY - h.y * 0.62 + sin(t * 2.3) * 0.15, buddyZ)
             }
-            buddy.critter.update(dt: dt, target: target, visible: mode != .erase, painting: mode == .paint,
+            buddy.critter.update(dt: dt, target: target, visible: !buddy.showsStarfish, painting: mode == .paint,
                               beatPulse: beatPulse)
-            buddy.starfish.update(dt: dt, target: SIMD3(target.x, target.y, 0.3), visible: mode == .erase,
+            buddy.starfish.update(dt: dt, target: SIMD3(target.x, target.y, 0.3), visible: buddy.showsStarfish,
                                   beatPulse: beatPulse)
 
             movement += min(buddy.toolSpeed, 4) * (hand == nil ? 0 : 1)
@@ -377,12 +390,14 @@ final class Playground {
             pot.update(dt: dt, beatPulse: beatPulse, rubProgress: min(progress, 1), selectedCount: wearing)
         }
         for pot in critterPots {
-            let rubbers = buddies.filter { $0.rubbingPot == .critter(pot.kind) }
+            let rubbers = buddies.filter { $0.rubbingPot == pot.target }
             let progress = rubbers.map(\.rubAmount).max() ?? 0
             if progress > 0 { rubbing = true }
-            let wearers = buddies.filter { $0.critter.kind == pot.kind }
+            let wearers = buddies.filter { wears($0, pot.target) }
+            let paints: Bool
+            if case .tool(let tool) = pot.target { paints = tool.usesColor } else { paints = true }
             pot.update(dt: dt, beatPulse: beatPulse, rubProgress: min(progress, 1), selectedCount: wearers.count,
-                       color: wearers.first?.color)
+                       color: paints ? wearers.first?.color : nil)
         }
         for pot in templatePots {
             let rubbers = buddies.filter { $0.rubbingPot == .template(pot.kind) }
@@ -432,11 +447,15 @@ final class Playground {
         }
         p = simd_clamp(p, center - half, center + half)
 
-        // Lay real paint every frame, the way this brush animal paints.
-        let dabs = buddy.critter.dabs(from: lastStamp[slot] ?? p, to: p, radius: Self.strokeRadius,
-                                      speed: buddy.critter.speed)
+        // Lay real paint every frame, the way this tool (legacy: this brush animal) paints.
+        let from = lastStamp[slot] ?? p
+        let dabs = controlScheme == .fist
+            ? buddy.tool.dabs(from: from, to: p, radius: Self.strokeRadius, speed: buddy.critter.speed)
+            : buddy.critter.dabs(from: from, to: p, radius: Self.strokeRadius, speed: buddy.critter.speed)
         lay(dabs, color: buddy.color, seed: Float(slot) * 13.7 + Float(strokes.count) * 2.3)
         lastStamp[slot] = p
+        // The blender only moves paint that's already there: it doesn't start a stroke of its own.
+        if controlScheme == .fist && buddy.tool == .blender { return }
 
         let spacing = Self.strokeRadius * 0.6
         if let stroke = activeStroke[slot], let last = lastBead[slot] {
@@ -478,7 +497,9 @@ final class Playground {
             let buddy = buddies[slot]
             buddy.critter.react(.happy, for: 0.7)   // proud of that line
             // Some brushes paint when you let go (the pufferfish bursts).
-            lay(buddy.critter.released(), color: buddy.color, seed: Float(slot) * 7.7 + Float(strokes.count))
+            if controlScheme == .legacy {
+                lay(buddy.critter.released(), color: buddy.color, seed: Float(slot) * 7.7 + Float(strokes.count))
+            }
         }
         activeStroke[slot] = nil
         lastBead[slot] = nil
@@ -626,7 +647,7 @@ final class Playground {
             buddy.critter.colorPreview = nil
         }
         guard buddy.mode == .swim || buddy.mode == .paint else { return stop() }
-        let p = buddy.critter.position.value
+        let p = buddy.toolPosition
         func near(_ c: SIMD3<Float>) -> Bool {
             simd_distance(SIMD2(p.x, p.y), SIMD2(c.x, c.y + 0.04)) < PaintPot.radius + 0.14
         }
@@ -635,8 +656,8 @@ final class Playground {
         if let pot = pots.first(where: { near($0.root.simdPosition) }), pot.colorIndex != buddy.colorIndex {
             target = .color(pot.colorIndex)
             potPosition = pot.root.simdPosition
-        } else if let pot = critterPots.first(where: { near($0.root.simdPosition) }), pot.kind != buddy.critter.kind {
-            target = .critter(pot.kind)
+        } else if let pot = critterPots.first(where: { near($0.root.simdPosition) }), !wears(buddy, pot.target) {
+            target = pot.target
             potPosition = pot.root.simdPosition
         } else if let pot = templatePots.first(where: { near($0.root.simdPosition) }), pot.kind != template?.kind {
             target = .template(pot.kind)
@@ -676,6 +697,14 @@ final class Playground {
             scene.rootNode.addChildNode(buddy.critter.root)
             effects.colorSplash(at: potPosition + SIMD3(0, 0.15, 0.1), color: buddy.color)
             audio.play(.swap, pan: pan)
+        case .tool(let tool):
+            finishStroke(slot: buddy.slot)
+            if let old = buddy.equip(tool) {
+                old.root.removeFromParentNode()
+                scene.rootNode.addChildNode(buddy.critter.root)
+            }
+            effects.colorSplash(at: potPosition + SIMD3(0, 0.15, 0.1), color: tool.usesColor ? buddy.color : SIMD3(1, 1, 1))
+            audio.play(.swap, pan: pan)
         case .template(let kind):
             showTemplate(kind)
             effects.colorSplash(at: potPosition + SIMD3(0, 0.15, 0.1), color: kind.signatureColor)
@@ -692,10 +721,19 @@ final class Playground {
         template = outline
     }
 
+    /// The buddy already is this brush animal or holds this tool.
+    private func wears(_ buddy: Buddy, _ target: PotTarget) -> Bool {
+        switch target {
+        case .critter(let kind): return buddy.critter.kind == kind
+        case .tool(let tool): return buddy.tool == tool
+        case .color, .template: return false
+        }
+    }
+
     private func bouncePot(_ target: PotTarget, _ strength: Float) {
         switch target {
         case .color(let index): pots.first { $0.colorIndex == index }?.bounce(strength)
-        case .critter(let kind): critterPots.first { $0.kind == kind }?.bounce(strength)
+        case .critter, .tool: critterPots.first { $0.target == target }?.bounce(strength)
         case .template(let kind): templatePots.first { $0.kind == kind }?.bounce(strength)
         }
     }
@@ -728,6 +766,8 @@ final class Playground {
         if colors != buddyColors { buddyColors = colors }
         let kinds = buddies.map(\.critter.kind)
         if kinds != buddyKinds { buddyKinds = kinds }
+        let tools = buddies.map(\.tool)
+        if tools != buddyTools { buddyTools = tools }
 
         let cameraHands = hands.filter { !$0.isPointer }
         if cameraHands.isEmpty {

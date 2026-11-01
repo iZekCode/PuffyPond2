@@ -51,7 +51,7 @@ struct HUDView: View {
                 .padding(16 * scale)
 
                 if playground.showGuide {
-                    GuideCard { withAnimation(.easeOut(duration: 0.3)) { playground.showGuide = false } }
+                    GuideCard(scheme: playground.controlScheme) { withAnimation(.easeOut(duration: 0.3)) { playground.showGuide = false } }
                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
                 if playground.cameraStatus == .denied || playground.cameraStatus == .unavailable {
@@ -76,6 +76,16 @@ struct HUDView: View {
     // MARK: Hint
 
     private var hintContent: (symbol: String, text: String) {
+        if playground.controlScheme == .fist {
+            switch playground.hint {
+            case .raiseHands: return ("hand.raised.fill", "Raise both hands — a paint buddy follows each one")
+            case .swimming: return ("hand.raised.fill", "Make a fist to paint · rub a pot for a color, a bubble for a new tool")
+            case .drawing: return ("paintbrush.pointed.fill", "Swoosh! Keep your fist closed and sweep your arm")
+            case .erasing: return ("star.fill", "Starfish scrub! Keep your fist closed to wipe the paint away")
+            case .tracing: return ("scribble.variable", "Make a fist and follow the dotted line · the starfish wipes it away")
+            default: break
+            }
+        }
         switch playground.hint {
         case .starting: return ("camera.fill", "Waking up the camera…")
         case .raiseHands: return ("hand.raised.fill", "Raise both hands — a brush animal follows each one")
@@ -120,16 +130,26 @@ struct HUDView: View {
     private func colorChip(slot: Int) -> some View {
         let index = slot < playground.buddyColors.count ? playground.buddyColors[slot] : slot
         let kind = slot < playground.buddyKinds.count ? playground.buddyKinds[slot] : .octopus
+        let colorName = Paint.names[index % Paint.names.count]
+        var symbol = kind.symbol
+        var label = "\(colorName) \(kind.name)"
+        var tint = Paint.swiftUI(Paint.colors[index % Paint.colors.count])
+        if playground.controlScheme == .fist {
+            let tool = slot < playground.buddyTools.count ? playground.buddyTools[slot] : .brush
+            symbol = tool.symbol
+            label = tool.usesColor ? "\(colorName) \(tool.name)" : tool.name
+            if !tool.usesColor { tint = Color(red: 0.55, green: 0.5, blue: 0.7) }
+        }
         return HStack(spacing: 8 * scale) {
-            Image(systemName: kind.symbol)
+            Image(systemName: symbol)
                 .font(.system(size: 15 * scale, weight: .bold))
-            Text("\(Paint.names[index % Paint.names.count]) \(kind.name)")
+            Text(label)
                 .font(.system(size: 14 * scale, weight: .heavy, design: .rounded))
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 12 * scale)
         .padding(.vertical, 7 * scale)
-        .background(Paint.swiftUI(Paint.colors[index % Paint.colors.count]).gradient, in: Capsule())
+        .background(tint.gradient, in: Capsule())
         .overlay(Capsule().stroke(.white, lineWidth: 2))
         .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
         .symbolEffect(.bounce, value: index)
@@ -217,6 +237,7 @@ struct RoundButton: View {
 }
 
 private struct GuideCard: View {
+    let scheme: ControlScheme
     let dismiss: () -> Void
     @Environment(\.uiScale) private var scale
 
@@ -228,7 +249,24 @@ private struct GuideCard: View {
         var id: String { title }
     }
 
-    private let rows: [Row] = [
+    private var rows: [Row] { scheme == .fist ? fistRows : legacyRows }
+
+    private let fistRows: [Row] = [
+        Row(symbol: "hand.raised.fill", color: .orange, title: "Open hand = move",
+            detail: "Each hand has a paint buddy that follows you around. An open hand never paints."),
+        Row(symbol: "paintbrush.pointed.fill", color: .blue, title: "Fist = paint",
+            detail: "Close your hand and sweep your arm. Open it to stop."),
+        Row(symbol: "drop.fill", color: .mint, title: "Rub a paint pot = new color",
+            detail: "Swipe your buddy back and forth through a pot on the right until it soaks up the color."),
+        Row(symbol: "sparkles", color: .indigo, title: "Rub a bubble = new tool",
+            detail: "Snail thick oil, jelly liquid oil, octopus brush, starfish eraser, sponge blender."),
+        Row(symbol: "star.fill", color: .pink, title: "Starfish = eraser",
+            detail: "Pick the starfish bubble and make a fist to scrub paint and the dotted guide away."),
+        Row(symbol: "photo.artframe", color: .purple, title: "All done? Hang it up",
+            detail: "Tap the frame and your painting goes into the gallery, where the critters come to admire it."),
+    ]
+
+    private let legacyRows: [Row] = [
         Row(symbol: "hand.raised.fill", color: .orange, title: "Open hand = swim",
             detail: "Each hand has a brush animal that follows you around."),
         Row(symbol: "hand.pinch.fill", color: .blue, title: "Pinch = draw",
