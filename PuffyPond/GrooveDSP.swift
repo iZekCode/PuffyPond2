@@ -14,6 +14,7 @@ nonisolated enum Sfx: UInt8, Sendable {
     case gurgle    // a fish rubbing in a paint pot (a = progress 0…1, b = pan)
     case pick      // a fish soaks up a new color (a = color index, b = pan)
     case sparkle   // twinkly glitter after a pop
+    case splash    // a palm slaps the wet painting (a = strength 0…1, b = pan)
 }
 
 nonisolated struct SfxEvent: Sendable {
@@ -345,6 +346,12 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
                 start(.fm, Self.hz(n), peak: 0.05, decay: 0.35, at: Int(Float(k) * 0.04 * sampleRate),
                       pan: Float.random(in: -0.7...0.7), fm: (3.5, 1.5, 0.08))
             }
+        case .splash:
+            let s = 0.5 + 0.5 * min(max(e.a, 0), 1)
+            start(.noise, 0, peak: 0.22 * s, decay: 0.18, at: 0, pan: pan, filter: .bandPass(1400, q: 0.9, sr: sampleRate))
+            start(.sine, 520, peak: 0.12 * s, decay: 0.14, at: 0, pan: pan, glideFrom: 1100, glideTime: 0.05)
+            start(.noise, 0, peak: 0.08 * s, decay: 0.25, at: Int(0.05 * sampleRate), pan: -pan * 0.5,
+                  filter: .bandPass(3200, q: 1.4, sr: sampleRate))
         case .fizzle:
             start(.sine, 220, peak: 0.12, decay: 0.4, at: 0, glideFrom: 500, glideTime: 0.2)
             start(.noise, 0, peak: 0.1, decay: 0.3, at: 0, filter: .bandPass(700, q: 0.8, sr: sampleRate))

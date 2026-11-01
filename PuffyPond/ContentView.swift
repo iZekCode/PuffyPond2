@@ -23,6 +23,7 @@ struct ContentView: View {
     @State private var playground = Playground()
     @State private var tracker = HandTracker()
     @State private var gallery = Gallery()
+    @State private var pageHands = HandFrameRelay()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -86,7 +87,10 @@ struct ContentView: View {
             InstructionView(router: router, tracker: tracker, cameraStatus: playground.cameraStatus, choice: choice)
                 .transition(.opacity)
         case let .review(draft):
-            ReviewPlaceholder(draft: draft, router: router, save: { save(draft) }).transition(.opacity)
+            ReviewView(draft: draft, audio: playground.audio, relay: pageHands,
+                       keepDrawing: { router.go(.canvas(draft.choice)) }, save: { save(draft) })
+                .id(draft.id)
+                .transition(.opacity)
         case .gallery2D:
             PlaceholderPage(title: "Gallery", router: router).transition(.opacity)
         case .report:
@@ -105,6 +109,7 @@ struct ContentView: View {
         let record = PaintingRecord(date: Date(), templateID: draft.choice?.templateID,
                                     isDailyQuest: draft.choice?.isDailyQuest ?? false, stats: draft.stats)
         guard gallery.add(draft.image, record: record) != nil else { return }
+        playground.clearCanvas()
         router.go(.gallery3D(start: 0, justHung: true))
     }
 
@@ -125,7 +130,11 @@ struct ContentView: View {
 
     private func startTracking() {
         let playground = playground
-        tracker.onFrame = { frame in playground.ingest(frame) }
+        let pageHands = pageHands
+        tracker.onFrame = { frame in
+            playground.ingest(frame)
+            pageHands.send(frame)
+        }
         tracker.start { status in
             switch status {
             case .running: playground.cameraStatus = .running

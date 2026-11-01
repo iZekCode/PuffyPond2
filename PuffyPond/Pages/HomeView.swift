@@ -81,36 +81,6 @@ struct PageBackground: View {
 }
 
 /// Stand-in for the pages later tasks build, so every route is reachable and leads back home.
-/// Stand-in review page until the push & grab review lands: look at the painting, then save it or keep drawing.
-struct ReviewPlaceholder: View {
-    let draft: ReviewDraft
-    let router: AppRouter
-    let save: () -> Void
-    @Environment(\.uiScale) private var scale
-
-    var body: some View {
-        ZStack {
-            PageBackground()
-            VStack(spacing: 24 * scale) {
-                Image(decorative: draft.image, scale: 1)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 18 * scale, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 18 * scale, style: .continuous).stroke(.white, lineWidth: 6))
-                    .shadow(color: .black.opacity(0.15), radius: 16, y: 6)
-                    .frame(maxHeight: 420 * scale)
-                HStack(spacing: 20 * scale) {
-                    HomeButton(title: "Keep drawing", symbol: "paintbrush.pointed.fill", tint: .orange) {
-                        router.go(.canvas(draft.choice))
-                    }
-                    HomeButton(title: "Save to gallery", symbol: "building.columns.fill", tint: .pink, action: save)
-                }
-            }
-            .padding(32 * scale)
-        }
-    }
-}
-
 struct PlaceholderPage: View {
     let title: String
     let router: AppRouter

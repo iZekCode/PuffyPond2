@@ -641,7 +641,7 @@ final class Playground {
     }
 
     /// Wipes the paint, strokes and tracing guide off the easel.
-    private func clearCanvas() {
+    func clearCanvas() {
         for stroke in strokes { stroke.node.removeFromParentNode() }
         strokes.removeAll()
         paintLayer.clear()
