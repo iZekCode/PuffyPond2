@@ -16,7 +16,7 @@ No camera (or the simulator)? Every step also works by touch or mouse: see "With
 ```
 Home ──► Start drawing ──► Freeform ─────────────────────────┐
   │                   └──► Templates (daily quest on top,    ▼
-  │                        easy → hard, progressive unlock)  Get ready (distance check)
+  │                        near → far,   progressive unlock)  Get ready (distance check)
   │                                                          ▼
   │                                                          Canvas (fist paints, "Save image")
   │                                                          ▼
@@ -30,7 +30,7 @@ Home ──► Start drawing ──► Freeform ──────────�
 |---|---|
 | **Home** | Start drawing, View gallery or Report. |
 | **Freeform or template** | A blank canvas, or pick a dotted outline to trace. |
-| **Templates** | The **daily quest** sits on top: a random subject rolled once per day from its own pool (rocket, house, flower, …). Below it, nine templates from easy to hard (fish, duck, sun · turtle, snail, cat · octopus, seahorse, butterfly). A template unlocks once a painting of the one before it is in the gallery, so deleting that painting locks it again. |
+| **Templates** | The **daily quest** sits on top: a random subject rolled once per day from its own pool (rocket, house, flower, …). Below it, nine abstract shapes to trace, so kids decide what they become (pebble, bean, puddle · bumpy, wiggle, peanut · reach, sprawl, zigzag). No level labels are shown, but the order still goes from simple blobs to big shapes that stretch into every corner (the last three), to widen the range of motion. A template unlocks once a painting of the one before it is in the gallery, so deleting that painting locks it again. |
 | **Get ready** | A skeleton outline shows where to stand. Step back until your shoulders fit the band (about 1 m) and hold still while the ring fills; the canvas opens by itself. **Skip** is always there. |
 | **Canvas** | Paint with your fists (see below). The chosen template shows as a dotted guide. **Save image** takes you to the review; the house button goes Home (it asks first if the painting isn't saved). |
 | **Review** | The painting hangs on an elastic, glossy sheet. Fist = grab and pull, two fists = stretch and twist, a moving open palm = push ripples with a splash. Let go and it springs back. The play never changes the saved picture. **Save to gallery** or **Keep drawing** (back to the same canvas). |
@@ -93,7 +93,7 @@ Everything stays on the device in `Application Support/Gallery/`: one PNG per pa
 | `Pages/ReportView.swift`, `Stats/DayReport.swift` | Report page; one day's paintings and their merged stats |
 | `Stats/SessionRecorder.swift`, `Stats/SessionStats.swift` | Records painting time, heatmap, grip cycles and ROM during a canvas session; the saved stats |
 | `Templates/TemplateCatalog.swift`, `Templates/DailyQuest.swift` | Template order and unlocks; the daily quest pool and the roll of the day |
-| `Template.swift` | Outline art (SVG-style paths), the nine templates and the dotted guide on the canvas |
+| `Template.swift` | Outline art (SVG-style paths), the nine abstract templates and the dotted guide on the canvas |
 | `Input/DistanceGate.swift` | Shoulder width in the camera image → too close / too far / good, with the hold timer |
 | `Input/PaddleDetector.swift` | Open hand sweeping down → walk on or back in the 3D gallery |
 | `Input/HandFrameRelay.swift` | Passes camera hand frames to the review page and the 3D gallery |

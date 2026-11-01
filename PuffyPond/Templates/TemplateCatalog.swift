@@ -9,7 +9,7 @@ extension TemplateChoice {
 
 /// The templates in unlock order, and which of them a person can start from.
 enum TemplateCatalog {
-    /// Easy → hard. Each template opens once the one before it has a saved painting.
+    /// Easy → hard (the levels are never shown). Each template opens once the one before it has a saved painting.
     static let ordered: [TemplateKind] = TemplateKind.allCases.sorted {
         ($0.difficulty, index(of: $0)) < ($1.difficulty, index(of: $1))
     }
@@ -26,10 +26,6 @@ enum TemplateCatalog {
     static func isUnlocked(_ kind: TemplateKind, saved: Set<String>) -> Bool {
         guard let before = previous(of: kind) else { return true }
         return saved.contains(before.id)
-    }
-
-    static func sections() -> [(difficulty: TemplateDifficulty, kinds: [TemplateKind])] {
-        [TemplateDifficulty.easy, .medium, .hard].map { level in (level, ordered.filter { $0.difficulty == level }) }
     }
 
     private static func index(of kind: TemplateKind) -> Int { TemplateKind.allCases.firstIndex(of: kind) ?? 0 }

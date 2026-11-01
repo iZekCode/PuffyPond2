@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The daily quest on top, then every template from easy to hard. A template opens once a painting of
+/// The daily quest on top, then every template in unlock order. A template opens once a painting of
 /// the one before it is saved in the gallery.
 struct TemplatesView: View {
     let router: AppRouter
@@ -39,19 +39,13 @@ struct TemplatesView: View {
                         QuestCard(quest: quest, icon: icons[quest.id], done: questDone) {
                             router.go(.instruction(TemplateChoice(templateID: quest.id, isDailyQuest: true)))
                         }
-                        ForEach(TemplateCatalog.sections(), id: \.difficulty) { section in
-                            VStack(alignment: .leading, spacing: 10 * scale) {
-                                Text(section.difficulty.title)
-                                    .font(.system(size: 24 * scale, weight: .heavy, design: .rounded))
-                                    .foregroundStyle(Color(red: 0.25, green: 0.2, blue: 0.35))
-                                HStack(spacing: 16 * scale) {
-                                    ForEach(section.kinds, id: \.id) { kind in
-                                        let unlocked = TemplateCatalog.isUnlocked(kind, saved: saved)
-                                        TemplateTile(kind: kind, icon: icons[kind.id], unlocked: unlocked,
-                                                     lockedHint: TemplateCatalog.previous(of: kind)?.title) {
-                                            router.go(.instruction(TemplateChoice(templateID: kind.id, isDailyQuest: false)))
-                                        }
-                                    }
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16 * scale), count: 3),
+                                  spacing: 16 * scale) {
+                            ForEach(TemplateCatalog.ordered, id: \.id) { kind in
+                                let unlocked = TemplateCatalog.isUnlocked(kind, saved: saved)
+                                TemplateTile(kind: kind, icon: icons[kind.id], unlocked: unlocked,
+                                             lockedHint: TemplateCatalog.previous(of: kind)?.title) {
+                                    router.go(.instruction(TemplateChoice(templateID: kind.id, isDailyQuest: false)))
                                 }
                             }
                         }
