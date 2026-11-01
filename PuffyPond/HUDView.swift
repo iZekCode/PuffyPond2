@@ -4,7 +4,7 @@ import AVFoundation
 /// Light, friendly overlay: a hint bubble, camera preview, and a few buttons.
 struct HUDView: View {
     @Bindable var playground: Playground
-    let session: AVCaptureSession
+    let previewLayer: CameraPreviewLayer
     let saveImage: () -> Void
     let goHome: () -> Void
 
@@ -220,7 +220,7 @@ struct HUDView: View {
         let height: CGFloat = Platform.isPad ? 88 : 110
         let width = height * max(playground.imageAspect, 0.3)
         return ZStack {
-            CameraPreview(session: session)
+            CameraPreview(previewLayer: previewLayer)
             Canvas { context, size in
                 for hand in playground.previewHands {
                     for joint in hand {

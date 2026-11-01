@@ -174,31 +174,35 @@ final class PlaygroundSCNView: SCNView {
     }
 }
 
+/// Shows the tracker's shared camera layer. Only one host holds it at a time: the newest one takes it.
 struct CameraPreview: NSViewRepresentable {
-    let session: AVCaptureSession
+    let previewLayer: CameraPreviewLayer
 
     final class PreviewView: NSView {
-        let previewLayer = AVCaptureVideoPreviewLayer()
+        let previewLayer: CameraPreviewLayer
 
-        override init(frame: NSRect) {
-            super.init(frame: frame)
-            layer = previewLayer
+        init(previewLayer: CameraPreviewLayer) {
+            self.previewLayer = previewLayer
+            super.init(frame: .zero)
             wantsLayer = true
+            layer?.addSublayer(previewLayer)
         }
 
         required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
         override func layout() {
             super.layout()
+            guard previewLayer.superlayer === layer else { return }
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            previewLayer.frame = bounds
+            CATransaction.commit()
             Platform.configure(previewLayer.connection)
         }
     }
 
     func makeNSView(context: Context) -> PreviewView {
-        let view = PreviewView(frame: .zero)
-        view.previewLayer.session = session
-        view.previewLayer.videoGravity = .resizeAspectFill
-        return view
+        PreviewView(previewLayer: previewLayer)
     }
 
     func updateNSView(_ nsView: PreviewView, context: Context) {}
@@ -247,49 +251,35 @@ final class PlaygroundSCNView: SCNView {
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) { playground?.pointerEnded() }
 }
 
+/// Shows the tracker's shared camera layer. Only one host holds it at a time: the newest one takes it.
 struct CameraPreview: UIViewRepresentable {
-    let session: AVCaptureSession
+    let previewLayer: CameraPreviewLayer
 
     final class PreviewView: UIView {
-        override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
-        var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
-        private var rotation: AVCaptureDevice.RotationCoordinator?
-        private var rotationObserver: NSKeyValueObservation?
+        let previewLayer: CameraPreviewLayer
+
+        init(previewLayer: CameraPreviewLayer) {
+            self.previewLayer = previewLayer
+            super.init(frame: .zero)
+            layer.addSublayer(previewLayer)
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
         override func layoutSubviews() {
             super.layoutSubviews()
+            guard previewLayer.superlayer === layer else { return }
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            previewLayer.frame = bounds
+            CATransaction.commit()
             Platform.configure(previewLayer.connection)
-            followDeviceRotation()
-        }
-
-        /// Keeps the preview upright when the iPad is turned between the two landscape sides.
-        private func followDeviceRotation() {
-            guard Platform.isPad else { return }
-            if let rotation {
-                apply(rotation.videoRotationAngleForHorizonLevelPreview)
-                return
-            }
-            guard let device = (previewLayer.session?.inputs.first as? AVCaptureDeviceInput)?.device else { return }
-            let coordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: previewLayer)
-            rotation = coordinator
-            apply(coordinator.videoRotationAngleForHorizonLevelPreview)
-            rotationObserver = coordinator.observe(\.videoRotationAngleForHorizonLevelPreview) { [weak self] coordinator, _ in
-                let angle = coordinator.videoRotationAngleForHorizonLevelPreview
-                DispatchQueue.main.async { self?.apply(angle) }
-            }
-        }
-
-        private func apply(_ angle: CGFloat) {
-            guard let connection = previewLayer.connection, connection.isVideoRotationAngleSupported(angle) else { return }
-            connection.videoRotationAngle = angle
+            previewLayer.followDeviceRotation()
         }
     }
 
     func makeUIView(context: Context) -> PreviewView {
-        let view = PreviewView()
-        view.previewLayer.session = session
-        view.previewLayer.videoGravity = .resizeAspectFill
-        return view
+        PreviewView(previewLayer: previewLayer)
     }
 
     func updateUIView(_ uiView: PreviewView, context: Context) {}

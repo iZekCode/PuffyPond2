@@ -104,7 +104,7 @@ struct InstructionView: View {
             let height = proxy.size.height
             let width = min(height * aspect, proxy.size.width)
             ZStack {
-                CameraPreview(session: tracker.session)
+                CameraPreview(previewLayer: tracker.previewLayer)
                 Canvas { context, size in
                     drawTarget(context, size: size)
                     drawBody(context, size: size)
