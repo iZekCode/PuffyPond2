@@ -153,6 +153,9 @@ final class HandInput {
         hand.lastSample = now
     }
 
+    /// Forgets every hand, e.g. when leaving the canvas, so nothing keeps painting from a stale pose.
+    func reset() { tracked.removeAll() }
+
     /// Render-rate smoothing with a little prediction to hide camera latency.
     func advance(dt: Float, now: Double) -> [HandState] {
         var states: [HandState] = []

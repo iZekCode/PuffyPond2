@@ -8,6 +8,7 @@ struct HUDView: View {
     let paintingCount: Int
     let finish: () -> Void
     let openGallery: () -> Void
+    let goHome: () -> Void
 
     @Environment(\.uiScale) private var scale
 
@@ -143,6 +144,7 @@ struct HUDView: View {
 
     private var controls: some View {
         HStack(spacing: 10 * scale) {
+            RoundButton(symbol: "house.fill", tint: .green, action: goHome)
             if playground.hasDrawing {
                 RoundButton(symbol: "photo.artframe", tint: .pink, action: finish)
             }

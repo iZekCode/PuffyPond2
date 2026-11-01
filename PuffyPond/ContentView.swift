@@ -19,26 +19,32 @@ struct PuffyPondApp: App {
 }
 
 struct ContentView: View {
+    @State private var router = AppRouter()
     @State private var playground = Playground()
     @State private var tracker = HandTracker()
     @State private var gallery = Gallery()
-    /// Which painting the gallery opens on; nil while at the easel.
-    @State private var visit: GalleryVisit?
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
+        let onCanvas = router.route.isCanvas
         ZStack {
+            // The easel stays alive under every page so SceneKit isn't rebuilt; it only shows on the canvas.
             PlaygroundView(playground: playground)
                 .ignoresSafeArea()
-            HUDView(playground: playground, session: tracker.session,
-                    paintingCount: gallery.paintings.count, finish: hangPainting, openGallery: { open(GalleryVisit(index: 0, justHung: false)) })
-            if let visit {
-                GalleryView(gallery: gallery, startAt: visit.index, justHung: visit.justHung) { open(nil) }
+                .opacity(onCanvas ? 1 : 0)
+                .allowsHitTesting(onCanvas)
+            if onCanvas {
+                HUDView(playground: playground, session: tracker.session,
+                        paintingCount: gallery.paintings.count, finish: hangPainting,
+                        openGallery: { router.go(.gallery3D(start: 0, justHung: false)) },
+                        goHome: router.home)
                     .transition(.opacity)
             }
+            page
         }
         .immersive()
         .environment(\.uiScale, Platform.isPad ? 1.2 : 1)
+        .onChange(of: onCanvas, initial: true) { _, canvas in playground.isAway = !canvas }
         .onAppear {
             Platform.keepAwake()
             playground.start()
@@ -58,15 +64,35 @@ struct ContentView: View {
         }
     }
 
+    @ViewBuilder private var page: some View {
+        switch router.route {
+        case .canvas:
+            EmptyView()
+        case .home:
+            HomeView(router: router).transition(.opacity)
+        case let .gallery3D(start, justHung):
+            GalleryView(gallery: gallery, startAt: start, justHung: justHung, close: router.home)
+                .id(start)
+                .transition(.opacity)
+        case .modePicker:
+            PlaceholderPage(title: "Choose a mode", router: router).transition(.opacity)
+        case .templates:
+            PlaceholderPage(title: "Templates", router: router).transition(.opacity)
+        case .instruction:
+            PlaceholderPage(title: "Get ready", router: router).transition(.opacity)
+        case .review:
+            PlaceholderPage(title: "Review", router: router).transition(.opacity)
+        case .gallery2D:
+            PlaceholderPage(title: "Gallery", router: router).transition(.opacity)
+        case .report:
+            PlaceholderPage(title: "Report", router: router).transition(.opacity)
+        }
+    }
+
     /// Photographs the painting off the easel and walks over to see it hanging in the gallery.
     private func hangPainting() {
         guard let photo = playground.finishPainting(), gallery.add(photo) != nil else { return }
-        open(GalleryVisit(index: 0, justHung: true))
-    }
-
-    private func open(_ next: GalleryVisit?) {
-        playground.isAway = next != nil
-        withAnimation(.easeInOut(duration: 0.45)) { visit = next }
+        router.go(.gallery3D(start: 0, justHung: true))
     }
 
     private func startTracking() {
@@ -80,9 +106,4 @@ struct ContentView: View {
             }
         }
     }
-}
-
-private struct GalleryVisit {
-    let index: Int
-    let justHung: Bool
 }

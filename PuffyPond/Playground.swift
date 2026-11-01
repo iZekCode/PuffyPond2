@@ -28,8 +28,17 @@ final class Playground {
     var musicOn = true
     var hint: Hint = .starting
     var hasDrawing = false
-    /// The gallery is showing: hands stop painting until the kids come back to the easel.
-    var isAway = false
+    /// Another page is showing: hands stop painting until the kids come back to the easel.
+    /// Leaving mid-stroke ends the stroke and forgets the hands and the pointer.
+    var isAway = false {
+        didSet {
+            guard isAway, !oldValue else { return }
+            input.reset()
+            pointerEnded()
+            for slot in Array(activeStroke.keys) { finishStroke(slot: slot) }
+            previewHands = []
+        }
+    }
     var previewHands: [[CGPoint]] = []
     var imageAspect: CGFloat = 4.0 / 3.0
     var pointerErases = false
