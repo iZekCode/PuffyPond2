@@ -1,5 +1,6 @@
 import AVFoundation
 import Vision
+import os
 import CoreGraphics
 #if os(iOS)
 import UIKit
@@ -52,6 +53,47 @@ nonisolated struct HandFrame: Sendable {
     var imageAspect: Float
 }
 
+/// The upper-body joints the app cares about. Left and right are the person's own sides.
+nonisolated enum BodyJoint: Int, CaseIterable, Sendable {
+    case neck
+    case leftShoulder, rightShoulder
+    case leftElbow, rightElbow
+    case leftWrist, rightWrist
+
+    var visionName: VNHumanBodyPoseObservation.JointName {
+        switch self {
+        case .neck: return .neck
+        case .leftShoulder: return .leftShoulder
+        case .rightShoulder: return .rightShoulder
+        case .leftElbow: return .leftElbow
+        case .rightElbow: return .rightElbow
+        case .leftWrist: return .leftWrist
+        case .rightWrist: return .rightWrist
+        }
+    }
+}
+
+nonisolated struct BodyPoint: Sendable {
+    /// Upright, mirrored camera image like `HandObservation`: x right, y down, both in 0...1.
+    var location: SIMD2<Float>
+    var confidence: Float
+}
+
+/// One detected upper body, or none when nobody is in view.
+nonisolated struct BodyFrame: Sendable {
+    var points: [BodyPoint?]
+    /// Width / height of the (upright) camera image.
+    var imageAspect: Float
+
+    subscript(_ joint: BodyJoint) -> BodyPoint? { points[joint.rawValue] }
+
+    /// Shoulder distance and midpoint as fractions of the image width, when both shoulders are seen.
+    var shoulders: (width: Float, centerX: Float)? {
+        guard let left = self[.leftShoulder], let right = self[.rightShoulder] else { return nil }
+        return (abs(left.location.x - right.location.x), (left.location.x + right.location.x) / 2)
+    }
+}
+
 /// Runs the front camera and Vision's hand-pose detector, entirely on device.
 nonisolated final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
     enum Status: Sendable { case running, denied, unavailable }
@@ -67,10 +109,18 @@ nonisolated final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBuf
     let session = AVCaptureSession()
     /// Set before calling `start`. Delivered on the main actor once per processed frame.
     var onFrame: (@MainActor @Sendable (HandFrame) -> Void)?
+    /// Set before calling `start`. Delivered once per processed frame while `bodyPoseEnabled` is on.
+    var onBody: (@MainActor @Sendable (BodyFrame) -> Void)?
+    /// Body pose costs frame time, so only the pages that need it (distance check, canvas) switch it on.
+    var bodyPoseEnabled: Bool {
+        get { bodyPoseFlag.withLock { $0 } }
+        set { bodyPoseFlag.withLock { $0 = newValue } }
+    }
 
     private let sessionQueue = DispatchQueue(label: "puffy.camera.session")
     private let videoQueue = DispatchQueue(label: "puffy.camera.video", qos: .userInteractive)
     private var configured = false
+    private let bodyPoseFlag = OSAllocatedUnfairLock(initialState: false)
     #if os(iOS)
     private var rotation: AVCaptureDevice.RotationCoordinator?
     private var rotationObserver: NSKeyValueObservation?
@@ -80,6 +130,8 @@ nonisolated final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBuf
         request.maximumHandCount = 2
         return request
     }()
+
+    private let bodyRequest = VNDetectHumanBodyPoseRequest()
 
     func start(completion: @escaping @MainActor @Sendable (Status) -> Void) {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
@@ -207,11 +259,14 @@ nonisolated final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBuf
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let width = CVPixelBufferGetWidth(pixelBuffer)
         let height = CVPixelBufferGetHeight(pixelBuffer)
+        let aspect = Float(width) / Float(max(height, 1))
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up, options: [:])
 
+        let wantsBody = bodyPoseEnabled
         var hands: [HandObservation] = []
+        var body: BodyFrame?
         do {
-            try handler.perform([request])
+            try handler.perform(wantsBody ? [request, bodyRequest] : [request])
             for observation in request.results ?? [] {
                 guard let points = try? observation.recognizedPoints(.all) else { continue }
                 var joints = [SIMD2<Float>?](repeating: nil, count: HandJoint.allCases.count)
@@ -222,12 +277,31 @@ nonisolated final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBuf
                 }
                 hands.append(HandObservation(joints: joints, confidence: observation.confidence))
             }
+            if wantsBody { body = bodyFrame(from: bodyRequest.results?.first, aspect: aspect) }
         } catch {
             // A failed frame is simply skipped.
         }
 
-        let frame = HandFrame(hands: hands, imageAspect: Float(width) / Float(max(height, 1)))
+        let frame = HandFrame(hands: hands, imageAspect: aspect)
         let callback = onFrame
-        Task { @MainActor in callback?(frame) }
+        let bodyCallback = onBody
+        Task { @MainActor in
+            callback?(frame)
+            if wantsBody { bodyCallback?(body ?? BodyFrame(points: Self.noBody, imageAspect: aspect)) }
+        }
+    }
+
+    private static let noBody = [BodyPoint?](repeating: nil, count: BodyJoint.allCases.count)
+
+    private func bodyFrame(from observation: VNHumanBodyPoseObservation?, aspect: Float) -> BodyFrame {
+        var points = Self.noBody
+        if let observation, let recognized = try? observation.recognizedPoints(.all) {
+            for joint in BodyJoint.allCases {
+                guard let point = recognized[joint.visionName], point.confidence > 0.3 else { continue }
+                points[joint.rawValue] = BodyPoint(location: SIMD2(Float(point.location.x), Float(1 - point.location.y)),
+                                                   confidence: point.confidence)
+            }
+        }
+        return BodyFrame(points: points, imageAspect: aspect)
     }
 }

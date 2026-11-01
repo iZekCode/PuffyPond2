@@ -79,8 +79,7 @@ struct ContentView: View {
         case .templates:
             TemplatesView(router: router, gallery: gallery).transition(.opacity)
         case let .instruction(choice):
-            // The distance check arrives with the instruction page; until then go straight on.
-            PlaceholderPage(title: "Get ready", router: router, next: ("Start", .canvas(choice)))
+            InstructionView(router: router, tracker: tracker, cameraStatus: playground.cameraStatus, choice: choice)
                 .transition(.opacity)
         case .review:
             PlaceholderPage(title: "Review", router: router).transition(.opacity)
