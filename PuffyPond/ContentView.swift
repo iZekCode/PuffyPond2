@@ -34,17 +34,21 @@ struct ContentView: View {
                 .opacity(onCanvas ? 1 : 0)
                 .allowsHitTesting(onCanvas)
             if onCanvas {
-                HUDView(playground: playground, session: tracker.session,
-                        paintingCount: gallery.paintings.count, finish: hangPainting,
-                        openGallery: { router.go(.gallery3D(start: 0, justHung: false)) },
-                        goHome: router.home)
+                HUDView(playground: playground, session: tracker.session, saveImage: saveImage, goHome: router.home)
                     .transition(.opacity)
             }
             page
         }
         .immersive()
         .environment(\.uiScale, Platform.isPad ? 1.2 : 1)
-        .onChange(of: onCanvas, initial: true) { _, canvas in playground.isAway = !canvas }
+        .onChange(of: onCanvas, initial: true) { _, canvas in
+            playground.isAway = !canvas
+            watchBody(canvas)
+        }
+        .onChange(of: router.route) { old, new in
+            // Coming from the distance check is a new session; coming back from the review page is not.
+            if case .canvas(let choice) = new, case .instruction = old { playground.begin(choice) }
+        }
         .onAppear {
             Platform.keepAwake()
             playground.start()
@@ -81,8 +85,8 @@ struct ContentView: View {
         case let .instruction(choice):
             InstructionView(router: router, tracker: tracker, cameraStatus: playground.cameraStatus, choice: choice)
                 .transition(.opacity)
-        case .review:
-            PlaceholderPage(title: "Review", router: router).transition(.opacity)
+        case let .review(draft):
+            ReviewPlaceholder(draft: draft, router: router, save: { save(draft) }).transition(.opacity)
         case .gallery2D:
             PlaceholderPage(title: "Gallery", router: router).transition(.opacity)
         case .report:
@@ -90,10 +94,33 @@ struct ContentView: View {
         }
     }
 
-    /// Photographs the painting off the easel and walks over to see it hanging in the gallery.
-    private func hangPainting() {
-        guard let photo = playground.finishPainting(), gallery.add(photo) != nil else { return }
+    /// Photographs the painting off the easel and takes it to the review page.
+    private func saveImage() {
+        guard case .canvas(let choice) = router.route, let photo = playground.finishPainting() else { return }
+        router.go(.review(ReviewDraft(image: photo, choice: choice, stats: playground.sessionStats())))
+    }
+
+    /// Hangs the reviewed painting, with its template and movement stats, and walks over to see it.
+    private func save(_ draft: ReviewDraft) {
+        let record = PaintingRecord(date: Date(), templateID: draft.choice?.templateID,
+                                    isDailyQuest: draft.choice?.isDailyQuest ?? false, stats: draft.stats)
+        guard gallery.add(draft.image, record: record) != nil else { return }
         router.go(.gallery3D(start: 0, justHung: true))
+    }
+
+    /// Body pose runs on the canvas for the range-of-motion stats, and stops when the canvas closes
+    /// (the distance check page switches it on for itself).
+    private func watchBody(_ canvas: Bool) {
+        if canvas {
+            let playground = playground
+            tracker.onBody = { frame in playground.ingest(frame) }
+            tracker.bodyPoseEnabled = true
+        } else if case .instruction = router.route {
+            return
+        } else {
+            tracker.bodyPoseEnabled = false
+            tracker.onBody = nil
+        }
     }
 
     private func startTracking() {

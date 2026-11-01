@@ -5,12 +5,11 @@ import AVFoundation
 struct HUDView: View {
     @Bindable var playground: Playground
     let session: AVCaptureSession
-    let paintingCount: Int
-    let finish: () -> Void
-    let openGallery: () -> Void
+    let saveImage: () -> Void
     let goHome: () -> Void
 
     @Environment(\.uiScale) private var scale
+    @State private var confirmingHome = false
 
     /// The iPad is wide and short: the title and the two buddy chips share one row so the hint fits
     /// in the free strip above the canvas.
@@ -58,6 +57,12 @@ struct HUDView: View {
                     CameraNotice(denied: playground.cameraStatus == .denied)
                 }
         }
+        .confirmationDialog("Leave without saving?", isPresented: $confirmingHome, titleVisibility: .visible) {
+            Button("Leave", role: .destructive, action: goHome)
+            Button("Keep drawing", role: .cancel) {}
+        } message: {
+            Text("This painting isn't saved yet.")
+        }
     }
 
     private var title: some View {
@@ -93,9 +98,9 @@ struct HUDView: View {
         case .pickingColor: return ("drop.fill", "Rub rub rub! Swipe through the pot to soak up the color")
         case .drawing: return ("paintbrush.pointed.fill", "Swoosh! Keep pinching and sweep your arm")
         case .erasing: return ("star.fill", "Starfish scrub! Wipe the paint away")
-        case .readyToHang: return ("photo.artframe", "All done? Tap the frame to hang it in the gallery")
+        case .readyToHang: return ("photo.artframe", "All done? Tap Save image")
         case .tracing: return ("scribble.variable", "Pinch and follow the dotted line · fist to wipe it away")
-        case .touchMode: return ("hand.draw.fill", "Drag to draw · tap the frame when you're done")
+        case .touchMode: return ("hand.draw.fill", "Drag to draw · tap Save image when you're done")
         }
     }
 
@@ -164,12 +169,8 @@ struct HUDView: View {
 
     private var controls: some View {
         HStack(spacing: 10 * scale) {
-            RoundButton(symbol: "house.fill", tint: .green, action: goHome)
-            if playground.hasDrawing {
-                RoundButton(symbol: "photo.artframe", tint: .pink, action: finish)
-            }
-            if paintingCount > 0 {
-                RoundButton(symbol: "building.columns.fill", tint: .orange, action: openGallery)
+            RoundButton(symbol: "house.fill", tint: .green) {
+                if playground.hasDrawing { confirmingHome = true } else { goHome() }
             }
             #if os(iOS)
             RoundButton(symbol: playground.pointerErases ? "star.fill" : "paintbrush.pointed.fill",
@@ -187,7 +188,29 @@ struct HUDView: View {
                 withAnimation { playground.showGuide = true }
             }
             RoundButton(symbol: "arrow.counterclockwise", tint: .red) { playground.clearAll() }
+            if playground.hasDrawing {
+                saveButton.transition(.scale.combined(with: .opacity))
+            }
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: playground.hasDrawing)
+    }
+
+    private var saveButton: some View {
+        Button(action: saveImage) {
+            HStack(spacing: 8 * scale) {
+                Image(systemName: "photo.artframe")
+                    .font(.system(size: 18 * scale, weight: .bold))
+                Text("Save image")
+                    .font(.system(size: 18 * scale, weight: .heavy, design: .rounded))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 18 * scale)
+            .frame(height: 46 * scale)
+            .background(Color.pink.gradient, in: Capsule())
+            .overlay(Capsule().stroke(.white, lineWidth: 2.5))
+            .shadow(color: Color.pink.opacity(0.4), radius: 6, y: 3)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: Camera preview
@@ -262,8 +285,8 @@ private struct GuideCard: View {
             detail: "Snail thick oil, jelly liquid oil, octopus brush, starfish eraser, sponge blender."),
         Row(symbol: "star.fill", color: .pink, title: "Starfish = eraser",
             detail: "Pick the starfish bubble and make a fist to scrub paint and the dotted guide away."),
-        Row(symbol: "photo.artframe", color: .purple, title: "All done? Hang it up",
-            detail: "Tap the frame and your painting goes into the gallery, where the critters come to admire it."),
+        Row(symbol: "photo.artframe", color: .purple, title: "All done? Save it",
+            detail: "Tap Save image to look it over, then hang it in the gallery for the critters to admire."),
     ]
 
     private let legacyRows: [Row] = [
@@ -277,8 +300,8 @@ private struct GuideCard: View {
             detail: "Octopus bundle brush, snail palette knife, puffer splatter, seahorse calligraphy, jelly watercolor, frog prints."),
         Row(symbol: "star.fill", color: .pink, title: "Fist = Starfish",
             detail: "Make a fist and your critter turns into a starfish that scrubs paint away."),
-        Row(symbol: "photo.artframe", color: .purple, title: "All done? Hang it up",
-            detail: "Tap the frame and your painting goes into the gallery, where the critters come to admire it."),
+        Row(symbol: "photo.artframe", color: .purple, title: "All done? Save it",
+            detail: "Tap Save image to look it over, then hang it in the gallery for the critters to admire."),
     ]
 
     var body: some View {

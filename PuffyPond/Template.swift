@@ -214,7 +214,8 @@ enum TemplateKind: String, CaseIterable {
 
 /// The dotted outline lying on the canvas, just under the paint. The starfish scrubs it away dash by dash.
 final class TemplateOutline {
-    let kind: TemplateKind
+    /// The template it came from (nil for a daily-quest outline).
+    let kind: TemplateKind?
     let node = SCNNode()
     private let material = SCNMaterial()
     private let origin: SIMD2<Float>        // bottom-left of the canvas
@@ -230,12 +231,16 @@ final class TemplateOutline {
     private static let gap: Float = 0.14
     private static let ink = CGColor(red: 0.42, green: 0.36, blue: 0.3, alpha: 0.5)
 
-    init(kind: TemplateKind, canvasCenter: SIMD2<Float>, canvasSize: SIMD2<Float>, z: Float) {
+    convenience init(kind: TemplateKind, canvasCenter: SIMD2<Float>, canvasSize: SIMD2<Float>, z: Float) {
+        self.init(art: kind.art, kind: kind, canvasCenter: canvasCenter, canvasSize: canvasSize, z: z)
+    }
+
+    init(art: OutlineArt, kind: TemplateKind? = nil, canvasCenter: SIMD2<Float>, canvasSize: SIMD2<Float>, z: Float) {
         self.kind = kind
         origin = canvasCenter - canvasSize * 0.5
         size = canvasSize
         // Big and bold so small kids can follow it; nudged up a little, clear of the bubbles on the tray.
-        let shape = kind.shape(center: canvasCenter + SIMD2(0, 0.15), size: canvasSize * SIMD2(0.72, 0.68))
+        let shape = art.shape(center: canvasCenter + SIMD2(0, 0.15), size: canvasSize * SIMD2(0.72, 0.68))
         marks = shape.lines.flatMap { Self.dashes($0) } + shape.eyes.map { [$0] }
 
         let plane = SCNPlane(width: CGFloat(canvasSize.x), height: CGFloat(canvasSize.y))

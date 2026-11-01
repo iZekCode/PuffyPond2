@@ -14,10 +14,37 @@ struct SessionStats: Codable, Equatable {
     var duration: TimeInterval = 0
     /// Highest shoulder abduction reached per arm, in degrees.
     var romDegrees: [Side: Double] = [:]
-    /// Time the drawing hands spent painting, per canvas cell (`heatmapColumns` × `heatmapRows`, row-major).
+    /// Time the drawing hands spent painting, per canvas cell (`heatmapColumns` × `heatmapRows`, row-major,
+    /// top-left first), in hundredths of a second.
     var heatmap: [UInt16] = Array(repeating: 0, count: heatmapColumns * heatmapRows)
     /// Seconds each hand spent painting. Named after the original pinch; with the fist controls it counts fist time.
     var pinchSeconds: [Side: Double] = [:]
+    /// Straightest elbow per arm, in degrees (180 = fully straight).
+    var elbowExtension: [Side: Double] = [:]
+    /// Highest wrist above its shoulder per arm, in shoulder widths (negative = never got above it).
+    var reachHeight: [Side: Double] = [:]
+    /// Area the wrist covered per arm (convex hull), in shoulder widths squared.
+    var reachArea: [Side: Double] = [:]
+    /// Fist → open cycles per hand.
+    var gripCycles: [Side: Int] = [:]
+    /// Biggest tilt of the shoulder line, in degrees (over 15 means leaning over to reach).
+    var maxTrunkLean: Double = 0
+
+    init() {}
+
+    /// Stats saved before a metric existed decode with that metric empty.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        duration = try c.decodeIfPresent(TimeInterval.self, forKey: .duration) ?? 0
+        romDegrees = try c.decodeIfPresent([Side: Double].self, forKey: .romDegrees) ?? [:]
+        heatmap = try c.decodeIfPresent([UInt16].self, forKey: .heatmap) ?? heatmap
+        pinchSeconds = try c.decodeIfPresent([Side: Double].self, forKey: .pinchSeconds) ?? [:]
+        elbowExtension = try c.decodeIfPresent([Side: Double].self, forKey: .elbowExtension) ?? [:]
+        reachHeight = try c.decodeIfPresent([Side: Double].self, forKey: .reachHeight) ?? [:]
+        reachArea = try c.decodeIfPresent([Side: Double].self, forKey: .reachArea) ?? [:]
+        gripCycles = try c.decodeIfPresent([Side: Int].self, forKey: .gripCycles) ?? [:]
+        maxTrunkLean = try c.decodeIfPresent(Double.self, forKey: .maxTrunkLean) ?? 0
+    }
 }
 
 /// What is remembered about one saved painting: when, which template, and the session's movement stats.

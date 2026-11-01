@@ -53,12 +53,15 @@ nonisolated struct HandFrame: Sendable {
     var imageAspect: Float
 }
 
-/// The upper-body joints the app cares about. Left and right are the person's own sides.
+/// The upper-body joints the app cares about, named as Vision names them. Vision reads the camera image
+/// as a plain photo, so on the mirrored image its left and right are swapped; `SessionRecorder` works
+/// out the person's sides from where the shoulders sit instead.
 nonisolated enum BodyJoint: Int, CaseIterable, Sendable {
     case neck
     case leftShoulder, rightShoulder
     case leftElbow, rightElbow
     case leftWrist, rightWrist
+    case leftHip, rightHip
 
     var visionName: VNHumanBodyPoseObservation.JointName {
         switch self {
@@ -69,6 +72,8 @@ nonisolated enum BodyJoint: Int, CaseIterable, Sendable {
         case .rightElbow: return .rightElbow
         case .leftWrist: return .leftWrist
         case .rightWrist: return .rightWrist
+        case .leftHip: return .leftHip
+        case .rightHip: return .rightHip
         }
     }
 }

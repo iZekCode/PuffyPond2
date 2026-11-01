@@ -14,6 +14,8 @@ struct ReviewDraft: Equatable {
     let id = UUID()
     let image: CGImage
     let choice: TemplateChoice?
+    /// Movement stats of the session; nil when it was drawn by touch or mouse.
+    let stats: SessionStats?
 
     static func == (lhs: ReviewDraft, rhs: ReviewDraft) -> Bool { lhs.id == rhs.id }
 }

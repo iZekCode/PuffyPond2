@@ -1,5 +1,12 @@
 import Foundation
 
+extension TemplateChoice {
+    /// The outline to trace: a template from the catalog, or the day's quest from its own pool.
+    var art: OutlineArt? {
+        isDailyQuest ? QuestCatalog.quest(id: templateID)?.art : TemplateCatalog.kind(id: templateID)?.art
+    }
+}
+
 /// The templates in unlock order, and which of them a person can start from.
 enum TemplateCatalog {
     /// Easy → hard. Each template opens once the one before it has a saved painting.

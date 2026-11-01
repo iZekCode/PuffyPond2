@@ -74,6 +74,8 @@ struct InstructionView: View {
             tracker.bodyPoseEnabled = true
         }
         .onDisappear {
+            // On to the canvas: it takes over the body pose for the movement stats.
+            guard !router.route.isCanvas else { return }
             tracker.bodyPoseEnabled = false
             tracker.onBody = nil
         }

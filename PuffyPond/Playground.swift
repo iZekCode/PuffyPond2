@@ -77,6 +77,8 @@ final class Playground {
     @ObservationIgnored private let canvasNode = SCNNode()
     @ObservationIgnored private var canvasBoard: SCNNode?
     @ObservationIgnored private var studioLights: [SCNNode] = []
+    /// Movement stats of the current canvas session (camera hands and body only).
+    @ObservationIgnored private var recorder = SessionRecorder()
 
     // Layout
     @ObservationIgnored private var aspect: Float = 16.0 / 10.0
@@ -248,8 +250,9 @@ final class Playground {
             scene.rootNode.addChildNode(pot.root)
             scene.rootNode.addChildNode(pot.residentRoot)
         }
-        // A row of template bubbles on the tray: rub one to get a dotted animal to trace.
-        for (k, kind) in TemplateKind.legacyTray.enumerated() {
+        // A row of template bubbles on the tray: rub one to get a dotted animal to trace. The fist
+        // controls pick the template before the canvas opens instead.
+        for (k, kind) in (controlScheme == .legacy ? TemplateKind.legacyTray : []).enumerated() {
             let x = (Float(k) - Float(TemplateKind.legacyTray.count - 1) / 2) * 0.9
             let pot = TemplatePot(kind: kind, at: SIMD3(x, Self.templateRowY, 0.3))
             scene.rootNode.addChildNode(pot.root)
@@ -304,6 +307,12 @@ final class Playground {
         }
     }
 
+    /// Body pose for the range-of-motion stats; only counts while the canvas is up.
+    func ingest(_ body: BodyFrame) {
+        guard !isAway else { return }
+        recorder.record(body: body, at: CACurrentMediaTime())
+    }
+
     func pointerBegan(_ uv: SIMD2<Float>) {
         pointer = uv
         pointerPrevious = uv
@@ -343,6 +352,7 @@ final class Playground {
         var movement: Float = 0
         var drawingNow = false
         var erasingNow = false
+        var recorded: [SessionRecorder.Hand] = []
         for buddy in buddies {
             let hand = hands.first { $0.slot == buddy.slot && $0.tracking }
             // The touch/mouse eraser button makes the pointer scrub, whatever tool the buddy holds.
@@ -380,7 +390,13 @@ final class Playground {
                 break
             }
             rubPots(buddy, dt: dt, now: now)
+            if let hand, !hand.isPointer {
+                recorded.append(SessionRecorder.Hand(slot: hand.slot, pose: hand.pose,
+                                                     painting: mode == .paint || mode == .erase,
+                                                     canvas: canvasUV(buddy.toolPosition)))
+            }
         }
+        if !isAway { recorder.record(hands: recorded, dt: Double(dt)) }
         var rubbing = false
         for pot in pots {
             let rubbers = buddies.filter { $0.rubbingPot == .color(pot.colorIndex) }
@@ -420,6 +436,14 @@ final class Playground {
         audio.update(energy: energy, now: now)
 
         publishHUD(dt: dt, hands: hands, drawing: drawingNow, erasing: erasingNow, rubbing: rubbing)
+    }
+
+    /// A world point → canvas (0…1, y down), nil when it's off the canvas.
+    private func canvasUV(_ p: SIMD3<Float>) -> SIMD2<Float>? {
+        let size = Self.canvasSize
+        let uv = SIMD2((p.x + size.x * 0.5) / size.x, (0.1 + size.y * 0.5 - p.y) / size.y)
+        guard uv.x >= 0, uv.x <= 1, uv.y >= 0, uv.y <= 1 else { return nil }
+        return uv
     }
 
     private func panFor(_ x: Float) -> Float {
@@ -561,8 +585,8 @@ final class Playground {
 
     // MARK: - Hang it in the gallery
 
-    /// Photographs the finished painting (just the canvas and its paint, lit like the studio) and
-    /// clears the easel for the next one. Nil when there's nothing painted yet.
+    /// Photographs the finished painting (just the canvas and its paint, lit like the studio). The paint
+    /// stays on the easel, so "Keep drawing" on the review page carries on. Nil when there's nothing painted yet.
     func finishPainting() -> CGImage? {
         guard !strokes.isEmpty else {
             audio.play(.swap)
@@ -573,7 +597,6 @@ final class Playground {
             audio.play(.fizzle)
             return nil
         }
-        clearCanvas()
         audio.play(.fanfare)
         for buddy in buddies { buddy.critter.react(.happy, for: 1.2) }
         return photo
@@ -628,6 +651,20 @@ final class Playground {
         lastBead = [:]
         lastStamp = [:]
     }
+
+    /// Starts a fresh canvas session: clears the easel, lays the chosen outline, resets the stats.
+    func begin(_ choice: TemplateChoice?) {
+        clearCanvas()
+        if let choice, let art = choice.art {
+            let kind = choice.isDailyQuest ? nil : TemplateCatalog.kind(id: choice.templateID)
+            showOutline(TemplateOutline(art: art, kind: kind, canvasCenter: SIMD2(0, 0.1), canvasSize: Self.canvasSize,
+                                        z: Self.canvasZ + 0.0008))
+        }
+        recorder = SessionRecorder()
+    }
+
+    /// Movement stats so far; nil when only touch or mouse drew.
+    func sessionStats() -> SessionStats? { recorder.finish() }
 
     func clearAll() {
         clearCanvas()
@@ -714,9 +751,12 @@ final class Playground {
 
     /// Lays a new dotted outline on the canvas (replacing any other one). Paint already there stays.
     private func showTemplate(_ kind: TemplateKind) {
+        showOutline(TemplateOutline(kind: kind, canvasCenter: SIMD2(0, 0.1), canvasSize: Self.canvasSize,
+                                    z: Self.canvasZ + 0.0008))
+    }
+
+    private func showOutline(_ outline: TemplateOutline) {
         template?.fadeAway()
-        let outline = TemplateOutline(kind: kind, canvasCenter: SIMD2(0, 0.1), canvasSize: Self.canvasSize,
-                                      z: Self.canvasZ + 0.0008)
         scene.rootNode.addChildNode(outline.node)
         template = outline
     }
