@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		7A0000000000000500000000 /* StableDiffusion in Frameworks */ = {isa = PBXBuildFile; productRef = 7A0000000000000410000000 /* StableDiffusion */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -43,7 +42,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7A0000000000000500000000 /* StableDiffusion in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -94,9 +92,6 @@
 				7A0000000000000000000010 /* PuffyPond */,
 			);
 			name = PuffyPond;
-			packageProductDependencies = (
-				7A0000000000000410000000 /* StableDiffusion */,
-			);
 			productName = PuffyPond;
 			productReference = 7A0000000000000000000120 /* PuffyPond.app */;
 			productType = "com.apple.product-type.application";
@@ -150,9 +145,6 @@
 			);
 			mainGroup = 7A0000000000000000000001;
 			minimizedProjectReferenceProxies = 1;
-			packageReferences = (
-				7A0000000000000400000000 /* XCRemoteSwiftPackageReference "ml-stable-diffusion" */,
-			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7A0000000000000000000020 /* Products */;
 			projectDirPath = "";
@@ -487,25 +479,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		7A0000000000000400000000 /* XCRemoteSwiftPackageReference "ml-stable-diffusion" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/apple/ml-stable-diffusion";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.1.1;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		7A0000000000000410000000 /* StableDiffusion */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 7A0000000000000400000000 /* XCRemoteSwiftPackageReference "ml-stable-diffusion" */;
-			productName = StableDiffusion;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 7A0000000000000000000000 /* Project object */;
 }

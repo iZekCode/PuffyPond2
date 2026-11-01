@@ -22,7 +22,6 @@ struct ContentView: View {
     @State private var playground = Playground()
     @State private var tracker = HandTracker()
     @State private var gallery = Gallery()
-    @State private var magicStore = MagicModelStore()
     /// Which painting the gallery opens on; nil while at the easel.
     @State private var visit: GalleryVisit?
     @Environment(\.scenePhase) private var scenePhase
@@ -31,7 +30,7 @@ struct ContentView: View {
         ZStack {
             PlaygroundView(playground: playground)
                 .ignoresSafeArea()
-            HUDView(playground: playground, session: tracker.session, magicStore: magicStore,
+            HUDView(playground: playground, session: tracker.session,
                     paintingCount: gallery.paintings.count, finish: hangPainting, openGallery: { open(GalleryVisit(index: 0, justHung: false)) })
             if let visit {
                 GalleryView(gallery: gallery, startAt: visit.index, justHung: visit.justHung) { open(nil) }
@@ -42,7 +41,6 @@ struct ContentView: View {
         .environment(\.uiScale, Platform.isPad ? 1.2 : 1)
         .onAppear {
             Platform.keepAwake()
-            playground.setUpMagic(store: magicStore)
             playground.start()
             startTracking()
         }

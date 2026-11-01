@@ -36,8 +36,6 @@ final class Playground {
     var buddyColors: [Int] = [0, 1]
     var buddyKinds: [CritterKind] = [.octopus, .seahorse]
     var colorFlash: ColorFlash?
-    /// AI "magic" mode; nil until the app hands over its model store (see `setUpMagic`).
-    private(set) var magic: MagicController?
 
     // MARK: World
     @ObservationIgnored let effects = Effects(scene: SCNScene())
@@ -67,11 +65,6 @@ final class Playground {
     @ObservationIgnored private let canvasNode = SCNNode()
     @ObservationIgnored private var canvasBoard: SCNNode?
     @ObservationIgnored private var studioLights: [SCNNode] = []
-    @ObservationIgnored private let magicOverlay = MagicOverlay()
-    /// Counts paintings so Magic keeps one seed per painting (the picture doesn't jump around between runs).
-    @ObservationIgnored private var paintingNumber = 0
-    /// The bare board, photographed once, so Magic can tell paint from canvas weave.
-    @ObservationIgnored private var blankPhoto: CGImage?
 
     // Layout
     @ObservationIgnored private var aspect: Float = 16.0 / 10.0
@@ -112,24 +105,6 @@ final class Playground {
 
     func pause() {
         audio.pause()
-        magic?.pause()
-    }
-
-    /// Gives the easel its AI "magic" brain. Does nothing on devices that can't run it.
-    func setUpMagic(store: MagicModelStore) {
-        guard magic == nil, MagicSupport.isSupported else { return }
-        scene.rootNode.addChildNode(magicOverlay.node)
-        blankPhoto = photographCanvas(pixels: MagicController.photoWidth)
-        magic = MagicController(
-            overlay: magicOverlay, store: store,
-            photograph: { [weak self] width in self?.photographCanvas(pixels: width) },
-            blank: { [weak self] in self?.blankPhoto },
-            context: { [weak self] in
-                guard let self else { return (nil, []) }
-                let brushes = strokes.map(\.brush)
-                return (template?.kind, brushes.isEmpty ? buddyKinds : brushes)
-            },
-            seed: { [weak self] in UInt32(truncatingIfNeeded: self?.paintingNumber ?? 0) })
     }
 
     func toggleMusic() {
@@ -409,7 +384,6 @@ final class Playground {
         template?.update()
 
         paintLayer.update(dt: dt)
-        magic?.tick(at: now)
 
         effects.update(dt: dt)
         shake = max(0, shake - dt * 4)
@@ -478,7 +452,6 @@ final class Playground {
             strokes.append(stroke)
             activeStroke[slot] = stroke
             lastBead[slot] = p
-            magic?.strokeBegan(at: now)
             buddy.critter.gulp()
             audio.play(.blip, a: (p.y - center.y) / Self.canvasSize.y + 0.5, pan: panFor(p.x))
         }
@@ -497,7 +470,6 @@ final class Playground {
             buddy.critter.react(.happy, for: 0.7)   // proud of that line
             // Some brushes paint when you let go (the pufferfish bursts).
             lay(buddy.critter.released(), color: buddy.color, seed: Float(slot) * 7.7 + Float(strokes.count))
-            magic?.canvasChanged(at: CACurrentMediaTime())
         }
         activeStroke[slot] = nil
         lastBead[slot] = nil
@@ -547,7 +519,6 @@ final class Playground {
         }
         strokes = newStrokes
         if erasedAny {
-            magic?.canvasChanged(at: now)
             buddy.starfish.scrubbed()
             if now - lastSqueak > 0.09 {
                 lastSqueak = now
@@ -626,8 +597,6 @@ final class Playground {
         activeStroke = [:]
         lastBead = [:]
         lastStamp = [:]
-        paintingNumber += 1
-        magic?.cleared()
     }
 
     func clearAll() {

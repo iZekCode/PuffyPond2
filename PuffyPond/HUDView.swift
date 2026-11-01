@@ -5,7 +5,6 @@ import AVFoundation
 struct HUDView: View {
     @Bindable var playground: Playground
     let session: AVCaptureSession
-    let magicStore: MagicModelStore
     let paintingCount: Int
     let finish: () -> Void
     let openGallery: () -> Void
@@ -144,9 +143,6 @@ struct HUDView: View {
 
     private var controls: some View {
         HStack(spacing: 10 * scale) {
-            if let magic = playground.magic {
-                MagicButton(magic: magic, store: magicStore)
-            }
             if playground.hasDrawing {
                 RoundButton(symbol: "photo.artframe", tint: .pink, action: finish)
             }
@@ -215,67 +211,6 @@ struct RoundButton: View {
                 .shadow(color: tint.opacity(0.4), radius: 6, y: 3)
         }
         .buttonStyle(.plain)
-    }
-}
-
-/// Turns Magic on and off. Before the model is downloaded it downloads it, with a progress ring.
-private struct MagicButton: View {
-    let magic: MagicController
-    let store: MagicModelStore
-    @Environment(\.uiScale) private var scale
-
-    var body: some View {
-        Button(action: tapped) {
-            ZStack {
-                Image(systemName: failed ? "exclamationmark.arrow.triangle.2.circlepath" : "sparkles")
-                    .font(.system(size: 18 * scale, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 46 * scale, height: 46 * scale)
-                    .background(Color.cyan.gradient.opacity(lit ? 1 : 0.55), in: Circle())
-                    .overlay(Circle().stroke(.white, lineWidth: 2.5))
-                    .symbolEffect(.variableColor.iterative, isActive: magic.isGenerating)
-                if case .downloading(let progress) = store.state {
-                    Circle()
-                        .trim(from: 0, to: max(progress, 0.03))
-                        .stroke(.white, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                        .frame(width: 38 * scale, height: 38 * scale)
-                }
-            }
-            .shadow(color: Color.cyan.opacity(lit ? 0.6 : 0.3), radius: lit ? 10 : 6, y: 3)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
-    }
-
-    private var failed: Bool {
-        if case .failed = store.state { return true }
-        return false
-    }
-
-    private var lit: Bool {
-        if case .ready = store.state { return magic.isOn }
-        return false
-    }
-
-    private var label: String {
-        switch store.state {
-        case .notDownloaded: return "Download Magic"
-        case .downloading: return "Downloading Magic"
-        case .ready: return magic.isOn ? "Turn Magic off" : "Turn Magic on"
-        case .failed(let message): return "Magic download failed: \(message). Tap to retry"
-        }
-    }
-
-    private func tapped() {
-        switch store.state {
-        case .notDownloaded, .failed:
-            Task { await store.download() }
-        case .downloading:
-            break
-        case .ready:
-            magic.isOn.toggle()
-        }
     }
 }
 
