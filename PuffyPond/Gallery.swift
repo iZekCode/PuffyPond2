@@ -10,20 +10,32 @@ import simd
 
 struct Painting: Identifiable, Equatable {
     let url: URL
-    let date: Date
+    let record: PaintingRecord
     var id: URL { url }
+    var date: Date { record.date }
+
+    /// The JSON file with the record, next to the PNG.
+    var sidecarURL: URL { Self.sidecarURL(for: url) }
+
+    static func sidecarURL(for png: URL) -> URL {
+        png.deletingPathExtension().appendingPathExtension("json")
+    }
 }
 
-/// Finished paintings, kept as PNGs on the device (newest first).
+/// Finished paintings, kept as PNGs on the device (newest first), each with a JSON record beside it.
 @Observable
 final class Gallery {
     private(set) var paintings: [Painting] = []
     @ObservationIgnored private let folder: URL
 
-    init() {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        folder = base.appendingPathComponent("Gallery", isDirectory: true)
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    init(folder: URL? = nil) {
+        if let folder {
+            self.folder = folder
+        } else {
+            let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            self.folder = base.appendingPathComponent("Gallery", isDirectory: true)
+        }
+        try? FileManager.default.createDirectory(at: self.folder, withIntermediateDirectories: true)
         reload()
     }
 
@@ -33,28 +45,63 @@ final class Gallery {
         paintings = files
             .filter { $0.pathExtension == "png" }
             .map { url in
-                Painting(url: url, date: (try? url.resourceValues(forKeys: Set(keys)).creationDate) ?? .distantPast)
+                let sidecar = Painting.sidecarURL(for: url)
+                if let data = try? Data(contentsOf: sidecar),
+                   let record = try? JSONDecoder().decode(PaintingRecord.self, from: data) {
+                    return Painting(url: url, record: record)
+                }
+                // A PNG from before records existed (or a broken sidecar): keep its date, write an empty record.
+                let created = (try? url.resourceValues(forKeys: Set(keys)).creationDate) ?? .distantPast
+                let record = PaintingRecord(date: created)
+                Self.write(record, to: sidecar)
+                return Painting(url: url, record: record)
             }
             .sorted { $0.date > $1.date }
     }
 
+    private static func write(_ record: PaintingRecord, to url: URL) {
+        guard let data = try? JSONEncoder().encode(record) else { return }
+        try? data.write(to: url, options: .atomic)
+    }
+
     /// Hangs a new painting at the front of the gallery.
     @discardableResult
-    func add(_ image: CGImage) -> Painting? {
-        let date = Date()
-        let url = folder.appendingPathComponent("painting-\(Int(date.timeIntervalSince1970 * 1000)).png")
+    func add(_ image: CGImage, record: PaintingRecord = PaintingRecord(date: Date())) -> Painting? {
+        let url = folder.appendingPathComponent("painting-\(Int(record.date.timeIntervalSince1970 * 1000)).png")
         guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
         else { return nil }
         CGImageDestinationAddImage(destination, image, nil)
         guard CGImageDestinationFinalize(destination) else { return nil }
-        let painting = Painting(url: url, date: date)
-        paintings.insert(painting, at: 0)
+        Self.write(record, to: Painting.sidecarURL(for: url))
+        let painting = Painting(url: url, record: record)
+        paintings.append(painting)
+        paintings.sort { $0.date > $1.date }
         return painting
     }
 
     func remove(_ painting: Painting) {
         try? FileManager.default.removeItem(at: painting.url)
+        try? FileManager.default.removeItem(at: painting.sidecarURL)
         paintings.removeAll { $0 == painting }
+    }
+
+    // MARK: Queries
+
+    /// Paintings made on the given local day, newest first.
+    func paintings(on day: Date, calendar: Calendar = .current) -> [Painting] {
+        paintings.filter { calendar.isDate($0.date, inSameDayAs: day) }
+    }
+
+    /// The local days (as start-of-day dates) in the month of `month` that have at least one painting.
+    func daysWithPaintings(in month: Date, calendar: Calendar = .current) -> Set<Date> {
+        Set(paintings
+            .filter { calendar.isDate($0.date, equalTo: month, toGranularity: .month) }
+            .map { calendar.startOfDay(for: $0.date) })
+    }
+
+    /// Ids of the templates that have at least one saved painting.
+    var savedTemplateIDs: Set<String> {
+        Set(paintings.compactMap(\.record.templateID))
     }
 
     static func image(of painting: Painting) -> PlatformImage? {
