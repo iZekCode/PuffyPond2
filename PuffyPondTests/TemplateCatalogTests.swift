@@ -16,9 +16,9 @@ struct TemplateCatalogTests {
 
     @Test func existingPaintingIDsStillResolve() {
         // Paintings saved before this update carry these ids in their sidecar.
-        #expect(TemplateCatalog.kind(id: "fish") == .fish)
-        #expect(TemplateCatalog.kind(id: "turtle") == .turtle)
-        #expect(TemplateCatalog.kind(id: "duck") == .duck)
+        #expect(TemplateCatalog.kind(id: "fish") == .pebble)
+        #expect(TemplateCatalog.kind(id: "turtle") == .bumpy)
+        #expect(TemplateCatalog.kind(id: "duck") == .bean)
         #expect(TemplateCatalog.kind(id: "nope") == nil)
     }
 
@@ -30,6 +30,23 @@ struct TemplateCatalogTests {
             let points = shape.lines.flatMap { $0 } + shape.eyes
             #expect(points.allSatisfy { abs($0.x) <= 1.001 && abs($0.y) <= 0.751 }, "\(kind.id) overflows its box")
         }
+    }
+
+    @Test func hardTemplatesReachTheCorners() {
+        // Hard shapes are drawn bigger and touch all four corners of their box, to widen the range of motion.
+        for kind in ordered where kind.difficulty == .hard {
+            #expect(kind.art.spread > 1, "\(kind.id) is not drawn bigger")
+            let shape = kind.art.shape(center: .zero, size: SIMD2(2, 1.5))
+            let points = shape.lines.flatMap { $0 }
+            #expect(points.contains { $0.x < -0.7 && $0.y > 0.45 }, "\(kind.id) misses top left")
+            #expect(points.contains { $0.x > 0.7 && $0.y > 0.45 }, "\(kind.id) misses top right")
+            #expect(points.contains { $0.x < -0.7 && $0.y < -0.45 }, "\(kind.id) misses bottom left")
+            #expect(points.contains { $0.x > 0.7 && $0.y < -0.45 }, "\(kind.id) misses bottom right")
+        }
+    }
+
+    @Test func templatesAreAbstractShapesWithoutEyes() {
+        #expect(ordered.allSatisfy { $0.art.eyes.isEmpty })
     }
 
     @Test func firstEasyAlwaysUnlocked() throws {
