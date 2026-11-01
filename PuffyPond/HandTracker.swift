@@ -290,9 +290,10 @@ nonisolated final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBuf
         let frame = HandFrame(hands: hands, imageAspect: aspect)
         let callback = onFrame
         let bodyCallback = onBody
+        let bodyFrame = body ?? BodyFrame(points: Self.noBody, imageAspect: aspect)
         Task { @MainActor in
             callback?(frame)
-            if wantsBody { bodyCallback?(body ?? BodyFrame(points: Self.noBody, imageAspect: aspect)) }
+            if wantsBody { bodyCallback?(bodyFrame) }
         }
     }
 
