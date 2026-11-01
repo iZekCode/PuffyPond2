@@ -112,6 +112,9 @@ nonisolated final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBuf
     static let mirrored = true                // behave like a mirror
 
     let session = AVCaptureSession()
+    /// The one live camera picture. Each page that shows it hosts this same layer, so the session is attached
+    /// once: attaching a second preview layer to the running session blocked the main thread for 9 seconds.
+    let previewLayer = CameraPreviewLayer()
     /// Set before calling `start`. Delivered on the main actor once per processed frame.
     var onFrame: (@MainActor @Sendable (HandFrame) -> Void)?
     /// Set before calling `start`. Delivered once per processed frame while `bodyPoseEnabled` is on.
@@ -137,6 +140,12 @@ nonisolated final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBuf
     }()
 
     private let bodyRequest = VNDetectHumanBodyPoseRequest()
+
+    override init() {
+        super.init()
+        previewLayer.session = session
+        previewLayer.videoGravity = .resizeAspectFill
+    }
 
     func start(completion: @escaping @MainActor @Sendable (Status) -> Void) {
         switch AVCaptureDevice.authorizationStatus(for: .video) {

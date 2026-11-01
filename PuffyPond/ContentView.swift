@@ -35,7 +35,7 @@ struct ContentView: View {
                 .opacity(onCanvas ? 1 : 0)
                 .allowsHitTesting(onCanvas)
             if onCanvas {
-                HUDView(playground: playground, session: tracker.session, saveImage: saveImage, goHome: router.home)
+                HUDView(playground: playground, previewLayer: tracker.previewLayer, saveImage: saveImage, goHome: router.home)
                     .transition(.opacity)
             }
             page
