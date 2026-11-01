@@ -79,29 +79,3 @@ struct PageBackground: View {
             .ignoresSafeArea()
     }
 }
-
-/// Stand-in for the pages later tasks build, so every route is reachable and leads back home.
-struct PlaceholderPage: View {
-    let title: String
-    let router: AppRouter
-    var next: (title: String, route: Route)?
-    @Environment(\.uiScale) private var scale
-
-    var body: some View {
-        ZStack {
-            PageBackground()
-            VStack(spacing: 24 * scale) {
-                Text(title)
-                    .font(.system(size: 40 * scale, weight: .black, design: .rounded))
-                    .foregroundStyle(PageBackground.titleGradient)
-                Text("Coming soon")
-                    .font(.system(size: 18 * scale, weight: .bold, design: .rounded))
-                    .foregroundStyle(.secondary)
-                if let next {
-                    HomeButton(title: next.title, symbol: "arrow.right.circle.fill", tint: .pink) { router.go(next.route) }
-                }
-                HomeButton(title: "Home", symbol: "house.fill", tint: .green) { router.home() }
-            }
-        }
-    }
-}

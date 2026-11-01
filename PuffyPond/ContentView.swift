@@ -96,7 +96,7 @@ struct ContentView: View {
         case .gallery2D:
             Gallery2DView(gallery: gallery, router: router).transition(.opacity)
         case .report:
-            PlaceholderPage(title: "Report", router: router).transition(.opacity)
+            ReportView(gallery: gallery, router: router).transition(.opacity)
         }
     }
 
