@@ -1,8 +1,8 @@
 import SceneKit
 import SwiftUI
 
-/// After "Save image": the painting on a wet, elastic sheet to push and grab, then hang it in the
-/// gallery or go back to the easel. The play never touches the saved image, which is always the
+/// After "Save image": the paint on a wet, elastic sheet over the still canvas to push and grab, then hang
+/// it in the gallery or go back to the easel. The play never touches the saved image, which is always the
 /// undeformed photo.
 struct ReviewView: View {
     let draft: ReviewDraft
@@ -68,13 +68,15 @@ struct ReviewView: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            stage.show(draft.image, audio: audio)
+            audio.setTune(.silly)
+            stage.show(draft.photos, audio: audio)
             stage.onPress = { id in leave(id == Self.saveID ? save : keepDrawing) }
             let stage = stage
             relay.listener = { frame in stage.ingest(frame) }
             stage.start()
         }
         .onDisappear {
+            audio.setTune(.groove)
             relay.listener = nil
             stage.stop()
         }
@@ -106,6 +108,7 @@ struct ReviewView: View {
     private func leave(_ action: () -> Void) {
         guard !leaving else { return }
         leaving = true
+        audio.play(.honk)
         action()
     }
 

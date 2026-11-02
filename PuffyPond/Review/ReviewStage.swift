@@ -5,8 +5,9 @@ import QuartzCore
 import SceneKit
 import simd
 
-/// The review page's 3D side: the finished painting on an elastic, glossy sheet that the hands push and
-/// grab. Owns the camera hands, the solver and the gestures, and rebuilds the sheet's mesh each frame.
+/// The review page's 3D side: the bare canvas stays put while the paint, on an elastic transparent sheet
+/// above it, is what the hands push and grab. Owns the camera hands, the solver and the gestures, and
+/// rebuilds the sheet's mesh each frame.
 ///
 /// The camera is orthographic and looks straight at the sheet, so a hand's spot on the screen maps
 /// exactly onto the sheet (`sheetPoint(fromView:)`).
@@ -52,6 +53,7 @@ final class ReviewStage {
     @ObservationIgnored private let hands = HandInput()
     @ObservationIgnored private let sheet = SCNNode()
     @ObservationIgnored private let material = SCNMaterial()
+    @ObservationIgnored private let canvasMaterial = SCNMaterial()
     @ObservationIgnored private let frameDriver = FrameDriver()
     @ObservationIgnored private var audio: GrooveEngine?
     @ObservationIgnored private var ripples: [Ripple] = []
@@ -72,6 +74,8 @@ final class ReviewStage {
         var strength: Float
     }
 
+    /// Where the still canvas sits behind the paint sheet (z = 0).
+    static let canvasDepth: Float = -0.3
     static let maxRipples = 16
     static let rippleLifetime: Float = 2
     /// Seconds an open hand rests on a button to press it.
@@ -82,8 +86,9 @@ final class ReviewStage {
         frameDriver.onFrame = { [weak self] dt in self?.tick(dt: Float(dt)) }
     }
 
-    func show(_ image: CGImage, audio: GrooveEngine) {
-        material.diffuse.contents = image
+    func show(_ photos: CanvasPhotos, audio: GrooveEngine) {
+        canvasMaterial.diffuse.contents = photos.canvas
+        material.diffuse.contents = photos.paint
         self.audio = audio
         meshIsFlat = false
         updateMesh()
@@ -151,12 +156,23 @@ final class ReviewStage {
         switch event {
         case .grabbed(let p):
             addRipple(at: p, strength: 0.25)
+            audio?.play(.sproing, pan: pan(p))
         case .released(let p):
             addRipple(at: p, strength: 0.6)
-            audio?.play(.boing, a: 0.6, pan: pan(p))
+            audio?.play(.wobble, pan: pan(p))
         case let .pushed(p, strength):
             addRipple(at: p, strength: strength)
-            audio?.play(.splash, a: strength, pan: pan(p))
+            // Mostly wet slaps, now and then a duck.
+            if Int.random(in: 0..<8) == 0 {
+                audio?.play(.quack, pan: pan(p))
+            } else {
+                audio?.play(strength > 0.6 ? .splat : .splash, a: strength, pan: pan(p))
+            }
+        case .stretchStarted:
+            audio?.play(.whistleUp)
+        case .stretchEnded(let p):
+            addRipple(at: p, strength: 0.5)
+            audio?.play(.whistleDown)
         }
     }
 
@@ -305,7 +321,7 @@ final class ReviewStage {
         cameraNode.simdPosition = SIMD3(0, 0, 10)
         scene.rootNode.addChildNode(cameraNode)
 
-        // A wet-canvas gloss: mostly flat light, with a soft key from the upper left for the ripples.
+        // Mostly flat light, with a soft key from the upper left so the ripples catch shade.
         let ambient = SCNNode()
         ambient.light = SCNLight()
         ambient.light?.type = .ambient
@@ -318,16 +334,32 @@ final class ReviewStage {
         key.simdLook(at: SIMD3(0.35, -0.4, -1), up: SIMD3(0, 1, 0), localFront: SIMD3(0, 0, -1))
         scene.rootNode.addChildNode(key)
 
-        material.lightingModel = .blinn
-        material.specular.contents = PlatformColor(white: 1, alpha: 0.4)
-        material.shininess = 30
-        material.isDoubleSided = true
-        material.diffuse.wrapS = .clamp
-        material.diffuse.wrapT = .clamp
-        material.diffuse.mipFilter = .linear
+        // Both layers share the same plain lighting, so at rest the paint sits on the canvas exactly as photographed.
+        // No specular: on a premultiplied, see-through sheet it would haze the canvas where there is no paint.
+        for layer in [canvasMaterial, material] {
+            layer.lightingModel = .lambert
+            layer.isDoubleSided = true
+            layer.diffuse.wrapS = .clamp
+            layer.diffuse.wrapT = .clamp
+            layer.diffuse.mipFilter = .linear
+        }
+
+        // The bare canvas never moves.
+        let canvas = SCNNode(geometry: SCNPlane(width: CGFloat(SheetSolver.size.x), height: CGFloat(SheetSolver.size.y)))
+        canvas.geometry?.materials = [canvasMaterial]
+        canvas.simdPosition = SIMD3(0, 0, Self.canvasDepth)
+        scene.rootNode.addChildNode(canvas)
+
+        // The paint is drawn over it in triangle order, with no depth test: where the sheet folds over itself
+        // the layers stack the same way every frame instead of z-fighting into see-through patches.
+        material.transparencyMode = .aOne
+        material.blendMode = .alpha
+        material.writesToDepthBuffer = false
+        material.readsFromDepthBuffer = false
+        sheet.renderingOrder = 10
         scene.rootNode.addChildNode(sheet)
 
-        // A soft drop shadow so the sheet sits above the page.
+        // A soft drop shadow so the canvas sits above the page.
         let shadow = SCNNode(geometry: SCNPlane(width: CGFloat(SheetSolver.size.x) + 0.3,
                                                 height: CGFloat(SheetSolver.size.y) + 0.3))
         let shadowMaterial = SCNMaterial()
@@ -336,7 +368,7 @@ final class ReviewStage {
         shadowMaterial.transparency = 0.12
         shadowMaterial.writesToDepthBuffer = false
         shadow.geometry?.materials = [shadowMaterial]
-        shadow.simdPosition = SIMD3(0.06, -0.12, -0.5)
+        shadow.simdPosition = SIMD3(0.06, -0.12, Self.canvasDepth - 0.3)
         scene.rootNode.addChildNode(shadow)
         updateMesh()
     }
