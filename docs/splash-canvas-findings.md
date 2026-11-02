@@ -23,16 +23,27 @@ embedded data (`WebSandboxFrame`) points at the real app: `//gacembed.withgoogle
 
 **What was not done.**
 
-- REA's `analyze_javascript_application` was run on the downloaded tree and hit its 300 s per-source provider deadline
-  (partial evidence `ev_e73c05ba2844c8a1fa2ada30c43cd24eeb26cecb592bb7f7fff451c409d6359a`). It was not retried with a
-  higher `analysis_timeout_ms`. All findings below therefore come from direct reading, not from REA evidence.
+- REA's `analyze_javascript_application` on the full tree hit its per-source provider deadline every time it was tried:
+  300 s (partial evidence `ev_e73c05ba2844c8a1fa2ada30c43cd24eeb26cecb592bb7f7fff451c409d6359a`) and again at 1,500 s
+  (`ev_cc97f54f7dbb51c5069cccf18de21f542984e7d58f00e8fbc587b6b295667c33`). A third try on a copy of `main.js` with the 11,869
+  long NCA weight literals blanked out (about 90 KB smaller) also timed out at 420 s
+  (`ev_c217dd45d03a96d91355bd2ca0e24dda0bb09ee45842ef5846d21e21e392b2ea`). So raising the timeout does not help; the
+  bundle has some construct that REA's semantic pass cannot finish. REA **did** analyse `worker.js` on its own
+  (`ev_2e79e5766c65dd395ab06f268610fd40d0b1aa3476b2d8e09e8a0795188b1693`, parent
+  `ev_5eaa28281c8cb644644db4c9e42f0ff8cdd6e0a18517087e9c99e45f026ef297`): 1 file, 7,918 AST nodes, 0 parse failures,
+  9 retained request relations (consistent with the `fetch` to `/octopus-paint/api/image`). Everything about `main.js` comes
+  from direct reading, not REA evidence.
 - The app was never executed. No runtime capture, no frame inspection, no network capture. The built-in browser pane
-  refused the Google host, so there is no side-by-side visual reference.
-- `brushmodule.wasm` and `synthmodule.wasm` were not decompiled (WABT is not installed). Only their strings were looked
-  at, and those were mostly unhelpful (the build has stripped names). Their behaviour is inferred from how `main.js` calls
-  them.
-- The dialogue backend (`/octopus-paint/api/image`) was not called. Its behaviour is inferred from the worker code and the
-  credits text.
+  refused the Google host, and Claude in Chrome was **not connected** when tried (two attempts), so there is still no
+  side-by-side visual reference.
+- `brushmodule.wasm` and `synthmodule.wasm` were disassembled with WABT 1.0.42 (`wasm-validate`, `wasm-objdump`,
+  `wasm2wat`), and the full set of exports was recovered by joining the single-letter export names to the names the
+  Emscripten glue in `main.js` assigns (section 9.7). The function bodies were **not** read in detail: the code is 294 KB
+  and 363 KB of stripped functions, so what each one computes is still inferred from names, signatures and call sites.
+  REA's own `inspect_wasm_artifact` could not be used: the running REA server has no `REA_WABT_BIN_DIRECTORY` (it must be set
+  in the server's launch environment and the server restarted).
+- The dialogue backend (`/octopus-paint/api/image`) was not called. It is Google's private API and calling it would upload
+  a painting to their server. Its behaviour is inferred from the worker code and the credits text.
 
 **Files and sizes (observed).**
 
@@ -416,6 +427,67 @@ highlight. Roughness is `0.05`, F0 `0.05`.
 Plain HTML/CSS (Material Icons, Roboto, Google Sans). Circle buttons are 40 px, the info overlay is a black
 80 % veil, and the layout switches at 499.5 px width or height.
 
+### 9.7 The two WebAssembly modules (observed from WABT, inferred behaviour)
+
+Both modules validate (`wasm-validate`), are Emscripten builds, import only 3 host functions from module `a`, and start with
+a 337-page memory (about 21 MB), growable to 32,768 pages (2 GB). Exports are minified to single letters, but the Emscripten
+glue in `main.js` assigns each to a readable `_name`, so the names below are exact (observed), joined by export letter.
+
+| | `brushmodule.wasm` | `synthmodule.wasm` |
+|---|---|---|
+| Functions | 356 | 4,427 |
+| Code section | 294 KB | 363 KB |
+| Data segments | 29 (8.4 KB) | 9 (18.8 KB) |
+| Exports | 59 (53 named by the glue) | 40 (36 named by the glue) |
+| Language and libs | C++; **nlohmann::json 3.12** with MessagePack, BSON, UBJSON and BJData readers | C++; a Pure Data "Heavy" style context for the Foley sounds |
+
+**`brushmodule.wasm` exports with signatures** (`i32` is a pointer or int, `f32` a float):
+
+- Creation: `createBrush(meshPtr, meshLen, meshFmt, skelPtr, skelLen, skelFmt, subdivisions, unskinnedStiffness) -> brush`,
+  `createBrushVisualMesh`, `createDripper(streamCount)`, `createFabricSolver(w, h, f32 iterations) -> solver`.
+  The brush meshes are the `.msgpack` files; they are parsed **inside** the wasm (hence the JSON/MessagePack library).
+- Simulation: `brushStep(brush, targetPos xyz, targetRot quaternion xyzw, scale, mouthScale xyz, 3 more floats)`: 14 floats.
+  The call site passes the drag target position, the drag rotation, the scale, a 3-vector of mouth scale, and three
+  offsets (the last two are -0.2 when "Posing" and -0.1 when "Watching"). So the soft body is **pulled toward a
+  dragged target transform** every step, after `brushSetDamping(brush, f32)` and `brushSetVolumeSolverIterations(brush, 2)`.
+  The brush stops stepping once it has been nearly static for several frames.
+- Readback pointers (all `brush -> ptr`): `meshGetPositions`, `meshGetNormals`, `meshGetVelocities`,
+  `meshGetRestPositions`, `meshGetUVs`, `meshGetTriangleIndices`, `meshGetPointCount`, `meshGetTriangleIndexCount`,
+  `brushGetPNMesh`, plus `brushGetCentroid`, `brushGetRestCentroid`, `brushGetEnergy -> f32`,
+  `brushGetContactFraction(brush, f32) -> f32`, `brushGetClosestIndex(brush, x, y, z)`, `brushComputePaintBounds`,
+  `brushGetPaintBounds`, `brushGetPaintVelocityBounds`, `brushGetPaintTriangleIndices` / `...IndexCount`,
+  `brushGetDripIndices` / `...IndexCount`, `brushGetMouthPositions` / `...Count`, `brushGetEye(brush, i)` and the eye getters
+  (`eyeGetAttachPosition`, `eyeGetRestCenter`, `eyeGetScale`), `brushAddAccessory(... 9 args)`, `brushTranslate`, `brushTransform`.
+  The JS side copies positions, normals and velocities into WebGL buffers every active frame (`DYNAMIC_DRAW`).
+- Drips: `dripperStep(dripper, dt, positionsPtr, colorsPtr, sizeScalesPtr, sizeOffsetsPtr)`, and a stream API
+  (`streamGetParticlePositions`, `...Colors`, `...Sizes`, `...Tangents`, `...Velocities`, `...ActiveParticleCount`,
+  `...MaxParticleCount`, `...NextSpawnIndex`). Each stream is a particle chain the JS renders as the spline ribbon of section 5.3.
+  Particle size on the JS side is `0.015 * (1 + noise) * scale` with a `-0.01` size offset.
+- Fabric: `fabricSolverStep(solver, x, y, strength, radius)`, `fabricSolverReset`, `fabricSolverGetTextureData`.
+- `generateNoise(ptr, 32, 4, 3, 1/32, 100, 0.4)`: fills a **32x32x32 RGBA8 3D noise texture** (131,072 bytes), uploaded as
+  `TEXTURE_3D` with repeat wrapping. Its use (probably brush skin or colour noise) was not traced.
+
+**`synthmodule.wasm` is a source-filter voice synthesiser plus a sound-effects engine** (inferred from the export names):
+
+- Voices: `createSynth(...)`, `synthGetVoice`, `voiceAddExcitationFrame(voice, f32 pitch?, frame)`, `voiceAddSpectralFrame`,
+  `voiceSetGain`, `voiceSetSpectrumOffset`, `synthStep`, `synthGetBuffer`, `synthSetOnlyNoise`,
+  `synthHasEnoughExcitationFrames`, `synthHasEnoughSpectralFrames`, `createExcitationFrame` with
+  `excitationFrameGetPeriodic` / `...GetAperiodic`, and `createSpectralFrame` with `spectralFrameGetSpectrogram`.
+  "Periodic and aperiodic excitation plus a spectrogram per frame" is the structure of a WORLD-style speech vocoder.
+  **Inference:** the character voices are not played back as audio files. The dialogue pipeline delivers vocoder frames
+  (pitch, excitation, spectrogram) that this wasm renders, which lets each character get its own pitch and timbre, and it
+  gives the worker a signal to read lip-sync from. This agrees with the worker sending a `sampleRateHz` in its request and with the
+  audio processor posting `{voiceId, amplitude, f0}` every frame. It was not observed on the wire.
+- Effects: `createFoleyContext`, `createPitchShifterContext`, `createDCReverbContext`, `createReverbContext`,
+  `createIRFilter`, `createParallelIRFilter` with `irFilterGenerate` / `...Zero` / `...GetOutput` / `...IsZeroed` (partitioned
+  convolution against the `large_L/R_4608_12up.wav` impulse responses), and `heavyContextProcess` /
+  `heavySendMessage(ctx, nameHash, f32, f32)`.
+- Foley parameter names found in the data (observed): `in_isPainting`, `in_gain_strokes`, `in_gain_scrapes`, `in_gain_whoosh`,
+  `in_gain_bublets`, `in_gain_fartlets`, plus `choristerReverb`, `dry-gain`, `wet-gain`. So the painting sound is built from
+  five layers (strokes, scrapes, whooshes, bubblets, fartlets) that are gated and gained by the brush's energy and contact.
+- `synthBenchmarkSpectrumGeneration` is a debug export; `createSynth` takes two `f64` values (very likely sample rate and a
+  block size or similar) and 5 pointers or ints.
+
 ## 10. Why it looks the way it does
 
 1. **Texture comes from an automaton, not a stamp.** Learned NCAs grow a coherent stroke texture, then settle. That is
@@ -517,7 +589,12 @@ dialogue. Train your own NCA models and make your own assets.
 
 - The visual match of the new PuffyPond lighting against Splash Canvas (never compared side by side).
 - The exact camera field of view and the room `fov` constants (`u5`, `u1`), and the camera position per room.
-- Brush soft-body internals (wasm): constraint types, stiffness meaning, how `unskinnedStiffness` maps to the solver.
+- Brush soft-body internals (wasm): the API is now known (section 9.7), but not the constraint types, what the three extra
+  `brushStep` floats do, or how `unskinnedStiffness` and `volumeSensitivity` map to the solver. The function bodies are not read.
+- Why REA cannot finish `main.js` (it times out at 300 s, 420 s on a weight-stripped copy, and 1,500 s). Likely a pathological
+  construct in the minified bundle; not identified.
+- Whether the voice pipeline really delivers vocoder frames (section 9.7). Needs the response schema of `/api/image`.
+- What the 32x32x32 noise texture is used for.
 - The dialogue backend: request cost, prompt, model choice and caching. Whether speech comes back as audio or text.
 - The exact `audioconfig.json` location and the full set of Foley model parameters.
 - `mask.png` usage (a 404 at the guessed path).
