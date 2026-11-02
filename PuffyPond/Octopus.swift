@@ -2,9 +2,11 @@ import SceneKit
 import simd
 
 /// Bundle brush: a glossy head with a face and eight jiggly tentacles. The mouth blows the main
-/// stroke and every tentacle tip trails its own thin line of paint.
+/// stroke, and while painting the tentacles lie on the canvas: every stretch that touches it paints too.
 final class Octopus: Critter {
     private let tentacles: TentacleBundle
+    /// Height of a limb's centre when it lies on the canvas (just above the canvas face).
+    static let limbZ: Float = Playground.canvasZ + 0.02
     private var lastHead: SIMD3<Float>
 
     init(color: SIMD3<Float>, at start: SIMD3<Float>) {
@@ -40,16 +42,18 @@ final class Octopus: Critter {
         let head = bodyNode.simdPosition
         let teleported = simd_distance(head, lastHead) > 0.8
         lastHead = head
+        let pressing = painting && !hidden
         tentacles.simulate(dt: dt, body: leanNode.simdWorldTransform, scale: scale, clock: clock,
-                           beatPulse: beatPulse, snap: teleported)
-        tentacles.collectTips(dt: dt, painting: painting && !hidden)
+                           beatPulse: beatPulse, snap: teleported, press: pressing ? 1 : 0, minZ: Self.limbZ)
+        tentacles.collectTips(dt: dt, painting: pressing)
+        tentacles.collectContacts(dt: dt, painting: pressing, scale: scale, contactZ: Self.limbZ + 0.03)
         tentacles.rebuild(scale: scale, clock: clock, hidden: hidden)
     }
 
     override func dabs(from a: SIMD2<Float>, to b: SIMD2<Float>, radius: Float, speed: Float) -> [BrushDab] {
         var result = [BrushDab(from: a, to: b, radius: radius, speed: speed, style: .octopus)]
-        for tip in tentacles.tipStrokes {
-            result.append(BrushDab(from: tip.from, to: tip.to, radius: radius * 0.3, speed: tip.speed, style: .octopus))
+        for c in tentacles.contacts {
+            result.append(BrushDab(from: c.a, to: c.b, radius: c.radius, speed: c.speed, style: .octopus, drag: c.drag))
         }
         return result
     }

@@ -8,6 +8,15 @@ struct TipStroke {
     var speed: Float
 }
 
+/// A stretch of a limb lying on the canvas this frame: it paints like a brush.
+struct TentacleContact {
+    var a: SIMD2<Float>         // the two ends of the stretch (canvas plane)
+    var b: SIMD2<Float>
+    var drag: SIMD2<Float>      // how far it moved this frame
+    var radius: Float           // half the limb's width there
+    var speed: Float
+}
+
 /// Soft, jiggly limbs: Verlet chains hanging from a body. Each remembers a curled rest shape
 /// but lags, swings and wobbles whenever the body moves. Drawn as tapered tubes rebuilt every frame.
 final class TentacleBundle {
@@ -18,6 +27,7 @@ final class TentacleBundle {
         let outward: SIMD3<Float>      // which way it curls (body space)
         let phase: Float
         var lastTip: SIMD2<Float>?
+        var lastXY: [SIMD2<Float>] = []   // every point's canvas position last frame (for contact drag)
     }
 
     struct Shape {
@@ -37,6 +47,7 @@ final class TentacleBundle {
     let node = SCNNode()                // world-space mesh
     private(set) var limbs: [Limb] = []
     private(set) var tipStrokes: [TipStroke] = []
+    private(set) var contacts: [TentacleContact] = []
     private let shape: Shape
     /// The critter's accent material (set once the critter exists).
     var material = SCNMaterial()
@@ -82,8 +93,9 @@ final class TentacleBundle {
     /// - Parameters:
     ///   - body: the body's world transform (without squash).
     ///   - snap: jump straight to the rest shape (after a teleport).
+    ///   - press: 0…1, how hard the limbs are pushed down onto the canvas plane `minZ` (the tips most).
     func simulate(dt: Float, body m: simd_float4x4, scale: Float, clock: Float, beatPulse: Float, snap: Bool,
-                  minZ: Float = 0.1) {
+                  press: Float = 0, minZ: Float = 0.1) {
         func world(_ local: SIMD3<Float>) -> SIMD3<Float> { simd_make_float3(m * SIMD4(local, 1)) }
         let length = shape.segmentLength * scale
         let steps = max(1, Int((dt * 120).rounded(.up)))
@@ -125,7 +137,13 @@ final class TentacleBundle {
                     }
                     points[0] = rest[0]
                 }
-                // Never poke through the canvas.
+                // Pressed down, a limb lies on the canvas; it never pokes through it.
+                if press > 0 {
+                    for i in 1..<n where points[i].z > minZ {
+                        let t = Float(i) / Float(n - 1)
+                        points[i].z += (minZ - points[i].z) * press * (0.04 + 0.2 * t * t)
+                    }
+                }
                 for i in 1..<n where points[i].z < minZ { points[i].z = minZ }
             }
             limbs[k].points = points
@@ -143,6 +161,26 @@ final class TentacleBundle {
                 tipStrokes.append(TipStroke(from: last, to: tip, speed: simd_distance(last, tip) / max(dt, 1e-4)))
             }
             limbs[k].lastTip = tip
+        }
+    }
+
+    /// The stretches of every limb that lie on the canvas this frame (only kept while `painting`).
+    /// Each covers two links, so a full limb makes about five.
+    func collectContacts(dt: Float, painting: Bool, scale: Float, contactZ: Float) {
+        contacts.removeAll(keepingCapacity: true)
+        let n = shape.segments
+        for k in limbs.indices {
+            let p = limbs[k].points
+            let xy = p.map { SIMD2($0.x, $0.y) }
+            defer { limbs[k].lastXY = xy }
+            guard painting, limbs[k].lastXY.count == n else { continue }
+            for i in stride(from: 1, to: n - 2, by: 2) where p[i].z <= contactZ && p[i + 2].z <= contactZ {
+                let t = Float(i + 1) / Float(n - 1)
+                let radius = max((shape.rootRadius * (1 - t) + shape.tipRadius) * scale * 1.6, 0.016)
+                let drag = xy[i + 1] - limbs[k].lastXY[i + 1]
+                contacts.append(TentacleContact(a: xy[i], b: xy[i + 2], drag: drag, radius: radius,
+                                                speed: simd_length(drag) / max(dt, 1e-4)))
+            }
         }
     }
 

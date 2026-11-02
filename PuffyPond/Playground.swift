@@ -94,6 +94,7 @@ final class Playground {
     /// Template bubbles stand on the easel tray along the bottom of the canvas.
     static let templateRowY: Float = 0.1 - canvasSize.y * 0.5 + 0.23
     static let strokeRadius: Float = 0.085
+    static let paintHoverZ: Float = 0.24        // how high the brush animal hovers while painting
 
     // Timing
     @ObservationIgnored private var lastTime: Double = 0
@@ -375,7 +376,8 @@ final class Playground {
             }
             if mode != .paint { finishStroke(slot: buddy.slot) }
 
-            let buddyZ: Float = 0.42
+            // Painting, the animal comes down close to the canvas so its tentacles can lie on it.
+            let buddyZ: Float = mode == .paint ? Self.paintHoverZ : 0.42
             let target: SIMD3<Float>
             if let hand {
                 target = worldPoint(hand.position, z: buddyZ)
@@ -485,7 +487,8 @@ final class Playground {
 
         // Lay real paint every frame, the way this tool (legacy: this brush animal) paints.
         let from = lastStamp[slot] ?? p
-        let dabs = controlScheme == .fist
+        // The octopus paints with its tentacles too, so its brush always comes from the animal itself.
+        let dabs = controlScheme == .fist && buddy.tool != .brush
             ? buddy.tool.dabs(from: from, to: p, radius: Self.strokeRadius, speed: buddy.critter.speed)
             : buddy.critter.dabs(from: from, to: p, radius: Self.strokeRadius, speed: buddy.critter.speed)
         lay(dabs, color: buddy.color, seed: Float(slot) * 13.7 + Float(strokes.count) * 2.3)
@@ -524,7 +527,7 @@ final class Playground {
     private func lay(_ dabs: [BrushDab], color: SIMD3<Float>, seed: Float) {
         for (k, dab) in dabs.enumerated() {
             paintLayer.stamp(from: dab.from, to: dab.to, radius: dab.radius, color: color, speed: dab.speed,
-                             seed: seed + Float(k) * 5.1, style: dab.style)
+                             seed: seed + Float(k) * 5.1, style: dab.style, drag: dab.drag, strokeSeed: seed)
         }
     }
 

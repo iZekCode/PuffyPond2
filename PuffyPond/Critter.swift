@@ -78,6 +78,8 @@ struct BrushDab {
     var radius: Float
     var speed: Float
     var style: BrushStyle = .brush
+    /// How far the brush moved this frame, when that isn't `to - from` (a tentacle lying on the canvas).
+    var drag: SIMD2<Float>? = nil
 }
 
 /// A hand's brush animal: shared body rig (follow spring, lean, squash, presence), face and moods.

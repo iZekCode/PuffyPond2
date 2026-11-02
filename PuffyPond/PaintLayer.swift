@@ -43,6 +43,8 @@ private struct PaintParams {
     var canvas: SIMD4<Float>    // weave thread pitch (texels), weave depth under thin paint, per-texel grain height
     var nca: SIMD4<Float>       // NCA kernel stride (texels), dt, fire rate, frame number
     var ncaShade: SIMD4<Float>  // NCA height strength, colour strength, life lost per second, stride jitter
+    var ncaPatch: SIMD4<Float>  // NCA patch size (world), patch edge low, edge high, per-stroke bias range
+    var ncaSpeed: SIMD4<Float>  // NCA slow speed (full texture), fast speed (no texture, colour smears), world units/s
 }
 
 /// Real-looking wet paint on the canvas, simulated on the GPU with Metal.
@@ -79,6 +81,13 @@ final class PaintLayer {
     private static let ncaHeight: Float = 0.5         // how much the grown texture lifts and lowers the paint
     private static let ncaColor: Float = 0.8          // how much it brightens and darkens the pigment
     private static let ncaLifePerSecond: Float = 0.3  // a stroke keeps growing for about 1 / this many seconds
+    // The texture takes hold in patches along a stroke, not everywhere: a soft noise field decides where.
+    private static let ncaPatchSize: Float = 0.4      // patch width, in world units
+    private static let ncaPatchEdge = SIMD2<Float>(0.42, 0.58)  // noise range that fades from plain paint to full texture
+    private static let ncaPatchBias: Float = 0.1      // per-stroke shift of that range: some strokes carry more texture
+    // Speed (world units/s): a slow brush leaves the full texture, a fast one little, and its colour smears instead.
+    private static let ncaSlowSpeed: Float = 0.4
+    private static let ncaFastSpeed: Float = 2.5
 
     private let width: Int
     private let height: Int
@@ -190,22 +199,25 @@ final class PaintLayer {
     // MARK: Painting
 
     /// One brush dab along the segment a → b (applied on the next `update`).
+    /// `drag` is how far the brush moved this frame when that isn't `b - a`; `strokeSeed` is shared by every dab of a
+    /// stroke (an NCA brush uses it to decide where its texture takes hold).
     func stamp(from a: SIMD2<Float>, to b: SIMD2<Float>, radius: Float, color paint: SIMD3<Float>,
-               speed: Float, seed: Float, style: BrushStyle = .brush) {
+               speed: Float, seed: Float, style: BrushStyle = .brush, drag moved: SIMD2<Float>? = nil,
+               strokeSeed: Float? = nil) {
         guard stamps.count < Self.maxStamps else { return }
-        let len = simd_distance(a, b)
+        let len = simd_length(moved ?? b - a)
         // Moving lays a full coat; holding still slowly pools paint.
         let moving = smoothStep(0.002, 0.02, len)
         let amount = style.amount ?? 0.03 + (0.3 - 0.03) * moving
         let dry = smoothStep(1.6, 4.5, speed) * style.bristles   // fast = dry, streaky brush
-        let drag = texelVelocity(b - a)
+        let drag = texelVelocity(moved ?? b - a)
         stamps.append(PaintStamp(segment: SIMD4(a.x, a.y, b.x, b.y),
                                  color: SIMD4(paint.x, paint.y, paint.z, 0),
                                  brush: SIMD4(radius, amount, dry, seed),
                                  motion: SIMD4(drag.x, drag.y, 0, style.push),
                                  shape: SIMD4(style.nibAngle, style.nibAspect, style.bristles, style.watery),
                                  extra: SIMD4(style.knife, style.impasto, style.runs, style.blend),
-                                 nca: SIMD4(ncaLoaded ? style.nca : 0, style.ncaSeed, 0, 0)))
+                                 nca: SIMD4(ncaLoaded ? style.nca : 0, style.ncaSeed, strokeSeed ?? seed, 0)))
         if ncaLoaded && style.nca > 0.5 { ncaUsed = true }
         settleTime = max(settleTime, 5 + style.watery * 3)
     }
@@ -259,7 +271,9 @@ final class PaintLayer {
             shade: SIMD4(Self.normalStrength, Self.cavity, Self.reliefHeight, Self.bodyHeight),
             canvas: SIMD4(Studio.weaveTileSize / Float(Studio.threadsPerTile) / worldPerTexel, Self.weaveDepth, Self.grainHeight, 0),
             nca: SIMD4(Self.ncaStride, Self.ncaDT, Self.ncaFireRate, Float(frameNumber)),
-            ncaShade: SIMD4(Self.ncaHeight, Self.ncaColor, Self.ncaLifePerSecond, Self.ncaJitter))
+            ncaShade: SIMD4(Self.ncaHeight, Self.ncaColor, Self.ncaLifePerSecond, Self.ncaJitter),
+            ncaPatch: SIMD4(Self.ncaPatchSize, Self.ncaPatchEdge.x, Self.ncaPatchEdge.y, Self.ncaPatchBias),
+            ncaSpeed: SIMD4(Self.ncaSlowSpeed, Self.ncaFastSpeed, 0, 0))
         frameNumber &+= 1
         // A non-empty buffer even with no stamps, so the binding is always valid.
         let stampData = stamps.isEmpty

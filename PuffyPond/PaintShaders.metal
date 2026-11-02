@@ -13,7 +13,7 @@ struct PaintStamp {
     float4 motion;    // brush velocity (texels/s) xy, erase rate, push
     float4 shape;     // nib angle, nib aspect (1 = round), bristles (0…1), watery (0…1)
     float4 extra;     // palette knife, impasto, runs, blend (each 0…1)
-    float4 nca;       // neural cellular automaton: 1 = grows a learned texture, seed probability
+    float4 nca;       // neural cellular automaton: 1 = grows a learned texture, seed probability, stroke seed
 };
 
 struct PaintParams {
@@ -24,6 +24,8 @@ struct PaintParams {
     float4 canvas;    // weave thread pitch (texels), weave depth under thin paint, per-texel grain height
     float4 nca;       // kernel stride (texels), dt, fire rate, frame number
     float4 ncaShade;  // height strength, color strength, life lost per second, stride jitter
+    float4 ncaPatch;  // patch size (world), patch edge low, edge high, per-stroke bias range
+    float4 ncaSpeed;  // slow speed (full texture), fast speed (no texture, colour smears), world units/s
 };
 
 static float hash21(int2 p) {
@@ -173,9 +175,11 @@ kernel void paintStep(texture2d<float, access::sample> paintIn [[texture(0)]],
         float streak = max(0.0, bristle - dry * 0.5) / (1.0 - dry * 0.5);
         float deposit = st.brush.y * (profile + rimLift) * streak;
 
+        // An NCA brush gets more smeary the faster it moves: 0 at a slow speed, 1 at a fast one.
+        const float fast = st.nca.x > 0.5 ? smoothstep(P.ncaSpeed.x, P.ncaSpeed.y, length(st.motion.xy) * P.frame.z) : 0.0;
         // The brush drags whatever wet paint it passes through, and combs its own bristle marks into it.
         float push = saturate(1.1 - x);
-        velocity = mix(velocity, st.motion.xy, push * st.motion.w);
+        velocity = mix(velocity, st.motion.xy, push * mix(st.motion.w, 0.95, fast));
         // Runny paint slides downhill (texture y points down) while the brush keeps it wet.
         velocity.y += runs * 160.0 * push;
         wet = max(wet, push);
@@ -200,6 +204,20 @@ kernel void paintStep(texture2d<float, access::sample> paintIn [[texture(0)]],
             relief *= 1.0 - 0.4 * k;
             continue;
         }
+        if (fast > 0.01 && thickness > 0.02) {
+            // A fast stroke smears: its colour mixes with the paint a few texels around, as the blender does.
+            float sumA = 0.0, painted = 0.0;
+            float3 sumC = float3(0);
+            for (int n = 0; n < 4; n++) {
+                float2 o = n == 0 ? float2(4, 0) : n == 1 ? float2(-4, 0) : n == 2 ? float2(0, 4) : float2(0, -4);
+                float4 q = paintIn.sample(lin, from + o);
+                if (q.a > 0.02) { sumA += q.a; sumC += q.rgb * q.a; painted += 1.0; }
+            }
+            if (painted > 0.0) {
+                color = mix(color, sumC / sumA, 0.6 * fast * push);
+                thickness = mix(thickness, sumA / painted, 0.15 * fast * push);
+            }
+        }
         if (deposit <= 1e-6) continue;
         // A brush lays a coat of paint, it doesn't build a mound: thickness tops out at a cap.
         // Watercolor is a thin glaze, so washes build up layer by layer.
@@ -207,7 +225,7 @@ kernel void paintStep(texture2d<float, access::sample> paintIn [[texture(0)]],
         cap = mix(cap, 0.95 + 0.05 * ragged, impasto);
         float add = deposit * max(0.0, cap - thickness);
         // Wet-on-wet: new paint blends into what's there.
-        float blend = thickness < 1e-3 ? 1.0 : min(1.0, add / (thickness * 0.5 + add) + 0.12 + 0.3 * watery);
+        float blend = thickness < 1e-3 ? 1.0 : min(1.0, add / (thickness * 0.5 + add) + 0.12 + 0.3 * watery + 0.4 * fast);
         // Watercolor pigment gathers at the wash's edge and dries darker there.
         float pooled = 1.0 - 0.22 * watery * smoothstep(0.55, 0.95, x);
         float3 pigment = st.color.rgb * (0.96 + 0.04 * ragged) * pooled;
@@ -228,7 +246,7 @@ kernel void paintStep(texture2d<float, access::sample> paintIn [[texture(0)]],
 //
 // A trained texture that grows on its own where a brush has touched. Every texel holds 12 state channels
 // (ncaA = channels 0…3, ncaB = 4…7, ncaC = 8…11; the first three are the visible colour, centred on 0)
-// and a life value (r = how long it keeps growing, g = 1 while the texel carries an NCA texture).
+// and a life value (r = how long it keeps growing, g = how much of an NCA texture the texel carries, 0 = none).
 // Each step a texel perceives itself and its 8 neighbours with 4 fixed kernels per channel (identity,
 // Sobel-x, Sobel-y, Laplacian): 48 values, then a 2-layer perceptron (48 -> 96 ReLU -> 12) says how to change.
 // This is the "Self-Organising Textures" model (Distill 2021). tools/nca/train_nca.py trains the weights; the
@@ -287,7 +305,7 @@ kernel void ncaStep(texture2d<float, access::sample> ncaAIn [[texture(0)]],
     float4 state[3] = { ncaAIn.sample(lin, from), ncaBIn.sample(lin, from), ncaCIn.sample(lin, from) };
     float2 life = lifeIn.sample(lin, from).rg;
 
-    if (life.x > 0.01 && life.y > 0.5) {
+    if (life.x > 0.01 && life.y > 0.02) {
         // Neighbours are read at the stride (a jitter per texel is optional; 0 = exactly the next texel).
         float stride = P.nca.x * (1.0 + P.ncaShade.w * (hash3(int2(gid), 7u) * 2.0 - 1.0));
         float4 gx[3] = { float4(0), float4(0), float4(0) };
@@ -355,10 +373,20 @@ kernel void ncaStep(texture2d<float, access::sample> ncaAIn [[texture(0)]],
         if (st.nca.x > 0.5) {
             // Texels that are still growing keep their own pattern; the brush only starts fresh ones.
             if (life.x < 0.5 && hash3(int2(gid), uint(P.nca.w) * 17u + 11u) < st.nca.y) {
-                state[0] = float4(0);
-                state[1] = float4(0);
-                state[2] = float4(0);
-                life = float2(1.0, 1.0);
+                // The texture only takes hold in patches (a soft, low-frequency noise field, shifted per stroke,
+                // with a per-stroke bias so some strokes carry more of it than others); between them the paint stays plain.
+                // A slow brush leaves the full texture; the faster it moves, the less of it takes hold.
+                float2 offset = float2(st.nca.z * 3.7, st.nca.z * 1.9);
+                float bias = (hash3(int2(int(floor(st.nca.z * 31.0)), 5), 9u) * 2.0 - 1.0) * P.ncaPatch.w;
+                float field = noise(world / P.ncaPatch.x + offset) * 0.5 + 0.5 + bias;
+                float slow = 1.0 - smoothstep(P.ncaSpeed.x, P.ncaSpeed.y, length(st.motion.xy) * P.frame.z);
+                float coverage = smoothstep(P.ncaPatch.y, P.ncaPatch.z, field) * slow;
+                if (coverage > 0.02) {
+                    state[0] = float4(0);
+                    state[1] = float4(0);
+                    state[2] = float4(0);
+                    life = float2(1.0, coverage);
+                }
             }
         } else if (st.color.w > 0.5 ? dist < radius * 0.8 : (st.brush.y > 0.0 && st.extra.w < 0.5 && dist < radius * 0.8)) {
             life = float2(0.0);
