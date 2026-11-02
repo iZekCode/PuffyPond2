@@ -10,6 +10,7 @@ private struct PaintStamp {
     var motion: SIMD4<Float>    // brush velocity (texels/s) xy, erase rate, push
     var shape: SIMD4<Float>     // nib angle, nib aspect, bristles, watery
     var extra: SIMD4<Float>     // palette knife, impasto, runs, blend
+    var nca: SIMD4<Float> = .zero  // NCA brush (1 = on), seed probability
 }
 
 /// How one dab behaves: every brush animal paints with its own style.
@@ -24,8 +25,12 @@ struct BrushStyle {
     var impasto: Float = 0      // 1 = thick oil: paint piles much higher, with taller ridges
     var runs: Float = 0         // 1 = liquid oil: the wet paint under the brush slides downhill
     var blend: Float = 0        // 1 = blender: lays nothing, smudges and mixes the paint under it
+    var nca: Float = 0          // 1 = the paint grows a learned texture after the brush passes (see PaintLayer.ncaWeights)
+    var ncaSeed: Float = 1      // chance each texel under the brush starts growing
 
     static let brush = BrushStyle()
+    /// The octopus: wild, expressionist paint that grows its own texture.
+    static let octopus = BrushStyle(bristles: 0, nca: 1)
     static let blend = BrushStyle(amount: 0, push: 0.9, bristles: 0, blend: 1)
 }
 
@@ -36,6 +41,8 @@ private struct PaintParams {
     var tune: SIMD4<Float>      // dry rate, leveling, velocity damping, gravity
     var shade: SIMD4<Float>     // normal strength, cavity darkening, bristle relief, paint body
     var canvas: SIMD4<Float>    // weave thread pitch (texels), weave depth under thin paint, per-texel grain height
+    var nca: SIMD4<Float>       // NCA kernel stride (texels), dt, fire rate, frame number
+    var ncaShade: SIMD4<Float>  // NCA height strength, colour strength, life lost per second, stride jitter
 }
 
 /// Real-looking wet paint on the canvas, simulated on the GPU with Metal.
@@ -60,6 +67,19 @@ final class PaintLayer {
     private static let grainHeight: Float = 0.02      // per-texel canvas tooth under the paint
     private static let maxStamps = 256
 
+    // Neural cellular automaton brushes ("Self-Organising Textures": 12 channels, hidden 96). These must match the
+    // values the model was trained with (tools/nca/train_nca.py, runs/<name>/nca.json): the weights only grow the
+    // right texture under the same rule. The shader's sizes (12 channels, hidden 96) are fixed at compile time.
+    private static let ncaWeightFile = "notebook001"  // PuffyPond/NCA/notebook001.bin: 5856 float32
+    private static let ncaWeightCount = 5856
+    private static let ncaStride: Float = 1           // --stride
+    private static let ncaJitter: Float = 0           // --jitter
+    private static let ncaDT: Float = 1               // --dt
+    private static let ncaFireRate: Float = 0.5       // --fire-rate
+    private static let ncaHeight: Float = 0.5         // how much the grown texture lifts and lowers the paint
+    private static let ncaColor: Float = 0.8          // how much it brightens and darkens the pigment
+    private static let ncaLifePerSecond: Float = 0.3  // a stroke keeps growing for about 1 / this many seconds
+
     private let width: Int
     private let height: Int
     private let worldPerTexel: Float
@@ -68,9 +88,19 @@ final class PaintLayer {
     private let commandQueue: MTLCommandQueue?
     private let stepPipeline: MTLComputePipelineState?
     private let shadePipeline: MTLComputePipelineState?
+    private let ncaPipeline: MTLComputePipelineState?
+    private let ncaWeights: MTLBuffer?
+    private let ncaLoaded: Bool                       // false when the weight file is missing: NCA brushes then paint plainly
     private var paint: [MTLTexture] = []
     private var flow: [MTLTexture] = []
     private var current = 0
+    private var ncaA: [MTLTexture] = []               // NCA state channels 0…3 (the visible colour is 0…2)
+    private var ncaB: [MTLTexture] = []               // channels 4…7
+    private var ncaC: [MTLTexture] = []               // channels 8…11
+    private var ncaLife: [MTLTexture] = []            // r = growth left, g = texel carries an NCA texture
+    private var ncaCurrent = 0
+    private var ncaUsed = false                       // an NCA brush has painted since the last clear
+    private var frameNumber: UInt32 = 0
     private var albedo: MTLTexture?
     private var normalMap: MTLTexture?
     private var roughness: MTLTexture?
@@ -97,7 +127,10 @@ final class PaintLayer {
         let library = device?.makeDefaultLibrary()
         stepPipeline = library?.makeFunction(name: "paintStep").flatMap { try? device?.makeComputePipelineState(function: $0) }
         shadePipeline = library?.makeFunction(name: "paintShade").flatMap { try? device?.makeComputePipelineState(function: $0) }
-        guard let device, stepPipeline != nil, shadePipeline != nil else {
+        ncaPipeline = library?.makeFunction(name: "ncaStep").flatMap { try? device?.makeComputePipelineState(function: $0) }
+        guard let device, stepPipeline != nil, shadePipeline != nil, ncaPipeline != nil else {
+            ncaWeights = nil
+            ncaLoaded = false
             surface.isHidden = true
             return
         }
@@ -109,7 +142,14 @@ final class PaintLayer {
             d.storageMode = .private
             return device.makeTexture(descriptor: d)
         }
+        let trained = Self.loadNCAWeights(device)
+        ncaLoaded = trained != nil
+        ncaWeights = trained ?? device.makeBuffer(length: Self.ncaWeightCount * MemoryLayout<Float>.stride)
         paint = (0..<2).compactMap { _ in texture(.rgba16Float) }
+        ncaA = (0..<2).compactMap { _ in texture(.rgba16Float) }
+        ncaB = (0..<2).compactMap { _ in texture(.rgba16Float) }
+        ncaC = (0..<2).compactMap { _ in texture(.rgba16Float) }
+        ncaLife = (0..<2).compactMap { _ in texture(.rg16Float) }
         flow = (0..<2).compactMap { _ in texture(.rgba16Float) }
         albedo = texture(.rgba8Unorm)
         normalMap = texture(.rgba8Unorm)
@@ -127,6 +167,16 @@ final class PaintLayer {
         m.blendMode = .alpha
         m.writesToDepthBuffer = false
         plane.materials = [m]
+    }
+
+    /// The trained NCA weights from the app bundle, or a zero buffer (the NCA then changes nothing) when missing.
+    private static func loadNCAWeights(_ device: MTLDevice) -> MTLBuffer? {
+        let length = ncaWeightCount * MemoryLayout<Float>.stride
+        if let url = Bundle.main.url(forResource: ncaWeightFile, withExtension: "bin"),
+           let data = try? Data(contentsOf: url), data.count == length {
+            return data.withUnsafeBytes { device.makeBuffer(bytes: $0.baseAddress!, length: length) }
+        }
+        return nil
     }
 
     static var defaultResolution: Int {
@@ -154,7 +204,9 @@ final class PaintLayer {
                                  brush: SIMD4(radius, amount, dry, seed),
                                  motion: SIMD4(drag.x, drag.y, 0, style.push),
                                  shape: SIMD4(style.nibAngle, style.nibAspect, style.bristles, style.watery),
-                                 extra: SIMD4(style.knife, style.impasto, style.runs, style.blend)))
+                                 extra: SIMD4(style.knife, style.impasto, style.runs, style.blend),
+                                 nca: SIMD4(ncaLoaded ? style.nca : 0, style.ncaSeed, 0, 0)))
+        if ncaLoaded && style.nca > 0.5 { ncaUsed = true }
         settleTime = max(settleTime, 5 + style.watery * 3)
     }
 
@@ -165,12 +217,13 @@ final class PaintLayer {
                                  color: SIMD4(0, 0, 0, 1),
                                  brush: SIMD4(radius, 0, 0, 0),
                                  motion: SIMD4(0, 0, min(1, dt * 10), 0),
-                                 shape: SIMD4(0, 1, 0, 0), extra: .zero))
+                                 shape: SIMD4(0, 1, 0, 0), extra: .zero, nca: .zero))
         settleTime = max(settleTime, 5)
     }
 
     func clear() {
         needsClear = true
+        ncaUsed = false
         stamps.removeAll()
     }
 
@@ -195,6 +248,7 @@ final class PaintLayer {
         settleTime -= dt
         guard let commandQueue, let stepPipeline, let shadePipeline, paint.count == 2, flow.count == 2,
               let albedo, let normalMap, let roughness,
+              let ncaPipeline, let ncaWeights, ncaA.count == 2, ncaB.count == 2, ncaC.count == 2, ncaLife.count == 2,
               let buffer = commandQueue.makeCommandBuffer(),
               let encoder = buffer.makeComputeCommandEncoder() else { return }
 
@@ -203,10 +257,13 @@ final class PaintLayer {
             size: SIMD4(Float(width), Float(height), Float(stamps.count), needsClear ? 1 : 0),
             tune: SIMD4(Self.dryRate, Self.leveling, Self.damping, Self.gravity),
             shade: SIMD4(Self.normalStrength, Self.cavity, Self.reliefHeight, Self.bodyHeight),
-            canvas: SIMD4(Studio.weaveTileSize / Float(Studio.threadsPerTile) / worldPerTexel, Self.weaveDepth, Self.grainHeight, 0))
+            canvas: SIMD4(Studio.weaveTileSize / Float(Studio.threadsPerTile) / worldPerTexel, Self.weaveDepth, Self.grainHeight, 0),
+            nca: SIMD4(Self.ncaStride, Self.ncaDT, Self.ncaFireRate, Float(frameNumber)),
+            ncaShade: SIMD4(Self.ncaHeight, Self.ncaColor, Self.ncaLifePerSecond, Self.ncaJitter))
+        frameNumber &+= 1
         // A non-empty buffer even with no stamps, so the binding is always valid.
         let stampData = stamps.isEmpty
-            ? [PaintStamp(segment: .zero, color: .zero, brush: .zero, motion: .zero, shape: .zero, extra: .zero)]
+            ? [PaintStamp(segment: .zero, color: .zero, brush: .zero, motion: .zero, shape: .zero, extra: .zero, nca: .zero)]
             : stamps
         guard let stampBuffer = stampData.withUnsafeBytes({ device?.makeBuffer(bytes: $0.baseAddress!, length: $0.count) })
         else { encoder.endEncoding(); return }
@@ -224,12 +281,34 @@ final class PaintLayer {
         encoder.setBuffer(stampBuffer, offset: 0, index: 1)
         encoder.dispatchThreadgroups(groups, threadsPerThreadgroup: groupSize)
 
+        // The NCA reads the same flow the paint step did, so a grown texture is carried along with its paint.
+        if needsClear || ncaUsed {
+            let ncaNext = 1 - ncaCurrent
+            encoder.setComputePipelineState(ncaPipeline)
+            encoder.setTexture(ncaA[ncaCurrent], index: 0)
+            encoder.setTexture(ncaB[ncaCurrent], index: 1)
+            encoder.setTexture(ncaC[ncaCurrent], index: 2)
+            encoder.setTexture(ncaLife[ncaCurrent], index: 3)
+            encoder.setTexture(flow[current], index: 4)
+            encoder.setTexture(ncaA[ncaNext], index: 5)
+            encoder.setTexture(ncaB[ncaNext], index: 6)
+            encoder.setTexture(ncaC[ncaNext], index: 7)
+            encoder.setTexture(ncaLife[ncaNext], index: 8)
+            encoder.setBytes(&params, length: MemoryLayout<PaintParams>.stride, index: 0)
+            encoder.setBuffer(stampBuffer, offset: 0, index: 1)
+            encoder.setBuffer(ncaWeights, offset: 0, index: 2)
+            encoder.dispatchThreadgroups(groups, threadsPerThreadgroup: groupSize)
+            ncaCurrent = ncaNext
+        }
+
         encoder.setComputePipelineState(shadePipeline)
         encoder.setTexture(paint[next], index: 0)
         encoder.setTexture(flow[next], index: 1)
         encoder.setTexture(albedo, index: 2)
         encoder.setTexture(normalMap, index: 3)
         encoder.setTexture(roughness, index: 4)
+        encoder.setTexture(ncaA[ncaCurrent], index: 5)
+        encoder.setTexture(ncaLife[ncaCurrent], index: 6)
         encoder.setBytes(&params, length: MemoryLayout<PaintParams>.stride, index: 0)
         encoder.dispatchThreadgroups(groups, threadsPerThreadgroup: groupSize)
 

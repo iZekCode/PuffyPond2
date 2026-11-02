@@ -54,7 +54,7 @@ enum PaintTool: Int, CaseIterable, Equatable {
             let style = BrushStyle(amount: 0.08 + 0.12 * moving, push: 0.35, bristles: 0.15, watery: 0.4, runs: 1)
             return [BrushDab(from: a, to: b, radius: radius * 1.25, speed: speed, style: style)]
         case .brush:
-            return [BrushDab(from: a, to: b, radius: radius, speed: speed)]
+            return [BrushDab(from: a, to: b, radius: radius, speed: speed, style: .octopus)]
         case .eraser:
             return []
         case .blender:

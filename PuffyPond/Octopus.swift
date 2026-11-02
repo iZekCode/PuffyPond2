@@ -47,9 +47,9 @@ final class Octopus: Critter {
     }
 
     override func dabs(from a: SIMD2<Float>, to b: SIMD2<Float>, radius: Float, speed: Float) -> [BrushDab] {
-        var result = [BrushDab(from: a, to: b, radius: radius, speed: speed)]
+        var result = [BrushDab(from: a, to: b, radius: radius, speed: speed, style: .octopus)]
         for tip in tentacles.tipStrokes {
-            result.append(BrushDab(from: tip.from, to: tip.to, radius: radius * 0.3, speed: tip.speed))
+            result.append(BrushDab(from: tip.from, to: tip.to, radius: radius * 0.3, speed: tip.speed, style: .octopus))
         }
         return result
     }
