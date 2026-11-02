@@ -596,8 +596,12 @@ Follow-up, same day (branch `feat/splash-white-canvas`): the canvas and light we
   a little more than Splash's fine grain, so it was cut again. The weave is now about one pixel per thread, so it reads
   as grain rather than a pattern.
 - `Playground.swift`: the key spot is now neutral white, with a wide cone (inner 70, outer 110) and no distance falloff,
-  so it lights the canvas almost evenly like Splash's far lights; the fill is neutral instead of cool; key intensity is
-  540 (820 washed the canvas to flat white and lost the weave).
+  so it lights the canvas almost evenly like Splash's far lights; the fill is neutral instead of cool. A first pass at
+  key intensity 540 was still too bright and leaned from the left, so the key now sits at the top centre
+  (`keyPosition` `(0, 7, 6)` aiming at the origin), with key 300 (tuned by hand; 820 washed the canvas to flat white
+  and lost the weave), fill 220, environment 0.7 and exposure offset -0.5. These are named constants
+  (`keyIntensity`, `fillIntensity`, `environmentIntensity`, `exposureOffset`, `keyPosition`, `keyTarget`,
+  `keyInnerAngle`, `keyOuterAngle`) at the top of the world-building section, so they can be tuned in one place.
 - Result on the simulator (one stroke, judged by eye): the canvas reads off-white with a soft, slight gradient and a
   fine weave, close to the Splash screenshot, and the orange paint still shows its ridges. The raking warm light that
   made ridges pop is gone; the normal map carries them now.
