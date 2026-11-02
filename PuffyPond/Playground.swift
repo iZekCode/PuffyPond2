@@ -136,7 +136,7 @@ final class Playground {
         scene.background.contents = Studio.backdrop()
         scene.background.intensity = 1.7          // the room photo, brought up to the camera's exposure
         scene.lightingEnvironment.contents = Studio.environment()
-        scene.lightingEnvironment.intensity = 1.1
+        scene.lightingEnvironment.intensity = 0.9
 
         let camera = SCNCamera()
         camera.fieldOfView = 34
@@ -163,7 +163,7 @@ final class Playground {
         // falling off to the right) so every ridge of paint shows, with soft shadows from the critters.
         let key = SCNLight()
         key.type = .spot
-        key.intensity = 1050
+        key.intensity = 820
         key.color = PlatformColor(red: 1, green: 0.95, blue: 0.88, alpha: 1)
         key.spotInnerAngle = 30
         key.spotOuterAngle = 95
@@ -188,7 +188,7 @@ final class Playground {
         // Cool bounce light from the room.
         let fill = SCNLight()
         fill.type = .ambient
-        fill.intensity = 260
+        fill.intensity = 280
         fill.color = PlatformColor(red: 0.9, green: 0.93, blue: 1, alpha: 1)
         let fillNode = SCNNode()
         fillNode.light = fill
