@@ -159,17 +159,17 @@ final class Playground {
         cameraNode.simdPosition = SIMD3(0, cameraY, cameraDistance)
         scene.rootNode.addChildNode(cameraNode)
 
-        // Window light from the upper left: a warm spot that rakes across the canvas (bright on the left,
-        // falling off to the right) so every ridge of paint shows, with soft shadows from the critters.
+        // Window light from the upper left: a neutral spot that lights the canvas almost evenly (like Splash
+        // Canvas's far lights), with soft shadows from the critters and the normal map showing the paint ridges.
         let key = SCNLight()
         key.type = .spot
-        key.intensity = 820
-        key.color = PlatformColor(red: 1, green: 0.95, blue: 0.88, alpha: 1)
-        key.spotInnerAngle = 30
-        key.spotOuterAngle = 95
+        key.intensity = 540
+        key.color = PlatformColor(red: 1, green: 1, blue: 1, alpha: 1)
+        key.spotInnerAngle = 70
+        key.spotOuterAngle = 110
         key.attenuationStartDistance = 4
-        key.attenuationEndDistance = 22
-        key.attenuationFalloffExponent = 1.2
+        key.attenuationEndDistance = 40
+        key.attenuationFalloffExponent = 0
         key.castsShadow = true
         key.shadowMode = .deferred
         key.shadowRadius = 14
@@ -189,7 +189,7 @@ final class Playground {
         let fill = SCNLight()
         fill.type = .ambient
         fill.intensity = 280
-        fill.color = PlatformColor(red: 0.9, green: 0.93, blue: 1, alpha: 1)
+        fill.color = PlatformColor(red: 1, green: 1, blue: 1, alpha: 1)
         let fillNode = SCNNode()
         fillNode.light = fill
         scene.rootNode.addChildNode(fillNode)
