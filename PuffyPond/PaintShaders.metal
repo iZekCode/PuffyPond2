@@ -20,7 +20,7 @@ struct PaintParams {
     float4 size;      // width, height, stamp count, clear
     float4 tune;      // dry rate, leveling, velocity damping, gravity
     float4 shade;     // normal strength, cavity darkening, bristle relief, paint body
-    float4 canvas;    // weave thread pitch (texels), weave depth under thin paint
+    float4 canvas;    // weave thread pitch (texels), weave depth under thin paint, per-texel grain height
 };
 
 static float hash21(int2 p) {
@@ -240,8 +240,10 @@ static float surfaceHeight(texture2d<float, access::read> paint, texture2d<float
     float covered = saturate(a * 20.0);
     float relief = flow.read(uint2(c)).w;
     float thin = covered * (1.0 - smoothstep(0.05, 0.4, a));
+    // Per-texel canvas tooth that shows through the paint, a little less where the coat is thick.
+    float grain = canvas.z * (hash21(c) * 0.5 + 0.5) * covered * (1.0 - 0.3 * saturate(a / 0.55));
     return a * shade.w + relief * shade.z * covered + 0.006 * noise(float2(c) * 0.9) * covered
-         + weave(float2(c), canvas.x) * canvas.y * thin;
+         + weave(float2(c), canvas.x) * canvas.y * thin + grain;
 }
 
 /// Turns the simulation into what the material samples: color + coverage, a per-pixel normal map
@@ -259,8 +261,13 @@ kernel void paintShade(texture2d<float, access::read> paint [[texture(0)]],
     #define h(o) surfaceHeight(paint, flow, int2(gid) + (o), size, P.shade, P.canvas)
     float hc = h(int2(0));
     float hl = h(int2(-1, 0)), hr = h(int2(1, 0)), hu = h(int2(0, -1)), hd = h(int2(0, 1));
+    float htl = h(int2(-1, -1)), htr = h(int2(1, -1)), hbl = h(int2(-1, 1)), hbr = h(int2(1, 1));
     float strength = P.shade.x;
-    float3 n = normalize(float3((hl - hr) * strength, (hd - hu) * strength, 1.0));
+    // Sobel gradient (scaled to match a central difference): smoother than 4 taps, so ridges and grain
+    // read as soft relief instead of per-texel noise.
+    float gx = ((htl - htr) + 2.0 * (hl - hr) + (hbl - hbr)) * 0.25;
+    float gy = ((hbl - htl) + 2.0 * (hd - hu) + (hbr - htr)) * 0.25;
+    float3 n = normalize(float3(gx * strength, gy * strength, 1.0));
 
     // Cavities (grooves, the dip inside a rim) read darker, like real impasto.
     float around = (h(int2(-3, 0)) + h(int2(3, 0)) + h(int2(0, -3)) + h(int2(0, 3))) * 0.25;
@@ -273,5 +280,6 @@ kernel void paintShade(texture2d<float, access::read> paint [[texture(0)]],
     float3 linearColor = pow(saturate(p.rgb * cavity), 2.2);
     albedo.write(float4(linearColor, coverage), gid);
     normalMap.write(float4(n * 0.5 + 0.5, 1), gid);
-    roughness.write(float4(float3(mix(0.55, 0.12, wet)), 1), gid);
+    // Bare canvas is fully matte; paint is satin when dry and glossy while wet.
+    roughness.write(float4(float3(mix(1.0, mix(0.3, 0.02, wet), sqrt(coverage))), 1), gid);
 }
