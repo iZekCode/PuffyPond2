@@ -33,9 +33,10 @@ embedded data (`WebSandboxFrame`) points at the real app: `//gacembed.withgoogle
   `ev_5eaa28281c8cb644644db4c9e42f0ff8cdd6e0a18517087e9c99e45f026ef297`): 1 file, 7,918 AST nodes, 0 parse failures,
   9 retained request relations (consistent with the `fetch` to `/octopus-paint/api/image`). Everything about `main.js` comes
   from direct reading, not REA evidence.
-- The app was never executed. No runtime capture, no frame inspection, no network capture. The built-in browser pane
-  refused the Google host, and Claude in Chrome was **not connected** when tried (two attempts), so there is still no
-  side-by-side visual reference.
+- The static analysis never executed the app: no frame inspection and no network capture. A later pass did run it in the
+  built-in browser pane (section 12, "Visual comparison"). That pane refuses `gacembed.withgoogle.com` when navigated to
+  directly, but it loads the Arts & Culture wrapper page and its embedded iframe, so the wrapper URL is the way in.
+  Claude in Chrome was **not connected** on three attempts, and was not needed.
 - `brushmodule.wasm` and `synthmodule.wasm` were disassembled with WABT 1.0.42 (`wasm-validate`, `wasm-objdump`,
   `wasm2wat`), and the full set of exports was recovered by joining the single-letter export names to the names the
   Emscripten glue in `main.js` assigns (section 9.7). The function bodies were **not** read in detail: the code is 294 KB
@@ -559,11 +560,41 @@ leveling, bristle grooves, stamps for each brush animal, and a normal-map shade 
 
 ### Known risks of the port
 
-- Wet paint at roughness 0.02, plus the existing `clearCoat = 0.55` on the paint material, may look mirror-like. Lower the clear coat first if so.
+- Wet paint at roughness 0.02, plus the existing `clearCoat = 0.55` on the paint material, may look mirror-like. Lower the clear coat first if so. (Checked on one stroke in the simulator: it did not look mirror-like. See "Visual comparison".)
 - `grainHeight` is estimated from the ratio of Splash's grain to its paint height, not measured.
 - The lights are also used by the photo booth for "Save image". `PaintMatte` calibrates the backdrop level itself, so saved
   images should follow, but this was not tested.
-- No stroke was drawn in the simulator after the change. Paint colour against the darker canvas has not been looked at.
+- Only one stroke was drawn in the simulator after the change (see "Visual comparison"). Paint colour against the darker canvas, other brushes and the photo-booth save have not been looked at.
+
+### Visual comparison (observed, 2026-11-02)
+
+First side-by-side look, after the port. Splash Canvas was run in the built-in browser pane through the wrapper URL
+(section 1) and one stroke was painted with the default octopus. PuffyPond was built from `main` (Debug, scratchpad
+DerivedData) and run on the iPad Pro 13-inch (M5) simulator, Freeform mode, camera step skipped, with one orange stroke
+drawn by a scripted touch path. This is a judgement from screenshots, not measured pixel values.
+
+| | Splash Canvas | PuffyPond |
+|---|---|---|
+| Bare canvas | near-white, even, fine grain | grey-beige linen, clearly darker and warmer, coarser and more visible weave |
+| Shadows | soft cast shadows from the characters | no comparable cast shadows seen |
+| Wet paint | pale gel-like blotch, sharp ridges, strong glossy highlights | bristle grooves, rough rim, moderate highlights; reads as thick paint, not mirror-like |
+| Fine detail | smooth | some fine speckle on the stroke, probably the per-texel grain |
+
+Findings:
+
+- The remaining canvas gap is mostly **base colour and weave scale**, not light level. The lighting change above
+  (key spot 820, ambient 280) cannot make the canvas read white. If the Splash look is the goal, the next change is the
+  canvas albedo and weave contrast, not the lights.
+- The clear-coat risk did not show on this stroke. Leave `clearCoat = 0.55` unless other colours or brushes show it.
+- The speckle should be checked at a closer zoom before `grainHeight = 0.02` is treated as final.
+
+Not covered: other colours and brushes, light paint on the canvas, the photo-booth "Save image" output, and any
+numeric comparison of canvas brightness.
+
+Testing notes: simulator screenshots lag the last action by one capture, so take a second screenshot before judging a
+tap. The app is landscape-only on a portrait iPad frame; tap coordinates were the screenshot coordinates scaled by
+0.688 (1032 pt wide device over 1500 px). The Splash experiment ignored the swatch click and only one stroke painted,
+so Splash colour behaviour was not compared.
 
 ## 13. If PuffyPond wants the actual Splash look
 
@@ -587,7 +618,8 @@ dialogue. Train your own NCA models and make your own assets.
 
 ## 15. Open questions
 
-- The visual match of the new PuffyPond lighting against Splash Canvas (never compared side by side).
+- The visual match of the new PuffyPond lighting against Splash Canvas: compared once on one stroke each (section 12,
+  "Visual comparison"). Colour, other brushes, the photo-booth save and brightness numbers are still open.
 - The exact camera field of view and the room `fov` constants (`u5`, `u1`), and the camera position per room.
 - Brush soft-body internals (wasm): the API is now known (section 9.7), but not the constraint types, what the three extra
   `brushStep` floats do, or how `unskinnedStiffness` and `volumeSensitivity` map to the solver. The function bodies are not read.
