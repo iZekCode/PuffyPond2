@@ -15,6 +15,20 @@ nonisolated enum Sfx: UInt8, Sendable {
     case pick      // a fish soaks up a new color (a = color index, b = pan)
     case sparkle   // twinkly glitter after a pop
     case splash    // a palm slaps the wet painting (a = strength 0…1, b = pan)
+    case sproing   // a fist catches the paint like a rubber band (b = pan)
+    case wobble    // the paint lets go and jiggles home like jelly (b = pan)
+    case whistleUp // slide whistle swoops up (two fists pull apart)
+    case whistleDown // slide whistle swoops down (two fists let go)
+    case quack     // a rubber duck (b = pan)
+    case splat     // a hard slap of wet paint (a = strength 0…1, b = pan)
+    case honk      // clown horn: "ha-HONK"
+    case bloop     // a cartoon bubble (b = pan)
+}
+
+/// Which tune the background music plays.
+nonisolated enum Tune: UInt8, Sendable {
+    case groove    // the cheerful toy-pop groove
+    case silly     // a wobbly circus oom-pah with a kazoo
 }
 
 nonisolated struct SfxEvent: Sendable {
@@ -106,6 +120,20 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
     ]
     private static let blipScale: [Float] = [79, 81, 84, 86, 88, 91, 93, 96, 98, 100]
 
+    // The silly tune: C F G C twice, a staccato kazoo over a tuba oom-pah.
+    private static let sillyRoots: [Float] = [36, 41, 43, 36]
+    private static let sillyTriads: [[Float]] = [[60, 64, 67], [60, 65, 69], [59, 62, 67], [60, 64, 67]]
+    private static let sillyMelody: [[Float]] = [
+        [72, -1, 76, -1, 79, -1, 76, -1, 72, -1, 76, -1, 79, -1, 84, -1],
+        [81, 80, 81, -1, 77, -1, 72, -1, 77, -1, 81, 80, 81, -1, -1, -1],
+        [79, -1, 83, -1, 86, -1, 83, -1, 79, 78, 79, -1, 74, -1, -1, -1],
+        [84, -1, 79, -1, 76, -1, 79, -1, 72, -1, -1, 67, 72, -1, -1, -1],
+        [72, 74, 76, 77, 79, -1, 79, -1, 79, 77, 76, 74, 72, -1, -1, -1],
+        [77, -1, 77, -1, 81, -1, 81, -1, 84, -1, 83, -1, 81, -1, 77, -1],
+        [79, -1, -1, 79, -1, -1, 79, -1, 83, -1, 81, -1, 79, -1, 74, -1],
+        [72, -1, 76, -1, 79, -1, 84, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+    ]
+
     static func hz(_ midi: Float) -> Float { 440 * pow(2, (midi - 69) / 12) }
 
     private let sampleRate: Float
@@ -115,7 +143,7 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
     private let lock = UnsafeMutablePointer<os_unfair_lock>.allocate(capacity: 1)
     private let queue = UnsafeMutablePointer<SfxEvent>.allocate(capacity: GrooveDSP.queueCapacity)
     private var queueCount = 0                     // guarded by `lock`
-    private let shared = UnsafeMutablePointer<Double>.allocate(capacity: 3)   // [beat, energy, master]
+    private let shared = UnsafeMutablePointer<Double>.allocate(capacity: 4)   // [beat, energy, master, tune]
 
     // Audio thread
     private let table = UnsafeMutablePointer<Float>.allocate(capacity: GrooveDSP.tableSize)
@@ -134,7 +162,7 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
         samplesPerStep = Double(sampleRate) * 60 / Self.bpm / 4
         lock.initialize(to: os_unfair_lock())
         queue.initialize(repeating: SfxEvent(kind: .blip, a: 0, b: 0), count: Self.queueCapacity)
-        shared.initialize(repeating: 0, count: 3)
+        shared.initialize(repeating: 0, count: 4)
         shared[2] = 1
         for i in 0..<Self.tableSize {
             table[i] = sin(2 * Float.pi * Float(i) / Float(Self.tableSize))
@@ -164,6 +192,7 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
 
     func setEnergy(_ value: Float) { shared[1] = Double(value) }
     func setMuted(_ muted: Bool) { shared[2] = muted ? 0 : 1 }
+    func setTune(_ tune: Tune) { shared[3] = Double(tune.rawValue) }
     /// Musical time in beats (quarter notes) since start.
     var beat: Double { shared[0] }
 
@@ -247,6 +276,10 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
     // MARK: The groove
 
     private func playStep(at offset: Int) {
+        if shared[3] >= 0.5 {
+            playSillyStep(at: offset)
+            return
+        }
         let chord = bar % 4
         let section = bar % 8
         let root = Self.roots[chord]
@@ -294,6 +327,49 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
                   attack: 0.004, vibrato: (0.006, 5.5), cutoff: 3200)
             start(.fm, Self.hz(note + 12), peak: lead * 0.35, decay: 0.45, at: offset, pan: -0.15,
                   fm: (3.5, 1.6, 0.12))
+        }
+    }
+
+    /// The silly tune: soft thump and tuba "oom" on 1 and 3, chord "pah" on 2 and 4, wood-block ticks,
+    /// and a kazoo that sometimes scoops up into its notes. A slide whistle closes every second round.
+    private func playSillyStep(at offset: Int) {
+        let chord = bar % 4
+        let section = bar % 8
+
+        if step % 8 == 0 {
+            start(.sine, 55, peak: 0.45, decay: 0.2, at: offset, attack: 0.001, glideFrom: 140, glideTime: 0.03)
+            let oom = Self.sillyRoots[chord] + (step == 0 ? 0 : 7)
+            start(.square, Self.hz(oom), peak: 0.3, decay: 0.2, at: offset, attack: 0.004, cutoff: 520)
+        }
+        if step == 4 || step == 12 {
+            for (k, note) in Self.sillyTriads[chord].enumerated() {
+                start(.square, Self.hz(note), peak: 0.05, decay: 0.09, at: offset,
+                      pan: Float(k - 1) * 0.4, attack: 0.002, cutoff: 2200)
+            }
+        }
+        if step % 4 == 2 {
+            let high = step % 8 == 2
+            start(.sine, high ? 1250 : 880, peak: 0.1, decay: 0.035, at: offset, pan: high ? 0.35 : -0.35,
+                  attack: 0.001, glideFrom: high ? 1500 : 1050, glideTime: 0.01)
+        }
+
+        let note = Self.sillyMelody[section][step]
+        if note > 0 {
+            let lead: Float = 0.1 + 0.05 * energy
+            let scoop = step % 4 == 0 && section % 2 == 1
+            start(.square, Self.hz(note), peak: lead, decay: 0.2, at: offset, pan: 0.1, attack: 0.006,
+                  glideFrom: scoop ? Self.hz(note - 2.5) : nil, glideTime: 0.04, vibrato: (0.014, 6), cutoff: 2400)
+            start(.noise, 0, peak: lead * 0.25, decay: 0.12, at: offset, pan: 0.1,
+                  filter: .bandPass(Self.hz(note) * 2, q: 4, sr: sampleRate))
+        }
+
+        if section == 7 && step == 8 {
+            start(.sine, Self.hz(96), peak: 0.1, decay: 0.6, at: offset, attack: 0.02, glideFrom: Self.hz(62),
+                  glideTime: 0.25, vibrato: (0.012, 7))
+        }
+        if section % 4 == 3 && step == 15 {
+            start(.sine, 800, peak: 0.1, decay: 0.12, at: offset, pan: -0.3, glideFrom: 300, glideTime: 0.04,
+                  vibrato: (0.05, 20))
         }
     }
 
@@ -352,6 +428,49 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
             start(.sine, 520, peak: 0.12 * s, decay: 0.14, at: 0, pan: pan, glideFrom: 1100, glideTime: 0.05)
             start(.noise, 0, peak: 0.08 * s, decay: 0.25, at: Int(0.05 * sampleRate), pan: -pan * 0.5,
                   filter: .bandPass(3200, q: 1.4, sr: sampleRate))
+        case .sproing:
+            start(.sine, 180, peak: 0.28, decay: 0.5, at: 0, pan: pan, glideFrom: 900, glideTime: 0.05,
+                  vibrato: (0.18, 14))
+            start(.fm, 360, peak: 0.08, decay: 0.4, at: 0, pan: pan, fm: (1.5, 2.5, 0.2))
+        case .wobble:
+            start(.sine, 220, peak: 0.26, decay: 0.7, at: 0, pan: pan, glideFrom: 520, glideTime: 0.25,
+                  vibrato: (0.25, 11))
+            start(.triangle, 110, peak: 0.1, decay: 0.6, at: 0, pan: pan, glideFrom: 260, glideTime: 0.25,
+                  vibrato: (0.2, 11))
+        case .whistleUp:
+            start(.sine, Self.hz(96), peak: 0.13, decay: 0.5, at: 0, attack: 0.03, glideFrom: Self.hz(60),
+                  glideTime: 0.18, vibrato: (0.012, 7))
+            start(.noise, 0, peak: 0.03, decay: 0.4, at: 0, attack: 0.05, filter: .bandPass(2500, q: 1.5, sr: sampleRate))
+        case .whistleDown:
+            start(.sine, Self.hz(60), peak: 0.13, decay: 0.5, at: 0, attack: 0.01, glideFrom: Self.hz(94),
+                  glideTime: 0.2, vibrato: (0.012, 7))
+            start(.noise, 0, peak: 0.03, decay: 0.3, at: 0, filter: .bandPass(2000, q: 1.5, sr: sampleRate))
+        case .quack:
+            let bases: [Float] = [330, 290]
+            for (k, base) in bases.enumerated() {
+                start(.square, base, peak: 0.2, decay: 0.12, at: Int(Float(k) * 0.15 * sampleRate), pan: pan,
+                      attack: 0.004, glideFrom: base * 1.6, glideTime: 0.05, vibrato: (0.04, 40), cutoff: 1400)
+                start(.noise, 0, peak: 0.05, decay: 0.1, at: Int(Float(k) * 0.15 * sampleRate), pan: pan,
+                      filter: .bandPass(1200, q: 1.5, sr: sampleRate))
+            }
+        case .splat:
+            let s = 0.5 + 0.5 * min(max(e.a, 0), 1)
+            start(.noise, 0, peak: 0.3 * s, decay: 0.09, at: 0, pan: pan, filter: .bandPass(500, q: 1.5, sr: sampleRate))
+            start(.sine, 140, peak: 0.25 * s, decay: 0.1, at: 0, pan: pan, glideFrom: 400, glideTime: 0.03)
+            start(.noise, 0, peak: 0.1 * s, decay: 0.06, at: Int(0.03 * sampleRate), pan: -pan * 0.5,
+                  filter: .bandPass(2200, q: 1.2, sr: sampleRate))
+        case .honk:
+            let bases: [Float] = [262, 330]
+            for (k, base) in bases.enumerated() {
+                let at = Int(Float(k) * 0.16 * sampleRate)
+                start(.square, base, peak: 0.16, decay: 0.25, at: at, attack: 0.01, glideFrom: base * 0.8,
+                      glideTime: 0.03, cutoff: 2000)
+                start(.square, base * 1.012, peak: 0.12, decay: 0.25, at: at, attack: 0.01, glideFrom: base * 0.8,
+                      glideTime: 0.03, cutoff: 2000)
+            }
+        case .bloop:
+            start(.sine, 800, peak: 0.12, decay: 0.12, at: 0, pan: pan, glideFrom: 300, glideTime: 0.04,
+                  vibrato: (0.05, 20))
         case .fizzle:
             start(.sine, 220, peak: 0.12, decay: 0.4, at: 0, glideFrom: 500, glideTime: 0.2)
             start(.noise, 0, peak: 0.1, decay: 0.3, at: 0, filter: .bandPass(700, q: 0.8, sr: sampleRate))
@@ -482,6 +601,7 @@ final class GrooveEngine {
     private let reverb = AVAudioUnitReverb()
     private var dsp: GrooveDSP?
     private var muted = false
+    private var tune = Tune.groove
     private var lastRestart: Double = 0
 
     func start() {
@@ -496,6 +616,7 @@ final class GrooveEngine {
             guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2) else { return }
             let dsp = GrooveDSP(sampleRate: Float(sampleRate))
             dsp.setMuted(muted)
+            dsp.setTune(tune)
             let source = AVAudioSourceNode(format: format, renderBlock: dsp.makeRenderBlock())
             reverb.loadFactoryPreset(.mediumRoom)
             reverb.wetDryMix = 14
@@ -522,6 +643,12 @@ final class GrooveEngine {
     func setMuted(_ muted: Bool) {
         self.muted = muted
         dsp?.setMuted(muted)
+    }
+
+    /// Switches the background tune; sound effects and the beat clock carry on.
+    func setTune(_ tune: Tune) {
+        self.tune = tune
+        dsp?.setTune(tune)
     }
 
     /// Beats since the music started (fractional). Drives the dance-to-the-beat animations.

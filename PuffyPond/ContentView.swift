@@ -103,7 +103,7 @@ struct ContentView: View {
     /// Photographs the painting off the easel and takes it to the review page.
     private func saveImage() {
         guard case .canvas(let choice) = router.route, let photo = playground.finishPainting() else { return }
-        router.go(.review(ReviewDraft(image: photo, choice: choice, stats: playground.sessionStats())))
+        router.go(.review(ReviewDraft(photos: photo, choice: choice, stats: playground.sessionStats())))
     }
 
     /// Hangs the reviewed painting, with its template and movement stats, and walks over to see it.

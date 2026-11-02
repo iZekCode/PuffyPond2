@@ -9,13 +9,23 @@ struct TemplateChoice: Equatable, Hashable {
     let isDailyQuest: Bool
 }
 
+/// The finished painting photographed three ways: whole (what goes in the gallery), the bare canvas,
+/// and the paint alone on a clear background. The review page keeps the canvas still and plays with the paint.
+struct CanvasPhotos {
+    let whole: CGImage
+    let canvas: CGImage
+    let paint: CGImage
+}
+
 /// A finished painting waiting on the review page, before it goes to the gallery.
 struct ReviewDraft: Equatable {
     let id = UUID()
-    let image: CGImage
+    let photos: CanvasPhotos
     let choice: TemplateChoice?
     /// Movement stats of the session; nil when it was drawn by touch or mouse.
     let stats: SessionStats?
+
+    var image: CGImage { photos.whole }
 
     static func == (lhs: ReviewDraft, rhs: ReviewDraft) -> Bool { lhs.id == rhs.id }
 }

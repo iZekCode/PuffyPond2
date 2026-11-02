@@ -587,7 +587,7 @@ final class Playground {
 
     /// Photographs the finished painting (just the canvas and its paint, lit like the studio). The paint
     /// stays on the easel, so "Keep drawing" on the review page carries on. Nil when there's nothing painted yet.
-    func finishPainting() -> CGImage? {
+    func finishPainting() -> CanvasPhotos? {
         guard !strokes.isEmpty else {
             audio.play(.swap)
             return nil
@@ -604,15 +604,36 @@ final class Playground {
 
     /// Renders the canvas head-on in a little photo booth: copies of the board and the live paint,
     /// the studio's own lights, no critters, pots or tracing guide in the way.
-    private func photographCanvas(pixels width: CGFloat = 1920) -> CGImage? {
+    private func photographCanvas(pixels width: CGFloat = 1920) -> CanvasPhotos? {
+        guard let whole = photograph(board: true, paint: true, pixels: width),
+              let canvas = photograph(board: true, paint: false, pixels: width),
+              let onBlack = photograph(board: false, paint: true, background: .black, pixels: width),
+              let onWhite = photograph(board: false, paint: true, background: .white, pixels: width),
+              let blackLevel = backdropLevel(.black), let whiteLevel = backdropLevel(.white),
+              let paint = PaintMatte.extract(onBlack: onBlack, onWhite: onWhite, blackLevel: blackLevel,
+                                             whiteLevel: whiteLevel, floor: PaintMatte.sheenFloor) else { return nil }
+        return CanvasPhotos(whole: whole, canvas: canvas, paint: paint)
+    }
+
+    /// How bright a plain backdrop comes out in the booth, whose exposure can dim it.
+    private func backdropLevel(_ color: PlatformColor) -> Double? {
+        photograph(board: false, paint: false, background: color, pixels: 16).flatMap(PaintMatte.level)
+    }
+
+    /// One shot of the photo booth. Paint alone goes over a plain `background` (see `PaintMatte`).
+    private func photograph(board showBoard: Bool, paint showPaint: Bool, background: PlatformColor? = nil,
+                            pixels width: CGFloat) -> CGImage? {
         guard let canvasBoard else { return nil }
         let booth = SCNScene()
+        if let background { booth.background.contents = background }
         booth.lightingEnvironment.contents = scene.lightingEnvironment.contents
         booth.lightingEnvironment.intensity = scene.lightingEnvironment.intensity
-        let board = canvasBoard.clone()
-        board.simdTransform = canvasBoard.simdWorldTransform
-        booth.rootNode.addChildNode(board)
-        booth.rootNode.addChildNode(paintLayer.node.clone())
+        if showBoard {
+            let board = canvasBoard.clone()
+            board.simdTransform = canvasBoard.simdWorldTransform
+            booth.rootNode.addChildNode(board)
+        }
+        if showPaint { booth.rootNode.addChildNode(paintLayer.node.clone()) }
         for light in studioLights { booth.rootNode.addChildNode(light.clone()) }
 
         let size = Self.canvasSize

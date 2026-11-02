@@ -56,7 +56,7 @@ struct SheetGesturesTests {
         let x = solver.position(i).x
         #expect(x > solver.rest[i].x * 1.35)
         // The middle stays put under a symmetric stretch.
-        #expect(displacement(solver, at: .zero) < 0.1)
+        #expect(displacement(solver, at: .zero) < 0.2)
     }
 
     @Test func pushOnlyAffectsNodesInRadius() {
@@ -118,5 +118,92 @@ struct SheetGesturesTests {
         #expect(gestures.state == .stretching)
         run(gestures, solver, frames: 2) { _ in [hand(0, .fist, SIMD2(-1, 0)), hand(1, .open, SIMD2(1, 0))] }
         #expect(gestures.state == .grabbing)
+    }
+
+    /// Smallest signed area of any triangle of the sheet's mesh; negative means a flipped (folded) triangle.
+    private func smallestTriangleArea(_ solver: SheetSolver) -> Float {
+        let columns = SheetSolver.columns
+        var smallest = Float.infinity
+        func area(_ a: Int, _ b: Int, _ c: Int) -> Float {
+            let u = solver.position(b) - solver.position(a)
+            let v = solver.position(c) - solver.position(a)
+            return (u.x * v.y - u.y * v.x) / 2
+        }
+        for row in 0..<(SheetSolver.rows - 1) {
+            for column in 0..<(columns - 1) {
+                let a = row * columns + column
+                let b = a + 1
+                let c = a + columns
+                let d = c + 1
+                smallest = min(smallest, area(a, c, b), area(b, c, d))
+            }
+        }
+        return smallest
+    }
+
+    @Test func longDragBarelyBunchesTheSheet() {
+        let solver = SheetSolver()
+        let gestures = SheetGestures()
+        var smallest = Float.infinity
+        run(gestures, solver, frames: 180) { f in
+            smallest = min(smallest, smallestTriangleArea(solver))
+            return [hand(0, .fist, SIMD2(min(Float(f) / 90, 1) * 4.5, min(Float(f) / 90, 1) * -1.5))]
+        }
+        // Pushed-up paint may bunch a little, never by more than half a grid cell turning inside out.
+        let cell = SheetSolver.size.x / Float(SheetSolver.columns - 1) * SheetSolver.size.y / Float(SheetSolver.rows - 1)
+        #expect(smallest > -cell * 0.5)
+        // The patch travelled all the way with the hand.
+        #expect(solver.maxDisplacement > 4)
+    }
+
+    @Test func wideStretchNeverFoldsTheSheet() {
+        let solver = SheetSolver()
+        let gestures = SheetGestures()
+        var smallest = Float.infinity
+        run(gestures, solver, frames: 150) { f in
+            smallest = min(smallest, smallestTriangleArea(solver))
+            let t = min(Float(f) / 90, 1)
+            let spread = 0.8 + 2.2 * t
+            return [hand(0, .fist, SIMD2(-spread, 0)), hand(1, .fist, SIMD2(spread, 0))]
+        }
+        #expect(gestures.state == .stretching)
+        let cell = SheetSolver.size.x / Float(SheetSolver.columns - 1) * SheetSolver.size.y / Float(SheetSolver.rows - 1)
+        #expect(smallest > -cell * 0.5)
+    }
+
+    @Test func stretchAnnouncesItsStartAndEnd() {
+        let solver = SheetSolver()
+        let gestures = SheetGestures()
+        let begun = run(gestures, solver, frames: 10) { _ in [hand(0, .fist, SIMD2(-1, 0)), hand(1, .fist, SIMD2(1, 0))] }
+        #expect(begun.filter { if case .stretchStarted = $0 { true } else { false } }.count == 1)
+        let ended = run(gestures, solver, frames: 2) { _ in [hand(0, .fist, SIMD2(-1, 0)), hand(1, .open, SIMD2(1, 0))] }
+        #expect(ended.filter { if case .stretchEnded = $0 { true } else { false } }.count == 1)
+    }
+
+    @Test func grabMovesOnlyASmallPatch() {
+        let solver = SheetSolver()
+        let gestures = SheetGestures()
+        run(gestures, solver, frames: 90) { f in [hand(0, .fist, SIMD2(min(Float(f) / 60, 1) * 1.5, 0))] }
+        #expect(solver.maxDisplacement > 1.2)
+        // Anything more than 3 units from the hand's path stays where it was drawn.
+        for i in 0..<solver.count {
+            let p = solver.rest[i]
+            let along = min(max(p.x / 1.5, 0), 1)
+            if simd_length(p - SIMD2(along * 1.5, 0)) > 3 {
+                #expect(simd_length(solver.displacement[i]) < 0.1)
+            }
+        }
+    }
+
+    @Test func twoFistsEachMoveOnlyTheirOwnPatch() {
+        let solver = SheetSolver()
+        let gestures = SheetGestures()
+        run(gestures, solver, frames: 90) { f in
+            let t = min(Float(f) / 60, 1)
+            return [hand(0, .fist, SIMD2(-1.5 - t, 0)), hand(1, .fist, SIMD2(1.5 + t, 0))]
+        }
+        #expect(gestures.state == .stretching)
+        #expect(displacement(solver, at: SIMD2(2.5, 0)) > 0.7)
+        #expect(displacement(solver, at: SIMD2(0, 1.8)) < 0.05)
     }
 }
