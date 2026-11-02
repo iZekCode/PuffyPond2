@@ -246,7 +246,8 @@ kernel void paintStep(texture2d<float, access::sample> paintIn [[texture(0)]],
 //
 // A trained texture that grows on its own where a brush has touched. Every texel holds 12 state channels
 // (ncaA = channels 0…3, ncaB = 4…7, ncaC = 8…11; the first three are the visible colour, centred on 0)
-// and a life value (r = how long it keeps growing, g = how much of an NCA texture the texel carries, 0 = none).
+// and a life value (r = how long it keeps growing, g = how much of an NCA texture the texel carries, 0 = none,
+// b = which model grows there: every paint colour has its own, trained on its own texture).
 // Each step a texel perceives itself and its 8 neighbours with 4 fixed kernels per channel (identity,
 // Sobel-x, Sobel-y, Laplacian): 48 values, then a 2-layer perceptron (48 -> 96 ReLU -> 12) says how to change.
 // This is the "Self-Organising Textures" model (Distill 2021). tools/nca/train_nca.py trains the weights; the
@@ -257,6 +258,7 @@ constant int kNCAInputs = kNCAChannels * 4;
 constant int kNCAHidden = 96;
 constant int kNCAB1 = kNCAHidden * kNCAInputs;
 constant int kNCAW2 = kNCAB1 + kNCAHidden;
+constant int kNCAWeightCount = kNCAW2 + kNCAChannels * kNCAHidden;   // one model; the buffer holds one per paint colour
 
 static float hash3(int2 p, uint salt) {
     uint h = uint(p.x) * 374761393u + uint(p.y) * 668265263u + salt * 2246822519u;
@@ -303,7 +305,9 @@ kernel void ncaStep(texture2d<float, access::sample> ncaAIn [[texture(0)]],
     float2 shift = f0.xy * saturate(f0.z) * dt;
     float2 from = length(shift) > 0.05 ? pos - shift : pos;
     float4 state[3] = { ncaAIn.sample(lin, from), ncaBIn.sample(lin, from), ncaCIn.sample(lin, from) };
-    float2 life = lifeIn.sample(lin, from).rg;
+    constexpr sampler near(coord::pixel, filter::nearest, address::clamp_to_edge);   // a model index must not blend
+    float4 life = lifeIn.sample(near, from);
+    constant float *Wm = W + int(life.z + 0.5) * kNCAWeightCount;
 
     if (life.x > 0.01 && life.y > 0.02) {
         // Neighbours are read at the stride (a jitter per texel is optional; 0 = exactly the next texel).
@@ -341,14 +345,14 @@ kernel void ncaStep(texture2d<float, access::sample> ncaAIn [[texture(0)]],
         }
         float hidden[kNCAHidden];
         for (int h = 0; h < kNCAHidden; h++) {
-            float s = W[kNCAB1 + h];
-            for (int i = 0; i < kNCAInputs; i++) s += W[h * kNCAInputs + i] * perceived[i];
+            float s = Wm[kNCAB1 + h];
+            for (int i = 0; i < kNCAInputs; i++) s += Wm[h * kNCAInputs + i] * perceived[i];
             hidden[h] = max(s, 0.0);
         }
         float delta[kNCAChannels];
         for (int o = 0; o < kNCAChannels; o++) {
             float s = 0.0;
-            for (int h = 0; h < kNCAHidden; h++) s += W[kNCAW2 + o * kNCAHidden + h] * hidden[h];
+            for (int h = 0; h < kNCAHidden; h++) s += Wm[kNCAW2 + o * kNCAHidden + h] * hidden[h];
             delta[o] = s;
         }
         // Only a share of the texels change each frame (the rule was trained that way). The notebook does not
@@ -385,18 +389,18 @@ kernel void ncaStep(texture2d<float, access::sample> ncaAIn [[texture(0)]],
                     state[0] = float4(0);
                     state[1] = float4(0);
                     state[2] = float4(0);
-                    life = float2(1.0, coverage);
+                    life = float4(1.0, coverage, st.nca.w, 0.0);
                 }
             }
         } else if (st.color.w > 0.5 ? dist < radius * 0.8 : (st.brush.y > 0.0 && st.extra.w < 0.5 && dist < radius * 0.8)) {
-            life = float2(0.0);
+            life = float4(0.0);
         }
     }
 
     ncaAOut.write(state[0], gid);
     ncaBOut.write(state[1], gid);
     ncaCOut.write(state[2], gid);
-    lifeOut.write(float4(life, 0, 0), gid);
+    lifeOut.write(life, gid);
 }
 
 /// The linen weave under the paint (0…1): warp and weft threads passing over and under each other.
@@ -411,9 +415,14 @@ static float weave(float2 p, float pitch) {
 
 /// Surface height at a clamped texel: a low, flat paint body plus the bristle relief and a faint grain.
 /// Thin paint follows the canvas weave underneath; a thick coat buries it.
+/// How much of an NCA texture a texel shows (0…1). A freshly seeded texel is still blank, so it fades in as it grows.
+static float ncaGrown(float4 life, float covered) {
+    return life.y * covered * smoothstep(0.0, 0.2, 1.0 - life.x);
+}
+
 static float surfaceHeight(texture2d<float, access::read> paint, texture2d<float, access::read> flow,
                            texture2d<float, access::read> nca, texture2d<float, access::read> ncaLife,
-                           int2 c, int2 size, float4 shade, float4 canvas, float ncaHeight) {
+                           constant float4 *ncaMeans, int2 c, int2 size, float4 shade, float4 canvas, float ncaHeight) {
     c = clamp(c, int2(0), size - 1);
     float a = paint.read(uint2(c)).a;
     float covered = saturate(a * 20.0);
@@ -421,9 +430,11 @@ static float surfaceHeight(texture2d<float, access::read> paint, texture2d<float
     float thin = covered * (1.0 - smoothstep(0.05, 0.4, a));
     // Per-texel canvas tooth that shows through the paint, a little less where the coat is thick.
     float grain = canvas.z * (hash21(c) * 0.5 + 0.5) * covered * (1.0 - 0.3 * saturate(a / 0.55));
-    // A grown NCA texture (its brightness, centred on 0) lifts and lowers the paint.
-    float ncaBright = dot(nca.read(uint2(c)).rgb, float3(1.0 / 3.0));
-    float grown = ncaLife.read(uint2(c)).g * covered;
+    // A grown NCA texture lifts and lowers the paint where it is brighter or darker than its model's average.
+    float4 life = ncaLife.read(uint2(c));
+    float meanBrightness = dot(ncaMeans[int(life.z + 0.5)].rgb, float3(1.0 / 3.0));
+    float ncaBright = dot(nca.read(uint2(c)).rgb + 0.5, float3(1.0 / 3.0)) - meanBrightness;
+    float grown = ncaGrown(life, covered);
     return a * shade.w + relief * shade.z * covered + 0.006 * noise(float2(c) * 0.9) * covered
          + weave(float2(c), canvas.x) * canvas.y * thin + grain + ncaBright * grown * ncaHeight;
 }
@@ -438,11 +449,12 @@ kernel void paintShade(texture2d<float, access::read> paint [[texture(0)]],
                        texture2d<float, access::read> ncaA [[texture(5)]],
                        texture2d<float, access::read> ncaLife [[texture(6)]],
                        constant PaintParams &P [[buffer(0)]],
+                       constant float4 *ncaMeans [[buffer(1)]],
                        uint2 gid [[thread_position_in_grid]]) {
     const int2 size = int2(P.size.xy);
     if (int(gid.x) >= size.x || int(gid.y) >= size.y) return;
     float4 p = paint.read(gid);
-    #define h(o) surfaceHeight(paint, flow, ncaA, ncaLife, int2(gid) + (o), size, P.shade, P.canvas, P.ncaShade.x)
+    #define h(o) surfaceHeight(paint, flow, ncaA, ncaLife, ncaMeans, int2(gid) + (o), size, P.shade, P.canvas, P.ncaShade.x)
     float hc = h(int2(0));
     float hl = h(int2(-1, 0)), hr = h(int2(1, 0)), hu = h(int2(0, -1)), hd = h(int2(0, 1));
     float htl = h(int2(-1, -1)), htr = h(int2(1, -1)), hbl = h(int2(-1, 1)), hbr = h(int2(1, 1));
@@ -461,10 +473,11 @@ kernel void paintShade(texture2d<float, access::read> paint [[texture(0)]],
 
     float wet = saturate(flow.read(gid).z);
     // Pigment colors are sRGB values; the material samples this texture as linear.
-    // A grown NCA texture also modulates the pigment's brightness, so its pattern shows in colour too.
-    float ncaBright = dot(ncaA.read(gid).rgb, float3(1.0 / 3.0));
-    float tint = 1.0 + ncaBright * ncaLife.read(gid).g * coverage * P.ncaShade.y * 2.0;
-    float3 linearColor = pow(saturate(p.rgb * cavity * tint), 2.2);
+    // Where an NCA texture has grown, its own colours replace the flat pigment (each paint colour has a model trained
+    // on a texture of that colour).
+    float grown = ncaGrown(ncaLife.read(gid), coverage);
+    float3 ncaColor = saturate(ncaA.read(gid).rgb + 0.5);
+    float3 linearColor = pow(saturate(mix(p.rgb, ncaColor, grown * P.ncaShade.y) * cavity), 2.2);
     albedo.write(float4(linearColor, coverage), gid);
     normalMap.write(float4(n * 0.5 + 0.5, 1), gid);
     // Bare canvas is fully matte; paint is satin when dry and glossy while wet.

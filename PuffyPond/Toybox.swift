@@ -15,17 +15,19 @@ typealias PlatformImage = UIImage
 // MARK: - Colors
 
 enum Paint {
-    /// Bright, high-contrast toy colors.
+    /// The six paint colours, each the main colour of an NCA texture (tools/nca/targets/<name>-texture.*).
+    /// The order matches the NCA model file (PuffyPond/NCA/octopus.bin) and the old palette's roles
+    /// (templates and animals refer to colours by index: 0 warm, 1 cool, 2 light, 3 pink, 4 green, 5 purple).
     static let colors: [SIMD3<Float>] = [
-        SIMD3(1.00, 0.42, 0.20), // tangerine
-        SIMD3(0.18, 0.62, 1.00), // sky blue
-        SIMD3(1.00, 0.80, 0.16), // lemon
-        SIMD3(0.98, 0.36, 0.62), // bubblegum
-        SIMD3(0.30, 0.85, 0.50), // mint
-        SIMD3(0.62, 0.42, 1.00), // grape
+        SIMD3(0.92, 0.21, 0.04), // red
+        SIMD3(0.16, 0.58, 0.92), // blue
+        SIMD3(1.00, 0.90, 0.10), // yellow
+        SIMD3(0.98, 0.53, 0.72), // pink
+        SIMD3(0.17, 0.63, 0.28), // green
+        SIMD3(0.52, 0.40, 0.77), // purple
     ]
 
-    static let names = ["Tangerine", "Sky", "Lemon", "Bubblegum", "Mint", "Grape"]
+    static let names = ["Red", "Blue", "Yellow", "Pink", "Green", "Purple"]
 
     static func swiftUI(_ c: SIMD3<Float>) -> Color {
         Color(red: Double(c.x), green: Double(c.y), blue: Double(c.z))

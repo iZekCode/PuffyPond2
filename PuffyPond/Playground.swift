@@ -491,7 +491,7 @@ final class Playground {
         let dabs = controlScheme == .fist && buddy.tool != .brush
             ? buddy.tool.dabs(from: from, to: p, radius: Self.strokeRadius, speed: buddy.critter.speed)
             : buddy.critter.dabs(from: from, to: p, radius: Self.strokeRadius, speed: buddy.critter.speed)
-        lay(dabs, color: buddy.color, seed: Float(slot) * 13.7 + Float(strokes.count) * 2.3)
+        lay(dabs, color: buddy.color, ncaModel: buddy.colorIndex, seed: Float(slot) * 13.7 + Float(strokes.count) * 2.3)
         lastStamp[slot] = p
         // The blender only moves paint that's already there: it doesn't start a stroke of its own.
         if controlScheme == .fist && buddy.tool == .blender { return }
@@ -524,10 +524,12 @@ final class Playground {
         }
     }
 
-    private func lay(_ dabs: [BrushDab], color: SIMD3<Float>, seed: Float) {
+    /// `ncaModel` is the paint colour's index: each colour has its own NCA texture model.
+    private func lay(_ dabs: [BrushDab], color: SIMD3<Float>, ncaModel: Int, seed: Float) {
         for (k, dab) in dabs.enumerated() {
             paintLayer.stamp(from: dab.from, to: dab.to, radius: dab.radius, color: color, speed: dab.speed,
-                             seed: seed + Float(k) * 5.1, style: dab.style, drag: dab.drag, strokeSeed: seed)
+                             seed: seed + Float(k) * 5.1, style: dab.style, drag: dab.drag, strokeSeed: seed,
+                             ncaModel: ncaModel)
         }
     }
 
@@ -537,7 +539,8 @@ final class Playground {
             buddy.critter.react(.happy, for: 0.7)   // proud of that line
             // Some brushes paint when you let go (the pufferfish bursts).
             if controlScheme == .legacy {
-                lay(buddy.critter.released(), color: buddy.color, seed: Float(slot) * 7.7 + Float(strokes.count))
+                lay(buddy.critter.released(), color: buddy.color, ncaModel: buddy.colorIndex,
+                    seed: Float(slot) * 7.7 + Float(strokes.count))
             }
         }
         activeStroke[slot] = nil

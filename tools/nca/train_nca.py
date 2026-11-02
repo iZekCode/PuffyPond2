@@ -157,9 +157,9 @@ def to_rgb(state):
     return state[:, :3] + 0.5
 
 
-def load_target(path, size, gray, device):
+def load_target(path, size, gray, device, crop=1.0):
     img = Image.open(path).convert("RGB")
-    side = min(img.size)  # centre square crop
+    side = int(min(img.size) * crop)  # centre square crop (crop < 1 trims the borders: watermarks, vignettes)
     left, top = (img.width - side) // 2, (img.height - side) // 2
     img = img.crop((left, top, left + side, top + side)).resize((size, size), Image.LANCZOS)
     t = torch.from_numpy(np.asarray(img)).float().div(255.0).permute(2, 0, 1)[None]
@@ -168,7 +168,7 @@ def load_target(path, size, gray, device):
     return t.to(device)
 
 
-def export(model, out_dir, args):
+def export(model, out_dir, args, mean_rgb):
     """nca.bin: float32 little-endian: w1 [hidden][chn*4], b1 [hidden], w2 [chn][hidden] (no bias)."""
     chn, hidden = model.chn, model.hidden
     w1 = model.w1.weight.detach().cpu().reshape(hidden, chn * 4).numpy()
@@ -190,6 +190,7 @@ def export(model, out_dir, args):
         "statePacking": "rgb = state[0:3] + 0.5; state += dt * delta * fireMask; no clamp",
         "seed": "zeros",
         "gray": args.gray,
+        "meanRGB": [round(float(v), 4) for v in mean_rgb],  # mean colour of the target (0..1), for the shader
         "wrap": "circular",
     }
     (out_dir / "nca.json").write_text(json.dumps(meta, indent=2))
@@ -221,6 +222,7 @@ def main():
     ap.add_argument("--dt", type=float, default=1.0)
     ap.add_argument("--fire-rate", type=float, default=0.5, help="chance a cell updates each step")
     ap.add_argument("--gray", action="store_true", help="train on luminance so the splat colour can tint it")
+    ap.add_argument("--crop", type=float, default=1.0, help="keep the central fraction of the square crop (e.g. 0.9)")
     ap.add_argument("--preview-every", type=int, default=500)
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
@@ -232,7 +234,8 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     print(f"device {device}")
 
-    target = load_target(args.target, args.size, args.gray, device)
+    target = load_target(args.target, args.size, args.gray, device, args.crop)
+    mean_rgb = target.mean(dim=(0, 2, 3)).cpu().numpy()
     torchvision.utils.save_image(target, out_dir / "target.png")
     style = StyleLoss(target, device)
 
@@ -264,7 +267,7 @@ def main():
         if it % args.preview_every == 0 or it == args.iters:
             preview(model, out_dir, f"preview_{it:05d}.png", device, args.fire_rate)
             torch.save(model.state_dict(), out_dir / "model.pt")
-            export(model, out_dir, args)
+            export(model, out_dir, args, mean_rgb)
 
     print(f"done. weights: {out_dir / 'nca.bin'}  meta: {out_dir / 'nca.json'}")
 
