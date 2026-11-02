@@ -590,8 +590,11 @@ Findings:
 
 Follow-up, same day (branch `feat/splash-white-canvas`): the canvas and light were changed to close that gap.
 
-- `Studio.swift`: canvas albedo `(0.84, 0.83, 0.80)` x ~0.9 became `(0.95, 0.95, 0.93)` x ~0.95; weave normal strength
-  2.4 became 1.4; `weaveTileSize` 0.4 became 0.25 (a finer weave; the paint shader reads the same constant).
+- `Studio.swift`: canvas albedo `(0.84, 0.83, 0.80)` x ~0.9 became `(0.95, 0.95, 0.93)` x ~0.96, with the weave's
+  share of the tone cut from 0.07 to 0.015; weave normal strength 2.4 became 0.8; `weaveTileSize` 0.4 became 0.2 (a
+  finer weave; the paint shader reads the same constant). A first pass (normal 1.4, tile 0.25) still showed the weave
+  a little more than Splash's fine grain, so it was cut again. The weave is now about one pixel per thread, so it reads
+  as grain rather than a pattern.
 - `Playground.swift`: the key spot is now neutral white, with a wide cone (inner 70, outer 110) and no distance falloff,
   so it lights the canvas almost evenly like Splash's far lights; the fill is neutral instead of cool; key intensity is
   540 (820 washed the canvas to flat white and lost the weave).
