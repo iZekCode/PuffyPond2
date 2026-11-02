@@ -169,6 +169,7 @@ struct HUDView: View {
 
     private var controls: some View {
         HStack(spacing: 10 * scale) {
+            brushSizeSlider
             RoundButton(symbol: "house.fill", tint: .green) {
                 if playground.hasDrawing { confirmingHome = true } else { goHome() }
             }
@@ -193,6 +194,20 @@ struct HUDView: View {
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: playground.hasDrawing)
+    }
+
+    /// How big the octopus is: bigger paints a wider stroke.
+    private var brushSizeSlider: some View {
+        HStack(spacing: 8 * scale) {
+            Image(systemName: "circle.fill").font(.system(size: 8 * scale)).foregroundStyle(.secondary)
+            Slider(value: $playground.octopusSize, in: Playground.octopusSizeRange)
+                .frame(width: 130 * scale)
+            Image(systemName: "circle.fill").font(.system(size: 20 * scale)).foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 14 * scale)
+        .frame(height: 46 * scale)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().stroke(.white, lineWidth: 2.5))
     }
 
     private var saveButton: some View {

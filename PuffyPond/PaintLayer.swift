@@ -29,8 +29,8 @@ struct BrushStyle {
     var ncaSeed: Float = 1      // chance each texel under the brush starts growing
 
     static let brush = BrushStyle()
-    /// The octopus: wild, expressionist paint that grows its own texture.
-    static let octopus = BrushStyle(bristles: 0, nca: 1)
+    /// The octopus: a thin watercolor wash that grows its own texture.
+    static let octopus = BrushStyle(push: 0.4, bristles: 0, watery: 0.6, nca: 1)
     static let blend = BrushStyle(amount: 0, push: 0.9, bristles: 0, blend: 1)
 }
 
@@ -81,7 +81,7 @@ final class PaintLayer {
     private static let ncaJitter: Float = 0           // --jitter
     private static let ncaDT: Float = 1               // --dt
     private static let ncaFireRate: Float = 0.5       // --fire-rate
-    private static let ncaHeight: Float = 0.5         // how much the grown texture lifts and lowers the paint
+    private static let ncaHeight: Float = 0.2         // how much the grown texture lifts and lowers the paint
     private static let ncaColor: Float = 0.9          // how far the pigment gives way to the texture's own colours
     private static let ncaLifePerSecond: Float = 0.3  // a stroke keeps growing for about 1 / this many seconds
     // The texture takes hold in patches along a stroke, not everywhere: a soft noise field decides where.

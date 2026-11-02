@@ -45,6 +45,8 @@ final class Playground {
     var buddyColors: [Int] = [0, 1]
     var buddyKinds: [CritterKind] = [.octopus, .seahorse]
     var buddyTools: [PaintTool] = [.brush, .brush]
+    /// How big the octopus is, and so how wide its brush paints (its mouth and every tentacle scale with it).
+    var octopusSize: Float = 1
     var colorFlash: ColorFlash?
     /// Fist paints with five tools (default), or the original pinch + six brush animals.
     let controlScheme: ControlScheme
@@ -95,6 +97,7 @@ final class Playground {
     static let templateRowY: Float = 0.1 - canvasSize.y * 0.5 + 0.23
     static let strokeRadius: Float = 0.085
     static let paintHoverZ: Float = 0.24        // how high the brush animal hovers while painting
+    static let octopusSizeRange: ClosedRange<Float> = 0.6...2.4
 
     // Timing
     @ObservationIgnored private var lastTime: Double = 0
@@ -377,7 +380,10 @@ final class Playground {
             if mode != .paint { finishStroke(slot: buddy.slot) }
 
             // Painting, the animal comes down close to the canvas so its tentacles can lie on it.
-            let buddyZ: Float = mode == .paint ? Self.paintHoverZ : 0.42
+            // A bigger octopus hovers higher, so its body stays clear of the canvas.
+            let bigOctopus = buddy.critter is Octopus ? max(octopusSize, 1) : 1
+            let buddyZ: Float = mode == .paint ? Self.canvasZ + (Self.paintHoverZ - Self.canvasZ) * bigOctopus : 0.42
+            if buddy.critter is Octopus { buddy.critter.sizeScale = octopusSize }
             let target: SIMD3<Float>
             if let hand {
                 target = worldPoint(hand.position, z: buddyZ)

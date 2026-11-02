@@ -375,8 +375,11 @@ kernel void ncaStep(texture2d<float, access::sample> ncaAIn [[texture(0)]],
         float dist = stampDistance(world, st);
         if (dist > radius) continue;
         if (st.nca.x > 0.5) {
-            // Texels that are still growing keep their own pattern; the brush only starts fresh ones.
-            if (life.x < 0.5 && hash3(int2(gid), uint(P.nca.w) * 17u + 11u) < st.nca.y) {
+            // Texels that are still growing keep their own pattern; the brush only starts fresh ones. Texels that
+            // already carried a texture restart a few at a time, so a brush held in place keeps the texture changing
+            // instead of the whole puddle blinking at once.
+            const float restart = life.y < 0.02 ? 1.0 : 0.05;
+            if (life.x < 0.5 && hash3(int2(gid), uint(P.nca.w) * 17u + 11u) < st.nca.y * restart) {
                 // The texture only takes hold in patches (a soft, low-frequency noise field, shifted per stroke,
                 // with a per-stroke bias so some strokes carry more of it than others); between them the paint stays plain.
                 // A slow brush leaves the full texture; the faster it moves, the less of it takes hold.

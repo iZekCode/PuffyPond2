@@ -94,17 +94,34 @@ final class TentacleBundle {
     ///   - body: the body's world transform (without squash).
     ///   - snap: jump straight to the rest shape (after a teleport).
     ///   - press: 0…1, how hard the limbs are pushed down onto the canvas plane `minZ` (the tips most).
+    ///   - trail: 0…1, how much the limbs gather into one bundle streaming along `trailDirection` (canvas plane).
     func simulate(dt: Float, body m: simd_float4x4, scale: Float, clock: Float, beatPulse: Float, snap: Bool,
-                  press: Float = 0, minZ: Float = 0.1) {
+                  press: Float = 0, minZ: Float = 0.1, trail: Float = 0, trailDirection: SIMD2<Float> = .zero) {
         func world(_ local: SIMD3<Float>) -> SIMD3<Float> { simd_make_float3(m * SIMD4(local, 1)) }
         let length = shape.segmentLength * scale
         let steps = max(1, Int((dt * 120).rounded(.up)))
         let h = dt / Float(steps)
         let gravity = SIMD3<Float>(0, -shape.gravity, 0) * h * h
         let n = shape.segments
+        let roots = limbs.map { world($0.rootLocal) }
+        let center = roots.reduce(.zero, +) / Float(max(roots.count, 1))
 
         for k in limbs.indices {
-            let rest = restShape(k, clock: clock).map(world)
+            var rest = restShape(k, clock: clock).map(world)
+            if trail > 0.01 {
+                // Wiping: the limb lies behind the head along the stroke, drawn in toward the middle so all of them
+                // end up side by side, with a little wobble along the way.
+                let dir = SIMD3(trailDirection.x, trailDirection.y, 0)
+                let side = SIMD3(-trailDirection.y, trailDirection.x, 0)
+                let lateral = simd_dot(rest[0] - center, side)
+                for i in 1..<n {
+                    let t = Float(i) / Float(n - 1)
+                    var p = rest[0] + dir * (Float(i) * length * 0.95)
+                    p += side * (-lateral * 0.6 * t + sin(clock * 7 + limbs[k].phase + t * 5) * length * 0.25 * t)
+                    p.z = rest[0].z + (minZ - rest[0].z) * min(1, t * 3)
+                    rest[i] += (p - rest[i]) * trail
+                }
+            }
             if snap {
                 limbs[k].points = rest
                 limbs[k].previous = rest
@@ -120,7 +137,7 @@ final class TentacleBundle {
                     let velocity = (points[i] - previous[i]) * shape.drag
                     previous[i] = points[i]
                     // Shape memory: stiff near the body, floppy toward the tip.
-                    let pull = shape.stiffness * (1 - 0.8 * t) * (1 + beatPulse * 0.5)
+                    let pull = shape.stiffness * (1 - 0.8 * t) * (1 + beatPulse * 0.5) * (1 + 3 * trail)
                     points[i] += velocity + (rest[i] - points[i]) * pull + gravity
                 }
                 for _ in 0..<3 {
