@@ -131,12 +131,24 @@ final class Playground {
 
     // MARK: - World building
 
+    // Lighting knobs. Brightness: keyIntensity, fillIntensity, environmentIntensity, exposureOffset (EV, lower is darker).
+    // Direction: keyPosition (x left/right, y up, z toward the camera) and keyTarget (the point it aims at).
+    // Spread: keyInnerAngle/keyOuterAngle (wider is more even, narrower is a vignette).
+    private static let keyIntensity: CGFloat = 300
+    private static let fillIntensity: CGFloat = 220
+    private static let environmentIntensity: CGFloat = 0.7
+    private static let exposureOffset: CGFloat = -0.5
+    private static let keyPosition = SIMD3<Float>(0, 7, 6)
+    private static let keyTarget = SIMD3<Float>(0, 0, 0)
+    private static let keyInnerAngle: CGFloat = 70
+    private static let keyOuterAngle: CGFloat = 110
+
     private func buildWorld() {
         // A painter's studio: soft window light in an out-of-focus room.
         scene.background.contents = Studio.backdrop()
         scene.background.intensity = 1.7          // the room photo, brought up to the camera's exposure
         scene.lightingEnvironment.contents = Studio.environment()
-        scene.lightingEnvironment.intensity = 0.9
+        scene.lightingEnvironment.intensity = Self.environmentIntensity
 
         let camera = SCNCamera()
         camera.fieldOfView = 34
@@ -145,7 +157,7 @@ final class Playground {
         // Photographic look: tone-mapped HDR, contact shadows, a soft lens vignette and a hint of bloom.
         camera.wantsHDR = true
         camera.wantsExposureAdaptation = false
-        camera.exposureOffset = -0.35
+        camera.exposureOffset = Self.exposureOffset
         camera.minimumExposure = -2
         camera.maximumExposure = 2
         camera.screenSpaceAmbientOcclusionIntensity = 0.6
@@ -159,17 +171,17 @@ final class Playground {
         cameraNode.simdPosition = SIMD3(0, cameraY, cameraDistance)
         scene.rootNode.addChildNode(cameraNode)
 
-        // Window light from the upper left: a warm spot that rakes across the canvas (bright on the left,
-        // falling off to the right) so every ridge of paint shows, with soft shadows from the critters.
+        // Overhead light from the top centre: a neutral spot that lights the canvas almost evenly (like Splash
+        // Canvas's far lights), with soft shadows from the critters and the normal map showing the paint ridges.
         let key = SCNLight()
         key.type = .spot
-        key.intensity = 820
-        key.color = PlatformColor(red: 1, green: 0.95, blue: 0.88, alpha: 1)
-        key.spotInnerAngle = 30
-        key.spotOuterAngle = 95
+        key.intensity = Self.keyIntensity
+        key.color = PlatformColor(red: 1, green: 1, blue: 1, alpha: 1)
+        key.spotInnerAngle = Self.keyInnerAngle
+        key.spotOuterAngle = Self.keyOuterAngle
         key.attenuationStartDistance = 4
-        key.attenuationEndDistance = 22
-        key.attenuationFalloffExponent = 1.2
+        key.attenuationEndDistance = 40
+        key.attenuationFalloffExponent = 0
         key.castsShadow = true
         key.shadowMode = .deferred
         key.shadowRadius = 14
@@ -180,16 +192,16 @@ final class Playground {
         key.zFar = 30
         let keyNode = SCNNode()
         keyNode.light = key
-        keyNode.simdPosition = SIMD3(-6.5, 4.5, 6)
-        keyNode.simdLook(at: SIMD3(0.8, 0, 0))
+        keyNode.simdPosition = Self.keyPosition
+        keyNode.simdLook(at: Self.keyTarget)
         scene.rootNode.addChildNode(keyNode)
         studioLights.append(keyNode)
 
-        // Cool bounce light from the room.
+        // Neutral bounce light from the room.
         let fill = SCNLight()
         fill.type = .ambient
-        fill.intensity = 280
-        fill.color = PlatformColor(red: 0.9, green: 0.93, blue: 1, alpha: 1)
+        fill.intensity = Self.fillIntensity
+        fill.color = PlatformColor(red: 1, green: 1, blue: 1, alpha: 1)
         let fillNode = SCNNode()
         fillNode.light = fill
         scene.rootNode.addChildNode(fillNode)

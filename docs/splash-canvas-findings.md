@@ -588,6 +588,26 @@ Findings:
 - The clear-coat risk did not show on this stroke. Leave `clearCoat = 0.55` unless other colours or brushes show it.
 - The speckle should be checked at a closer zoom before `grainHeight = 0.02` is treated as final.
 
+Follow-up, same day (branch `feat/splash-white-canvas`): the canvas and light were changed to close that gap.
+
+- `Studio.swift`: canvas albedo `(0.84, 0.83, 0.80)` x ~0.9 became `(0.95, 0.95, 0.93)` x ~0.96, with the weave's
+  share of the tone cut from 0.07 to 0.015; weave normal strength 2.4 became 0.8; `weaveTileSize` 0.4 became 0.2 (a
+  finer weave; the paint shader reads the same constant). A first pass (normal 1.4, tile 0.25) still showed the weave
+  a little more than Splash's fine grain, so it was cut again. The weave is now about one pixel per thread, so it reads
+  as grain rather than a pattern.
+- `Playground.swift`: the key spot is now neutral white, with a wide cone (inner 70, outer 110) and no distance falloff,
+  so it lights the canvas almost evenly like Splash's far lights; the fill is neutral instead of cool. A first pass at
+  key intensity 540 was still too bright and leaned from the left, so the key now sits at the top centre
+  (`keyPosition` `(0, 7, 6)` aiming at the origin), with key 300 (tuned by hand; 820 washed the canvas to flat white
+  and lost the weave), fill 220, environment 0.7 and exposure offset -0.5. These are named constants
+  (`keyIntensity`, `fillIntensity`, `environmentIntensity`, `exposureOffset`, `keyPosition`, `keyTarget`,
+  `keyInnerAngle`, `keyOuterAngle`) at the top of the world-building section, so they can be tuned in one place.
+- Result on the simulator (one stroke, judged by eye): the canvas reads off-white with a soft, slight gradient and a
+  fine weave, close to the Splash screenshot, and the orange paint still shows its ridges. The raking warm light that
+  made ridges pop is gone; the normal map carries them now.
+- Still untested: thin paint over the new weave, other colours and brushes, the photo-booth "Save image" output, and
+  numeric brightness. The key intensity of 540 was found by one trial, not tuned.
+
 Not covered: other colours and brushes, light paint on the canvas, the photo-booth "Save image" output, and any
 numeric comparison of canvas brightness.
 

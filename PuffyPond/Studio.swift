@@ -62,7 +62,7 @@ enum Studio {
     static let weaveTile = 512
     static let threadsPerTile = 32
     /// World size of one weave tile (the paint shader draws the same weave under thin paint).
-    static let weaveTileSize: Float = 0.4
+    static let weaveTileSize: Float = 0.2
 
     /// Height of the woven threads (0…1): warp and weft passing over and under each other.
     private static func weave(_ x: Int, _ y: Int) -> Float {
@@ -80,15 +80,15 @@ enum Studio {
         return max(top, under) + fiber
     }
 
-    /// Primed linen: warm off-white with the weave catching the light.
+    /// Primed linen: near-white with a fine, soft weave catching the light.
     static func canvasMaterial(repeats: SIMD2<Float>) -> SCNMaterial {
         let size = weaveTile
         let albedo = bitmap(width: size, height: size) { x, y in
             let h = weave(x, y)
-            let tone = 0.9 + 0.07 * h + 0.03 * noise(Float(x) / 40, Float(y) / 40, period: size / 40 + 1, seed: 11)
-            return SIMD4(SIMD3<Float>(0.84, 0.83, 0.8) * tone, 1)
+            let tone = 0.96 + 0.015 * h + 0.02 * noise(Float(x) / 40, Float(y) / 40, period: size / 40 + 1, seed: 11)
+            return SIMD4(SIMD3<Float>(0.95, 0.95, 0.93) * tone, 1)
         }
-        let normals = normalMap(size: size, strength: 2.4, height: weave)
+        let normals = normalMap(size: size, strength: 0.8, height: weave)
         let m = SCNMaterial()
         m.lightingModel = .physicallyBased
         m.diffuse.contents = Toybox.platformImage(albedo)
