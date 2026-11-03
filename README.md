@@ -57,7 +57,7 @@ The whole canvas is always on screen, with a column of paint pots beside its rig
 | Eraser | Mushroom | Scrubs paint away in puffs of spores. The template's dotted guide stays. |
 | Blender | Snail | Lays no paint; smudges and mixes the wet paint underneath. |
 
-The paint is simulated: flat wet strokes with bristle grooves and ragged edges, it levels out, blends with wet neighbours, thick blobs sag a little, and it dries over time.
+The paint is simulated: flat wet strokes with bristle grooves and ragged edges, it levels out, thick blobs sag a little, and it dries over time. Colours never blend by themselves: new paint covers whatever is under it, and only the snail (blender) mixes colours.
 
 The buttons along the bottom: brush size, Home, eraser for touch (iPad only), music, camera preview, help card, clear canvas, Save image, and the **eye**. The eye hides the HUD (buttons, hints, camera preview) so only the canvas, the pots, the bubbles and the brush characters show; the eye itself stays, faded, in the bottom right corner to bring the HUD back. There are no cast shadows under the pots, bubbles or brush animals.
 

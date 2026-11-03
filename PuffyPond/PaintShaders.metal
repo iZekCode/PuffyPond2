@@ -100,7 +100,9 @@ kernel void paintStep(texture2d<float, access::sample> paintIn [[texture(0)]],
         }
         thickness = mix(p.a, sumA * 0.2, level);
         float3 premul = mix(p.rgb * p.a, sumC * 0.2, level);
-        color = thickness > 1e-4 ? premul / thickness : p.rgb;
+        // Colours never mix here (only the blender mixes them): paint keeps its own colour, and only bare canvas that the
+        // wash blooms onto takes its neighbours'.
+        color = p.a > 0.02 ? p.rgb : (thickness > 1e-4 ? premul / thickness : p.rgb);
         if (blooming) wet = max(wet, runny * 0.9);   // the bloom carries on, a little weaker each texel
     }
 
@@ -205,7 +207,7 @@ kernel void paintStep(texture2d<float, access::sample> paintIn [[texture(0)]],
             continue;
         }
         if (fast > 0.01 && thickness > 0.02) {
-            // A fast stroke smears: its colour mixes with the paint a few texels around, as the blender does.
+            // A fast stroke smears its thickness a little (never its colour: only the blender mixes colours).
             float sumA = 0.0, painted = 0.0;
             float3 sumC = float3(0);
             for (int n = 0; n < 4; n++) {
@@ -214,7 +216,6 @@ kernel void paintStep(texture2d<float, access::sample> paintIn [[texture(0)]],
                 if (q.a > 0.02) { sumA += q.a; sumC += q.rgb * q.a; painted += 1.0; }
             }
             if (painted > 0.0) {
-                color = mix(color, sumC / sumA, 0.6 * fast * push);
                 thickness = mix(thickness, sumA / painted, 0.15 * fast * push);
             }
         }
@@ -224,15 +225,14 @@ kernel void paintStep(texture2d<float, access::sample> paintIn [[texture(0)]],
         float cap = mix(0.55 + 0.1 * ragged, 0.12 + 0.03 * ragged, watery);
         cap = mix(cap, 0.95 + 0.05 * ragged, impasto);
         float add = deposit * max(0.0, cap - thickness);
-        // Wet-on-wet: new paint blends into what's there.
-        float blend = thickness < 1e-3 ? 1.0 : min(1.0, add / (thickness * 0.5 + add) + 0.12 + 0.3 * watery + 0.4 * fast);
+        // The newest paint covers what is below it: colours never blend (only the blender mixes them), so wherever the
+        // brush lays paint the colour is simply the brush's.
+        float blend = saturate(deposit * 40.0);
         // Watercolor pigment gathers at the wash's edge and dries darker there.
         float pooled = 1.0 - 0.22 * watery * smoothstep(0.55, 0.95, x);
         float3 pigment = st.color.rgb * (0.96 + 0.04 * ragged) * pooled;
-        // Watercolor is a transparent glaze: a pale tint that darkens whatever is below it, like
-        // subtractive pigment (min, so a wash going over itself doesn't keep getting darker).
-        float3 below = thickness < 1e-3 ? float3(1) : color;
-        pigment = mix(pigment, min(below, mix(float3(1), pigment, 0.6)), watery);
+        // Watercolor is a pale tint of its pigment (whatever is below does not show through).
+        pigment = mix(pigment, mix(float3(1), pigment, 0.6), watery);
         color = mix(color, pigment, blend);
         thickness += add;
         wet = max(wet, 1.0 + 2.0 * watery);
@@ -378,6 +378,8 @@ kernel void ncaStep(texture2d<float, access::sample> ncaAIn [[texture(0)]],
         float dist = stampDistance(world, st);
         if (dist > radius) continue;
         if (st.nca.x > 0.5) {
+            // Paint of another colour covers the old colour's texture: colours never blend, the newest one wins.
+            if (life.y > 0.02 && dist < radius * 0.8 && int(life.z + 0.5) != int(st.nca.w + 0.5)) life = float4(0.0);
             // Texels that are still growing keep their own pattern; the brush only starts fresh ones. Texels that
             // already carried a texture restart a few at a time, so a brush held in place keeps the texture changing
             // instead of the whole puddle blinking at once.
