@@ -170,16 +170,16 @@ struct HUDView: View {
 
     // MARK: Controls
 
-    /// The eye: hides everything except the paint and the brush characters. It stays on screen, dimmed, to bring the rest back.
+    /// The eye: hides the HUD so only the canvas, the pots, the bubbles and the brush characters show. It stays on
+    /// screen, faded, to bring the HUD back. (Faded with colors: view opacity below 1 stops it taking clicks over the 3D view.)
     private var focusButton: some View {
         VStack {
             Spacer()
             HStack {
                 Spacer()
-                RoundButton(symbol: playground.focusMode ? "eye.slash.fill" : "eye.fill", tint: .gray) {
+                RoundButton(symbol: playground.focusMode ? "eye.slash.fill" : "eye.fill", tint: .gray, faded: playground.focusMode) {
                     withAnimation(.easeInOut(duration: 0.25)) { playground.focusMode.toggle() }
                 }
-                .opacity(playground.focusMode ? 0.45 : 1)
             }
         }
         .padding(16 * scale)
@@ -276,6 +276,7 @@ struct HUDView: View {
 struct RoundButton: View {
     let symbol: String
     let tint: Color
+    var faded = false
     let action: () -> Void
     @Environment(\.uiScale) private var scale
 
@@ -283,11 +284,11 @@ struct RoundButton: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 18 * scale, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(.white.opacity(faded ? 0.75 : 1))
                 .frame(width: 46 * scale, height: 46 * scale)
-                .background(tint.gradient, in: Circle())
-                .overlay(Circle().stroke(.white, lineWidth: 2.5))
-                .shadow(color: tint.opacity(0.4), radius: 6, y: 3)
+                .background(tint.opacity(faded ? 0.45 : 1).gradient, in: Circle())
+                .overlay(Circle().stroke(.white.opacity(faded ? 0.5 : 1), lineWidth: 2.5))
+                .shadow(color: tint.opacity(faded ? 0.15 : 0.4), radius: 6, y: 3)
         }
         .buttonStyle(.plain)
     }

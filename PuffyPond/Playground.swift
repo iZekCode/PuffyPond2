@@ -41,21 +41,8 @@ final class Playground {
     }
     var previewHands: [[CGPoint]] = []
     var imageAspect: CGFloat = 4.0 / 3.0
-    /// Hides everything that isn't paint or a brush character: the buttons, hints and camera preview, and the pots
-    /// and bubbles on the canvas.
-    var focusMode = false {
-        didSet {
-            guard focusMode != oldValue else { return }
-            for pot in pots { pot.root.isHidden = focusMode }
-            for pot in critterPots { pot.setShown(!focusMode) }
-            for pot in templatePots { pot.root.isHidden = focusMode }
-            for buddy in buddies {
-                buddy.rubbingPot = nil
-                buddy.rubAmount = 0
-                buddy.critter.colorPreview = nil
-            }
-        }
-    }
+    /// Hides the HUD (buttons, hints, camera preview). The paint, the brush characters, the pots and the bubbles stay.
+    var focusMode = false
     var pointerErases = false {
         didSet {
             guard controlScheme == .fist, pointerErases != oldValue, let buddy = buddies.first else { return }
@@ -321,7 +308,6 @@ final class Playground {
 
     /// Whether `p` (canvas plane) is under a pot or bubble: rubbing one must not paint or erase behind it.
     func isOverShelf(_ p: SIMD2<Float>) -> Bool {
-        guard !focusMode else { return false }
         let reach = PaintPot.radius + 0.14
         return pots.contains { simd_distance(p, SIMD2($0.root.simdPosition.x, $0.root.simdPosition.y + 0.04)) < reach }
             || critterPots.contains { simd_distance(p, SIMD2($0.root.simdPosition.x, $0.root.simdPosition.y + 0.04)) < reach }
@@ -776,7 +762,7 @@ final class Playground {
             buddy.rubAmount = 0
             buddy.critter.colorPreview = nil
         }
-        guard !focusMode, buddy.mode == .swim || buddy.mode == .paint else { return stop() }
+        guard buddy.mode == .swim || buddy.mode == .paint else { return stop() }
         let p = buddy.toolPosition
         func near(_ c: SIMD3<Float>) -> Bool {
             simd_distance(SIMD2(p.x, p.y), SIMD2(c.x, c.y + 0.04)) < PaintPot.radius + 0.14
