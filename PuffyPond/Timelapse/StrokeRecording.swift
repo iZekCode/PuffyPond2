@@ -60,51 +60,87 @@ struct StrokeRecording: Equatable {
         }
     }
 
-    /// Drops dabs evenly, never erases and (while there is room) never the first or last dab of a stroke, where a
-    /// stroke is every dab sharing a `strokeSeed`. A dropped dab's start is carried into the next kept dab of its
-    /// stroke, so the painted path stays connected.
+    /// Brings the recording down to `limit` events. Erases are capped at a quarter of the limit (evenly dropped),
+    /// then dabs go: first those that sit in the middle of a connected run of dabs of one stroke, which are merged
+    /// into the next dab so the painted path stays connected; then, if that is not enough, dabs that stand alone
+    /// (dropped outright, never joined to a neighbour that is not next to them); and last the first and last dab
+    /// of a stroke. A stroke is every dab sharing a `strokeSeed`, which is only a hint: it does not say the dabs
+    /// connect.
     func thinned(toAtMost limit: Int) -> StrokeRecording {
         guard events.count > limit else { return self }
-        let erases = events.reduce(0) { count, event in
-            if case .erase = event { count + 1 } else { count }
+        var dropped = Set<Int>()
+
+        let erases = events.indices.filter { if case .erase = events[$0] { true } else { false } }
+        if erases.count > limit / 4 {
+            dropped.formUnion(Self.evenly(erases, count: erases.count - limit / 4))
         }
+        var need = events.count - dropped.count - limit
+        guard need > 0 else { return removing(dropped, merged: []) }
+
         var groups: [Float: [Int]] = [:]
         for (index, event) in events.enumerated() {
             if case .dab(let dab) = event { groups[dab.strokeSeed, default: []].append(index) }
         }
-        var room = limit - erases
-        var protected = Set<Int>()
+        var joinable: [Int] = []
+        var alone: [Int] = []
+        var ends: [Int] = []
         for indices in groups.values {
-            protected.insert(indices[0])
-            protected.insert(indices[indices.count - 1])
+            for (k, index) in indices.enumerated() {
+                guard case .dab(let dab) = events[index] else { continue }
+                if k == 0 || k == indices.count - 1 {
+                    ends.append(index)
+                } else if case .dab(let before) = events[indices[k - 1]], case .dab(let after) = events[indices[k + 1]],
+                          dab.from == before.to, after.from == dab.to {
+                    joinable.append(index)
+                } else {
+                    alone.append(index)
+                }
+            }
         }
-        // Not even the stroke ends fit: thin every dab alike.
-        if protected.count > room { protected.removeAll() }
-        room -= protected.count
+        var merged = Set<Int>()
+        for (pool, isMerge) in [(joinable.sorted(), true), (alone.sorted(), false), (ends.sorted(), false)] where need > 0 {
+            let chosen = Self.evenly(pool, count: min(need, pool.count))
+            dropped.formUnion(chosen)
+            if isMerge { merged.formUnion(chosen) }
+            need -= chosen.count
+        }
+        return removing(dropped, merged: merged)
+    }
 
-        let optional = events.indices.filter { index in
-            if case .dab = events[index], !protected.contains(index) { return true }
-            return false
+    /// `count` of `indices`, spread evenly.
+    private static func evenly(_ indices: [Int], count: Int) -> [Int] {
+        guard count < indices.count else { return indices }
+        guard count > 0 else { return [] }
+        return indices.enumerated().compactMap { offset, index in
+            (offset + 1) * count / indices.count > offset * count / indices.count ? index : nil
         }
-        let keepCount = max(0, min(room, optional.count))
-        var kept = protected
-        for (k, index) in optional.enumerated() where (k + 1) * keepCount / max(optional.count, 1) > k * keepCount / max(optional.count, 1) {
-            kept.insert(index)
-        }
+    }
 
+    /// The events without `dropped`. A dropped dab in `merged` was joined end to end with its neighbours: its start
+    /// is carried into the next dab if that one carries on from where it ended.
+    private func removing(_ dropped: Set<Int>, merged: Set<Int>) -> StrokeRecording {
         var carried: [Float: SIMD2<Float>] = [:]
+        var endedAt: [Float: SIMD2<Float>] = [:]
         var result: [RecordedEvent] = []
-        result.reserveCapacity(kept.count + erases)
+        result.reserveCapacity(events.count - dropped.count)
         for (index, event) in events.enumerated() {
             switch event {
             case .erase:
-                result.append(event)
+                if !dropped.contains(index) { result.append(event) }
             case .dab(var dab):
-                if kept.contains(index) {
-                    if let start = carried.removeValue(forKey: dab.strokeSeed) { dab.from = start }
+                let seed = dab.strokeSeed
+                if dropped.contains(index) {
+                    if merged.contains(index) {
+                        if carried[seed] == nil || endedAt[seed] != dab.from { carried[seed] = dab.from }
+                        endedAt[seed] = dab.to
+                    } else {
+                        carried.removeValue(forKey: seed)
+                        endedAt.removeValue(forKey: seed)
+                    }
+                } else {
+                    if let start = carried.removeValue(forKey: seed), endedAt[seed] == dab.from { dab.from = start }
+                    endedAt.removeValue(forKey: seed)
                     result.append(.dab(dab))
-                } else if carried[dab.strokeSeed] == nil {
-                    carried[dab.strokeSeed] = dab.from
                 }
             }
         }

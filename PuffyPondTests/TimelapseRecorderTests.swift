@@ -53,4 +53,14 @@ struct TimelapseRecorderTests {
         recorder.record(dabs: [dab()], color: .zero, ncaModel: 0, seed: 1, brush: .butterfly)
         #expect(recorder.snapshot()?.events.first?.t == 0)
     }
+
+    @Test func erasesAreCoalesced() {
+        let recorder = recorder(times: [0, 0.01, 0.02, 0.2, 0.21])
+        recorder.recordErase(at: SIMD2(0, 0), radius: 0.3, dt: 0.016)
+        recorder.recordErase(at: SIMD2(0.01, 0), radius: 0.3, dt: 0.016)      // same spot, a moment later: skipped
+        recorder.recordErase(at: SIMD2(1, 0), radius: 0.3, dt: 0.016)         // moved far: kept
+        recorder.recordErase(at: SIMD2(1.01, 0), radius: 0.3, dt: 0.016)      // long enough since the last: kept
+        recorder.recordErase(at: SIMD2(1.02, 0), radius: 0.3, dt: 0.016)      // same spot, a moment later: skipped
+        #expect(recorder.snapshot()?.events.count == 3)
+    }
 }

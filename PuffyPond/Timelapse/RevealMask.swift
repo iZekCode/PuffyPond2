@@ -7,6 +7,8 @@ import simd
 final class RevealMask {
     static let width = 640
     static let height = 400
+    /// The paint stamp spreads past the brush radius; the reveal is drawn this much wider than the brush.
+    static let footprint: CGFloat = 1.5
 
     private let context: CGContext
     private let size = Playground.canvasSize
@@ -27,10 +29,16 @@ final class RevealMask {
         let scale = CGFloat(Self.width) / CGFloat(size.x)
         let from = pixel(dab.from)
         let to = pixel(dab.to)
-        context.setLineWidth(CGFloat(dab.radius) * 2 * scale)
+        context.setLineWidth(CGFloat(dab.radius) * 2 * Self.footprint * scale)
         context.move(to: from)
         context.addLine(to: to)
         context.strokePath()
+    }
+
+    /// Shows everything at once, without drawing any stroke.
+    func revealAll() {
+        context.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: Self.width, height: Self.height))
     }
 
     func clear() {

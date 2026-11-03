@@ -8,11 +8,16 @@ final class MaskReplayer: ReplayRenderer {
     let node = SCNNode()
     let mask = RevealMask()
 
+    /// The whole painting shows: the replay is over, so no stroke has to be drawn to get there.
+    private(set) var isFullyRevealed = false
+
     private let events: [(time: Double, dab: RecordedDab)]
+    private let duration: Double
     private let material = SCNMaterial()
     private var next = 0
 
     init(finalPaint: CGImage, recording: StrokeRecording, timeline: ReplayTimeline) {
+        duration = timeline.duration
         events = recording.events.compactMap { event in
             guard case .dab(let dab) = event, dab.style.blend <= 0.5 else { return nil }
             return (timeline.replayTime(forRecorded: dab.t), dab)
@@ -40,6 +45,16 @@ final class MaskReplayer: ReplayRenderer {
     }
 
     func advance(to replayTime: Double) {
+        guard !isFullyRevealed else { return }
+        // At the end the saved painting shows in full, including the paint that spread past the strokes, and Skip
+        // costs one fill instead of every remaining stroke.
+        if replayTime >= duration {
+            isFullyRevealed = true
+            next = events.count
+            mask.revealAll()
+            material.transparent.contents = mask.image
+            return
+        }
         var changed = false
         while next < events.count, events[next].time <= replayTime {
             mask.reveal(events[next].dab)
@@ -50,6 +65,7 @@ final class MaskReplayer: ReplayRenderer {
     }
 
     func reset() {
+        isFullyRevealed = false
         next = 0
         mask.clear()
         material.transparent.contents = mask.image

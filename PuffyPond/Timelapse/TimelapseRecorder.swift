@@ -8,6 +8,7 @@ final class TimelapseRecorder {
     private let clock: () -> Double
     private var recording = StrokeRecording()
     private var start: Double?
+    private var lastErase: (t: Double, center: SIMD2<Float>)?
 
     init(clock: @escaping () -> Double = CACurrentMediaTime) {
         self.clock = clock
@@ -24,13 +25,19 @@ final class TimelapseRecorder {
         }
     }
 
+    /// An eraser held on one spot reports every frame; only a sound's worth of it is kept: a new erase must be a
+    /// tenth of a second after the last one, or move half a brush away.
     func recordErase(at center: SIMD2<Float>, radius: Float, dt: Float) {
-        recording.append(.erase(RecordedErase(t: elapsed(), center: center, radius: radius, dt: dt)))
+        let t = elapsed()
+        if let last = lastErase, t - last.t < 0.1, simd_distance(center, last.center) < radius * 0.5 { return }
+        lastErase = (t, center)
+        recording.append(.erase(RecordedErase(t: t, center: center, radius: radius, dt: dt)))
     }
 
     func reset() {
         recording = StrokeRecording()
         start = nil
+        lastErase = nil
     }
 
     /// A copy of everything recorded so far; nil when nothing was.

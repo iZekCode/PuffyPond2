@@ -15,16 +15,27 @@ struct HoverDwell {
     private(set) var progress: (id: String, value: Double)?
     private var time = 0.0
     private var latched: String?
+    private var waitingForRelease = false
+
+    /// Ignores every hold until the hand has left all buttons. For when the page changes under a resting hand:
+    /// whatever button appears there must not be pressed by a hold that began on the old one.
+    mutating func requireRelease() {
+        waitingForRelease = true
+        time = 0
+        latched = nil
+        progress = nil
+    }
 
     /// `hoveredID`: the button an open hand is over, or nil. Returns the id when a full hold completes.
     mutating func update(hoveredID: String?, dt: Double) -> String? {
         guard let id = hoveredID else {
+            waitingForRelease = false
             time = 0
             latched = nil
             progress = nil
             return nil
         }
-        if latched == id { return nil }
+        if waitingForRelease || latched == id { return nil }
         latched = nil
         if progress?.id != id { time = 0 }
         time += dt

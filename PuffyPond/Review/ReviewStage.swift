@@ -148,6 +148,8 @@ final class ReviewStage {
     }
 
     private func beginTimelapse() {
+        hover.requireRelease()
+        dwell = nil
         phase = .timelapse
         sheet.removeAllActions()
         sheet.opacity = 0
@@ -159,6 +161,9 @@ final class ReviewStage {
 
     /// The picture gives way to the sheet, which wakes up with a wobble.
     private func finishTimelapse() {
+        // A hand resting where Skip was must not press the button that appears there.
+        hover.requireRelease()
+        dwell = nil
         phase = .interactive
         renderer?.node.runAction(.fadeOut(duration: 0.35))
         sheet.runAction(.fadeIn(duration: 0.35))

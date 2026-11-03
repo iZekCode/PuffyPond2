@@ -88,4 +88,37 @@ struct StrokeRecordingTests {
         let size = StrokeRecording(events: events).encoded().count
         #expect(size < 1_000_000, "encoded \(size) bytes")
     }
+
+    @Test func thinningNeverJoinsSegmentsThatAreNotConnected() {
+        // A limb brush lays several separate segments a frame under one seed.
+        var events: [RecordedEvent] = (0..<60).map { i in
+            .dab(dab(t: Double(i) / 64, from: SIMD2(Float(i), 0), to: SIMD2(Float(i) + 0.5, 0)))
+        }
+        // Then a new stroke whose first dab still carries the old seed, far from where the old one ended.
+        events += (0..<20).map { i in
+            .dab(dab(t: 2 + Double(i) / 64, from: SIMD2(100 + Float(i) * 0.1, 50), to: SIMD2(100.1 + Float(i) * 0.1, 50)))
+        }
+        let thinned = StrokeRecording(events: events).thinned(toAtMost: 40)
+        let kept = dabs(thinned.events)
+        #expect(kept.count <= 40)
+        for d in kept {
+            // No kept segment may stretch from the first stroke to the second.
+            #expect(!(d.from.x < 70 && d.to.x > 90), "joined \(d.from) to \(d.to)")
+        }
+        for d in kept where d.from.y == 0 {
+            #expect(simd_distance(d.from, d.to) < 1, "an unconnected segment was stretched: \(d.from) to \(d.to)")
+        }
+    }
+
+    @Test func erasesAreBudgetedToo() {
+        var events: [RecordedEvent] = (0..<30_000).map { i in
+            .erase(RecordedErase(t: Double(i) / 60, center: .zero, radius: 0.3, dt: 0.016))
+        }
+        events += chain(100)
+        let thinned = StrokeRecording(events: events).thinned(toAtMost: StrokeRecording.maxEvents)
+        let erases = thinned.events.filter { if case .erase = $0 { true } else { false } }
+        #expect(thinned.events.count <= StrokeRecording.maxEvents)
+        #expect(erases.count <= StrokeRecording.maxEvents / 4)
+        #expect(dabs(thinned.events).count == 100, "the painting itself survives a long erasing session")
+    }
 }

@@ -596,7 +596,10 @@ final class Playground {
         if isOverShelf(p) { return }
         let r = buddy.eraseRadius
         paintLayer.erase(at: p, radius: r, dt: frameDT)
-        timelapse.recordErase(at: p, radius: r, dt: frameDT)
+        // Only erasing on the canvas is part of the timelapse (the eraser also roams the shelf and the floor).
+        if abs(p.x) <= Self.canvasSize.x / 2, abs(p.y - 0.1) <= Self.canvasSize.y / 2 {
+            timelapse.recordErase(at: p, radius: r, dt: frameDT)
+        }
         // The legacy starfish scrubs the dotted guide away too; the garden mushroom only wipes paint.
         var erasedAny = buddy.showsStarfish ? (template?.erase(at: p, radius: r) ?? false) : false
         if let outline = template, outline.isEmpty {

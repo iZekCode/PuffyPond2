@@ -53,4 +53,14 @@ struct HoverDwellTests {
         _ = hold(&dwell, "a", seconds: 0.5)
         #expect(dwell.progress == nil, "a finished hold shows no ring")
     }
+
+    @Test func requireReleaseBlocksUntilTheHandLeaves() {
+        var dwell = HoverDwell()
+        _ = hold(&dwell, "a", seconds: 0.5)
+        dwell.requireRelease()
+        #expect(dwell.progress == nil)
+        #expect(hold(&dwell, "b", seconds: 3).isEmpty, "a hand that stays put never presses what appears under it")
+        _ = hold(&dwell, nil, seconds: 0.1)
+        #expect(hold(&dwell, "b", seconds: 1) == ["b"])
+    }
 }

@@ -42,6 +42,13 @@ struct RevealMaskTests {
         #expect(mask.coverage(atWorld: SIMD2(0, 0.1)) == 0)
     }
 
+    @Test func revealReachesTheBrushFootprint() {
+        let mask = RevealMask()
+        mask.reveal(dab(from: SIMD2(-1, 0.1), to: SIMD2(1, 0.1), radius: 0.2))
+        // The paint stamp spreads a little past the brush radius; the reveal has to cover it.
+        #expect(mask.coverage(atWorld: SIMD2(0, 0.1 + 0.2 * 1.3)) > 0.5)
+    }
+
     @Test func canvasCornersMapToPixels() {
         let mask = RevealMask()
         let center = SIMD2<Float>(0, 0.1)
@@ -75,7 +82,7 @@ struct RevealMaskTests {
         #expect(replayer.mask.coverage(atWorld: SIMD2(-2, 1)) > 0.9)
         #expect(replayer.mask.coverage(atWorld: SIMD2(2, -1)) == 0)
 
-        replayer.advance(to: 3)
+        replayer.advance(to: 1.5)
         #expect(replayer.mask.coverage(atWorld: SIMD2(2, -1)) > 0.9)
         #expect(replayer.mask.coverage(atWorld: SIMD2(0, 0.1)) == 0, "blender dabs reveal nothing")
 
@@ -121,8 +128,11 @@ struct RevealMaskTests {
         let renderer = SCNRenderer(device: MTLCreateSystemDefaultDevice(), options: nil)
         renderer.scene = scene
         renderer.pointOfView = lens
-        let shot = try #require(renderer.snapshot(atTime: 0, with: CGSize(width: 640, height: 400),
-                                                  antialiasingMode: .none).cgImageValue)
+        func shoot() throws -> CGImage {
+            try #require(renderer.snapshot(atTime: 0, with: CGSize(width: 640, height: 400),
+                                           antialiasingMode: .none).cgImageValue)
+        }
+        var shot = try shoot()
 
         func rgb(x: Int, y: Int) -> (r: Int, g: Int) {
             var bytes = [UInt8](repeating: 0, count: 4)
@@ -136,5 +146,29 @@ struct RevealMaskTests {
         let hidden = rgb(x: 520, y: 200)      // the far side
         #expect(revealed.r > 150 && revealed.g < 100, "paint shows where revealed: \(revealed)")
         #expect(hidden.g > 150 && hidden.r < 100, "background shows elsewhere: \(hidden)")
+
+        // At the end of the replay the whole saved painting shows, wherever the strokes did not reach.
+        replayer.advance(to: 1)
+        shot = try shoot()
+        let finished = rgb(x: 520, y: 200)
+        #expect(finished.r > 150 && finished.g < 100, "the whole painting shows at the end: \(finished)")
+    }
+
+    @Test func replayerRevealsEverythingAtTheEndInOneStep() throws {
+        let events: [RecordedEvent] = (0...200).map { i in
+            .dab(dab(from: SIMD2(-2, 1), to: SIMD2(-2, 1), t: Double(i) / 100))
+        }
+        let paint = try #require(CGContext(data: nil, width: 4, height: 4, bitsPerComponent: 8, bytesPerRow: 0,
+                                           space: CGColorSpaceCreateDeviceRGB(),
+                                           bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)?.makeImage())
+        let timeline = ReplayTimeline(eventTimes: events.map(\.t))
+        let replayer = MaskReplayer(finalPaint: paint, recording: StrokeRecording(events: events), timeline: timeline)
+
+        replayer.advance(to: timeline.duration / 2)
+        #expect(!replayer.isFullyRevealed)
+        replayer.advance(to: timeline.duration)
+        #expect(replayer.isFullyRevealed)
+        replayer.reset()
+        #expect(!replayer.isFullyRevealed)
     }
 }
