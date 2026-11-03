@@ -14,6 +14,9 @@ struct ReplayTimeline: Equatable {
     private let active: [Double]
     private let speed: Double
 
+    /// How many times faster than real time the replay runs (1 for a session that fits the target).
+    var speedUp: Double { speed }
+
     /// `eventTimes`: recorded seconds since the recording started, ascending.
     init(eventTimes: [Double]) {
         times = eventTimes

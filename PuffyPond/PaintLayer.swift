@@ -121,6 +121,8 @@ final class PaintLayer {
     private var needsClear = true
     private var settleTime: Float = 0                 // keep simulating while paint may still move
     private let surface: SCNNode
+    /// False when Metal or a shader could not be set up: the layer then paints nothing.
+    private(set) var isAvailable = false
 
     init(center: SIMD2<Float>, size: SIMD2<Float>, z: Float, pixelsAcross: Int = PaintLayer.defaultResolution) {
         width = pixelsAcross
@@ -182,6 +184,7 @@ final class PaintLayer {
         m.blendMode = .alpha
         m.writesToDepthBuffer = false
         plane.materials = [m]
+        isAvailable = true
     }
 
     /// The trained NCA models from the app bundle (weights and mean colours), or nil when missing or the wrong size.

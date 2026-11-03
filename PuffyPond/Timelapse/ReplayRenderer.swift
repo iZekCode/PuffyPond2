@@ -8,4 +8,10 @@ protocol ReplayRenderer: AnyObject {
     /// Shows the painting as it was `replayTime` replay seconds in. Later calls only move forward until `reset()`.
     func advance(to replayTime: Double)
     func reset()
+    /// Called once with the review scene when the renderer is added to it (lighting environment and the like).
+    func prepare(scene: SCNScene)
+}
+
+extension ReplayRenderer {
+    func prepare(scene: SCNScene) {}
 }

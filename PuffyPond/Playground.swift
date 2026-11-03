@@ -159,14 +159,14 @@ final class Playground {
     // Lighting knobs. Brightness: keyIntensity, fillIntensity, environmentIntensity, exposureOffset (EV, lower is darker).
     // Direction: keyPosition (x left/right, y up, z toward the camera) and keyTarget (the point it aims at).
     // Spread: keyInnerAngle/keyOuterAngle (wider is more even, narrower is a vignette).
-    private static let keyIntensity: CGFloat = 300
-    private static let fillIntensity: CGFloat = 220
-    private static let environmentIntensity: CGFloat = 0.7
+    static let keyIntensity: CGFloat = 300
+    static let fillIntensity: CGFloat = 220
+    static let environmentIntensity: CGFloat = 0.7
     private static let exposureOffset: CGFloat = -0.5
-    private static let keyPosition = SIMD3<Float>(0, 7, 6)
-    private static let keyTarget = SIMD3<Float>(0, 0, 0)
-    private static let keyInnerAngle: CGFloat = 70
-    private static let keyOuterAngle: CGFloat = 110
+    static let keyPosition = SIMD3<Float>(0, 7, 6)
+    static let keyTarget = SIMD3<Float>(0, 0, 0)
+    static let keyInnerAngle: CGFloat = 70
+    static let keyOuterAngle: CGFloat = 110
 
     private func buildWorld() {
         // A painter's studio: soft window light in an out-of-focus room.

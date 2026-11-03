@@ -9,6 +9,9 @@ final class TimelapseRecorder {
     private var recording = StrokeRecording()
     private var start: Double?
     private var lastErase: (t: Double, center: SIMD2<Float>)?
+    /// Scrubbing time of the erases that were skipped, carried into the next one kept: how hard an erase scrubs
+    /// depends on its `dt`, so a replay must not erase more gently than the eraser did.
+    private var skippedEraseTime: Float = 0
 
     init(clock: @escaping () -> Double = CACurrentMediaTime) {
         self.clock = clock
@@ -29,15 +32,20 @@ final class TimelapseRecorder {
     /// tenth of a second after the last one, or move half a brush away.
     func recordErase(at center: SIMD2<Float>, radius: Float, dt: Float) {
         let t = elapsed()
-        if let last = lastErase, t - last.t < 0.1, simd_distance(center, last.center) < radius * 0.5 { return }
+        if let last = lastErase, t - last.t < 0.1, simd_distance(center, last.center) < radius * 0.5 {
+            skippedEraseTime += dt
+            return
+        }
         lastErase = (t, center)
-        recording.append(.erase(RecordedErase(t: t, center: center, radius: radius, dt: dt)))
+        recording.append(.erase(RecordedErase(t: t, center: center, radius: radius, dt: dt + skippedEraseTime)))
+        skippedEraseTime = 0
     }
 
     func reset() {
         recording = StrokeRecording()
         start = nil
         lastErase = nil
+        skippedEraseTime = 0
     }
 
     /// A copy of everything recorded so far; nil when nothing was.

@@ -47,4 +47,11 @@ struct ReplayTimelineTests {
             #expect(abs(back - time) < 1e-6)
         }
     }
+
+    @Test func speedUpIsOneForShortSessionsAndGrowsWithLongOnes() {
+        #expect(ReplayTimeline(eventTimes: steady(until: 6)).speedUp == 1)
+        #expect(ReplayTimeline(eventTimes: []).speedUp == 1)
+        let long = ReplayTimeline(eventTimes: steady(until: 300))
+        #expect(abs(long.speedUp - 300 / ReplayTimeline.targetSeconds) < 1e-6)
+    }
 }

@@ -63,4 +63,18 @@ struct TimelapseRecorderTests {
         recorder.recordErase(at: SIMD2(1.02, 0), radius: 0.3, dt: 0.016)      // same spot, a moment later: skipped
         #expect(recorder.snapshot()?.events.count == 3)
     }
+
+    @Test func skippedErasesKeepTheirStrength() throws {
+        let recorder = recorder(times: [0, 0.01, 0.02, 0.2])
+        recorder.recordErase(at: .zero, radius: 0.3, dt: 0.016)
+        recorder.recordErase(at: .zero, radius: 0.3, dt: 0.016)      // skipped, but the eraser did scrub
+        recorder.recordErase(at: .zero, radius: 0.3, dt: 0.016)      // skipped
+        recorder.recordErase(at: .zero, radius: 0.3, dt: 0.016)      // recorded: carries the skipped time too
+        let erases = try #require(recorder.snapshot()).events.compactMap { event -> RecordedErase? in
+            if case let .erase(e) = event { e } else { nil }
+        }
+        #expect(erases.count == 2)
+        #expect(abs(erases[0].dt - 0.016) < 1e-6)
+        #expect(abs(erases[1].dt - 0.048) < 1e-6)
+    }
 }

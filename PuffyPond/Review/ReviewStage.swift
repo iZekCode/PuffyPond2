@@ -32,7 +32,9 @@ final class ReviewStage {
     private(set) var canReplay = false
     /// Makes what draws the timelapse picture; swapped in tests.
     @ObservationIgnored var makeRenderer: (CanvasPhotos, StrokeRecording, ReplayTimeline) -> ReplayRenderer = {
-        MaskReplayer(finalPaint: $0.paint, recording: $1, timeline: $2)
+        // The paint laid again, stroke by stroke, so every colour is as it was then; where the paint layer cannot
+        // run, the saved painting is uncovered along the strokes instead.
+        PaintLayerReplayer(recording: $1, timeline: $2) ?? MaskReplayer(finalPaint: $0.paint, recording: $1, timeline: $2)
     }
     /// Hands on screen, for the cursors.
     private(set) var cursors: [Cursor] = []
@@ -112,6 +114,7 @@ final class ReviewStage {
         let renderer = makeRenderer(photos, recording, timeline)
         renderer.node.simdPosition = SIMD3(0, 0, Self.canvasDepth + 0.15)
         scene.rootNode.addChildNode(renderer.node)
+        renderer.prepare(scene: scene)
         self.renderer = renderer
         conductor = TimelapseConductor(timeline: timeline, notes: NoteComposer.compose(recording, timeline: timeline))
         canReplay = true
@@ -121,8 +124,9 @@ final class ReviewStage {
     /// Jumps to the end of the timelapse and lets the hands play.
     func skipTimelapse() {
         guard phase == .timelapse, let conductor else { return }
+        // The saved painting fades in over whatever the replay has got to; laying the rest of the strokes first would
+        // freeze the page for as long as the painting took.
         conductor.skip()
-        renderer?.advance(to: conductor.replayTime)
         finishTimelapse()
     }
 
