@@ -88,6 +88,7 @@ final class Playground {
     /// What you actually see: wet, textured paint on the canvas.
     @ObservationIgnored private let paintLayer = PaintLayer(center: SIMD2(0, 0.1), size: Playground.canvasSize,
                                                             z: Playground.canvasZ + 0.0015)
+    @ObservationIgnored private let timelapse = TimelapseRecorder()
     @ObservationIgnored private var lastStamp: [Int: SIMD2<Float>] = [:]
     @ObservationIgnored private var frameDT: Float = 1.0 / 60.0
     @ObservationIgnored private var lastGurgle: [Int: Double] = [:]
@@ -520,7 +521,8 @@ final class Playground {
         let dabs = controlScheme == .fist && buddy.tool != .brush
             ? buddy.tool.dabs(from: from, to: p, radius: Self.strokeRadius, speed: buddy.critter.speed)
             : buddy.critter.dabs(from: from, to: p, radius: Self.strokeRadius, speed: buddy.critter.speed)
-        lay(dabs, color: buddy.color, ncaModel: buddy.colorIndex, seed: Float(slot) * 13.7 + Float(strokes.count) * 2.3)
+        lay(dabs, color: buddy.color, ncaModel: buddy.colorIndex, seed: Float(slot) * 13.7 + Float(strokes.count) * 2.3,
+            brush: buddy.critter.kind)
         lastStamp[slot] = p
         if let hold = buddy.critter.holdProgress, now - lastHoldSound > 0.45 {
             lastHoldSound = now
@@ -564,7 +566,8 @@ final class Playground {
     }
 
     /// `ncaModel` is the paint colour's index: each colour has its own NCA texture model.
-    private func lay(_ dabs: [BrushDab], color: SIMD3<Float>, ncaModel: Int, seed: Float) {
+    private func lay(_ dabs: [BrushDab], color: SIMD3<Float>, ncaModel: Int, seed: Float, brush: CritterKind) {
+        timelapse.record(dabs: dabs, color: color, ncaModel: ncaModel, seed: seed, brush: brush)
         for (k, dab) in dabs.enumerated() {
             paintLayer.stamp(from: dab.from, to: dab.to, radius: dab.radius, color: color, speed: dab.speed,
                              seed: seed + Float(k) * 5.1, style: dab.style, drag: dab.drag, strokeSeed: seed,
@@ -579,7 +582,7 @@ final class Playground {
             // Some brushes paint when you let go (the pufferfish bursts).
             if controlScheme == .legacy {
                 lay(buddy.critter.released(), color: buddy.color, ncaModel: buddy.colorIndex,
-                    seed: Float(slot) * 7.7 + Float(strokes.count))
+                    seed: Float(slot) * 7.7 + Float(strokes.count), brush: buddy.critter.kind)
             }
         }
         activeStroke[slot] = nil
@@ -593,6 +596,7 @@ final class Playground {
         if isOverShelf(p) { return }
         let r = buddy.eraseRadius
         paintLayer.erase(at: p, radius: r, dt: frameDT)
+        timelapse.recordErase(at: p, radius: r, dt: frameDT)
         // The legacy starfish scrubs the dotted guide away too; the garden mushroom only wipes paint.
         var erasedAny = buddy.showsStarfish ? (template?.erase(at: p, radius: r) ?? false) : false
         if let outline = template, outline.isEmpty {
@@ -725,6 +729,7 @@ final class Playground {
         for stroke in strokes { stroke.node.removeFromParentNode() }
         strokes.removeAll()
         paintLayer.clear()
+        timelapse.reset()
         template?.fadeAway()
         template = nil
         activeStroke = [:]
@@ -745,6 +750,9 @@ final class Playground {
 
     /// Movement stats so far; nil when only touch or mouse drew.
     func sessionStats() -> SessionStats? { recorder.finish() }
+
+    /// Everything painted since the canvas was last cleared, for the review page's timelapse.
+    func timelapseRecording() -> StrokeRecording? { timelapse.snapshot() }
 
     func clearAll() {
         clearCanvas()

@@ -24,6 +24,8 @@ struct ReviewDraft: Equatable {
     let choice: TemplateChoice?
     /// Movement stats of the session; nil when it was drawn by touch or mouse.
     let stats: SessionStats?
+    /// What was painted, for the timelapse; nil when nothing was recorded.
+    let recording: StrokeRecording?
 
     var image: CGImage { photos.whole }
 
