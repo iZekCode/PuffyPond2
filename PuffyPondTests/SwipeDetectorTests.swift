@@ -4,74 +4,79 @@ import simd
 @testable import PuffyPond
 
 @MainActor
-struct PaddleDetectorTests {
+struct SwipeDetectorTests {
     private let dt = 1.0 / 30
 
     private func hand(_ slot: Int, _ pose: HandPose, _ p: SIMD2<Float>, tracking: Bool = true) -> HandState {
         HandState(slot: slot, pose: pose, position: p, velocity: .zero, tracking: tracking)
     }
 
-    /// Moves one hand from `from` to `to` over `seconds`, starting at `start`, and collects the strokes.
-    private func sweep(_ detector: inout PaddleDetector, slot: Int = 1, pose: HandPose = .open,
-                       from: SIMD2<Float>, to: SIMD2<Float>, seconds: Double, start: Double = 0) -> [PaddleDetector.Stroke] {
+    /// Moves one hand from `from` to `to` over `seconds`, starting at `start`, and collects the swipes.
+    private func sweep(_ detector: inout SwipeDetector, slot: Int = 1, pose: HandPose = .open,
+                       from: SIMD2<Float>, to: SIMD2<Float>, seconds: Double, start: Double = 0) -> [SwipeDetector.Swipe] {
         let frames = Int(seconds / dt)
-        var strokes: [PaddleDetector.Stroke] = []
+        var swipes: [SwipeDetector.Swipe] = []
         for f in 0...frames {
             let t = Float(f) / Float(frames)
-            if let stroke = detector.feed([hand(slot, pose, from + (to - from) * t)], now: start + Double(f) * dt) {
-                strokes.append(stroke)
+            if let swipe = detector.feed([hand(slot, pose, from + (to - from) * t)], now: start + Double(f) * dt) {
+                swipes.append(swipe)
             }
         }
-        return strokes
+        return swipes
     }
 
-    @Test func downSweepOnRightIsNext() {
-        var detector = PaddleDetector()
-        let strokes = sweep(&detector, from: SIMD2(0.75, 0.3), to: SIMD2(0.7, 0.7), seconds: 0.4)
-        #expect(strokes == [.next])
+    @Test func leftSwipeIsNext() {
+        var detector = SwipeDetector()
+        let swipes = sweep(&detector, from: SIMD2(0.8, 0.5), to: SIMD2(0.4, 0.55), seconds: 0.4)
+        #expect(swipes == [.next])
     }
 
-    @Test func downSweepOnLeftIsPrevious() {
-        var detector = PaddleDetector()
-        let strokes = sweep(&detector, slot: 0, from: SIMD2(0.25, 0.3), to: SIMD2(0.3, 0.7), seconds: 0.4)
-        #expect(strokes == [.previous])
+    @Test func rightSwipeIsPrevious() {
+        var detector = SwipeDetector()
+        let swipes = sweep(&detector, slot: 0, from: SIMD2(0.2, 0.5), to: SIMD2(0.6, 0.45), seconds: 0.4)
+        #expect(swipes == [.previous])
     }
 
     @Test func slowDriftIsIgnored() {
-        var detector = PaddleDetector()
-        let strokes = sweep(&detector, from: SIMD2(0.75, 0.2), to: SIMD2(0.75, 0.8), seconds: 3)
-        #expect(strokes.isEmpty)
+        var detector = SwipeDetector()
+        let swipes = sweep(&detector, from: SIMD2(0.9, 0.5), to: SIMD2(0.1, 0.5), seconds: 4)
+        #expect(swipes.isEmpty)
     }
 
-    @Test func upSweepIsIgnored() {
-        var detector = PaddleDetector()
-        let strokes = sweep(&detector, from: SIMD2(0.75, 0.7), to: SIMD2(0.75, 0.3), seconds: 0.4)
-        #expect(strokes.isEmpty)
+    @Test func verticalSweepIsIgnored() {
+        var detector = SwipeDetector()
+        let swipes = sweep(&detector, from: SIMD2(0.75, 0.2), to: SIMD2(0.7, 0.7), seconds: 0.4)
+        #expect(swipes.isEmpty)
     }
 
-    @Test func fistSweepIsIgnored() {
-        var detector = PaddleDetector()
-        let strokes = sweep(&detector, pose: .fist, from: SIMD2(0.75, 0.3), to: SIMD2(0.75, 0.7), seconds: 0.4)
-        #expect(strokes.isEmpty)
+    @Test func diagonalSweepIsIgnored() {
+        var detector = SwipeDetector()
+        let swipes = sweep(&detector, from: SIMD2(0.8, 0.2), to: SIMD2(0.45, 0.6), seconds: 0.4)
+        #expect(swipes.isEmpty)
     }
 
-    @Test func cooldownBlocksDoubleTrigger() {
-        var detector = PaddleDetector()
-        var strokes = sweep(&detector, from: SIMD2(0.75, 0.2), to: SIMD2(0.75, 0.6), seconds: 0.3)
-        // The hand comes back up and paddles again right away: still inside the cooldown.
-        strokes += sweep(&detector, from: SIMD2(0.75, 0.6), to: SIMD2(0.75, 0.2), seconds: 0.1, start: 0.33)
-        strokes += sweep(&detector, from: SIMD2(0.75, 0.2), to: SIMD2(0.75, 0.6), seconds: 0.15, start: 0.46)
-        #expect(strokes == [.next])
-        // After the cooldown the next stroke counts.
-        strokes += sweep(&detector, from: SIMD2(0.75, 0.2), to: SIMD2(0.75, 0.6), seconds: 0.3, start: 1.5)
-        #expect(strokes == [.next, .next])
+    @Test func fistSwipeIsIgnored() {
+        var detector = SwipeDetector()
+        let swipes = sweep(&detector, pose: .fist, from: SIMD2(0.8, 0.5), to: SIMD2(0.4, 0.5), seconds: 0.4)
+        #expect(swipes.isEmpty)
     }
 
-    @Test func lostTrackingForgetsTheSweep() {
-        var detector = PaddleDetector()
-        _ = detector.feed([hand(1, .open, SIMD2(0.75, 0.2))], now: 0)
-        _ = detector.feed([hand(1, .open, SIMD2(0.75, 0.3), tracking: false)], now: 0.1)
-        let stroke = detector.feed([hand(1, .open, SIMD2(0.75, 0.6))], now: 0.2)
-        #expect(stroke == nil)
+    @Test func cooldownBlocksTheReturnStroke() {
+        var detector = SwipeDetector()
+        var swipes = sweep(&detector, from: SIMD2(0.8, 0.5), to: SIMD2(0.4, 0.5), seconds: 0.3)
+        // The hand comes back right away: still inside the cooldown, so it doesn't walk the other way.
+        swipes += sweep(&detector, from: SIMD2(0.4, 0.5), to: SIMD2(0.8, 0.5), seconds: 0.3, start: 0.33)
+        #expect(swipes == [.next])
+        // After the cooldown the next swipe counts.
+        swipes += sweep(&detector, from: SIMD2(0.8, 0.5), to: SIMD2(0.4, 0.5), seconds: 0.3, start: 1.5)
+        #expect(swipes == [.next, .next])
+    }
+
+    @Test func lostTrackingForgetsTheSwipe() {
+        var detector = SwipeDetector()
+        _ = detector.feed([hand(1, .open, SIMD2(0.8, 0.5))], now: 0)
+        _ = detector.feed([hand(1, .open, SIMD2(0.7, 0.5), tracking: false)], now: 0.1)
+        let swipe = detector.feed([hand(1, .open, SIMD2(0.4, 0.5))], now: 0.2)
+        #expect(swipe == nil)
     }
 }

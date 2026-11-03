@@ -190,8 +190,8 @@ extension PlatformImage {
 
 /// A quiet museum walk: every painting hangs in a white frame on its own grey partition, the partitions
 /// stand in one long row with a lamp over each, and the camera walks along the row on a rail. The brush
-/// animals tag along at the bottom and cheer a fresh painting. Open-hand paddle strokes in front of the
-/// camera walk to the next or previous painting.
+/// animals tag along at the bottom and cheer a fresh painting. Swiping an open palm left or right in front
+/// of the camera walks to the next or previous painting; holding a fist over the painting plays its timelapse.
 @Observable
 final class GalleryHall {
     /// One hand as drawn on top of the page, in view UV (0…1, y down).
@@ -218,8 +218,13 @@ final class GalleryHall {
 
     /// Camera hands on screen, for the small hand indicators.
     private(set) var cursors: [Cursor] = []
-    /// Called on a paddle stroke.
-    @ObservationIgnored var onPaddle: ((PaddleDetector.Stroke) -> Void)?
+    /// Called on a palm swipe.
+    @ObservationIgnored var onSwipe: ((SwipeDetector.Swipe) -> Void)?
+    /// The framed painting in front of the camera, in view UV, where a held fist plays its timelapse.
+    private(set) var paintingFrame = CGRect.zero
+    /// Fist-hold progress (0…1) over the painting, for its ring.
+    private(set) var fistProgress: Double?
+    @ObservationIgnored private var fistHold = HoverDwell()
     /// Buttons an open camera hand can hold still on to press, in view UV.
     @ObservationIgnored var targets: [HoverTarget] = []
     /// Called when a hover-and-hold completes.
@@ -236,7 +241,7 @@ final class GalleryHall {
     @ObservationIgnored private var visitors: [(critter: Critter, home: SIMD3<Float>)] = []
     @ObservationIgnored private let frameDriver = FrameDriver()
     @ObservationIgnored private let hands = HandInput()
-    @ObservationIgnored private var paddle = PaddleDetector()
+    @ObservationIgnored private var swipe = SwipeDetector()
     @ObservationIgnored private var clock: Float = 0
     @ObservationIgnored private let tanHalfFOV = Float(tan(17.0 * Double.pi / 180))
     @ObservationIgnored private var cameraDistance: Float = 9.2
@@ -248,6 +253,9 @@ final class GalleryHall {
     @ObservationIgnored private var walkTime: Float = 0
     @ObservationIgnored private var walkDuration: Float = 0
     @ObservationIgnored private var bob: Float = 0
+
+    /// The id `onPress` gets when a fist is held over the painting.
+    static let paintingID = "painting"
 
     private static let cameraY: Float = 0.15
     private static let visitorZ: Float = 2.6
@@ -274,7 +282,9 @@ final class GalleryHall {
     func stop() {
         frameDriver.stop()
         hands.reset()
-        paddle.reset()
+        swipe.reset()
+        fistHold.requireRelease()
+        fistProgress = nil
         cursors = []
     }
 
@@ -289,6 +299,14 @@ final class GalleryHall {
         let needHalfH: Float = 2.75
         cameraDistance = max(needHalfH / tanHalfFOV, needHalfW / (tanHalfFOV * aspect))
         placeCamera()
+        // The painting plane (z = 0) as the camera sees it, once the walk has brought it to the centre.
+        let artHalfH = cameraDistance * tanHalfFOV
+        let artHalfW = artHalfH * aspect
+        let artCenterV = 0.5 - (Self.artY - Self.cameraY) / (2 * artHalfH)
+        paintingFrame = CGRect(x: CGFloat(0.5 - Self.artSize.x / (4 * artHalfW)),
+                               y: CGFloat(artCenterV - Self.artSize.y / (4 * artHalfH)),
+                               width: CGFloat(Self.artSize.x / (2 * artHalfW)),
+                               height: CGFloat(Self.artSize.y / (2 * artHalfH)))
         let halfH = (cameraDistance - Self.visitorZ) * tanHalfFOV
         let halfW = halfH * aspect
         let bottom = Self.cameraY - halfH
@@ -473,7 +491,6 @@ final class GalleryHall {
         camera.vignettingPower = 0.8
         cameraNode.camera = camera
         scene.rootNode.addChildNode(cameraNode)
-        Effects.addFireflies(to: cameraNode, in: SIMD3(5, 3, 1.5), at: SIMD3(0, 0, -3))
         scene.rootNode.addChildNode(row)
 
         // Track light from the ceiling, walking with the camera: a soft pool on the painting in front,
@@ -536,7 +553,7 @@ final class GalleryHall {
         }
 
         let states = hands.advance(dt: dt, now: CACurrentMediaTime())
-        if let stroke = paddle.feed(states, now: CACurrentMediaTime()) { onPaddle?(stroke) }
+        if let direction = swipe.feed(states, now: CACurrentMediaTime()) { onSwipe?(direction) }
         let open = states.filter { $0.tracking && $0.pose != .fist }
         let hit = targets.first { target in
             open.contains { target.frame.contains(CGPoint(x: CGFloat($0.position.x), y: CGFloat($0.position.y))) }
@@ -545,6 +562,18 @@ final class GalleryHall {
         let ring = hover.progress.map { (id: $0.id, progress: $0.value) }
         if ring?.id != dwell?.id || ring?.progress != dwell?.progress { dwell = ring }
         if let pressed { onPress?(pressed) }
+
+        // A fist held over the framed painting, once the walk has settled, plays its timelapse.
+        let settled = walkTime >= walkDuration && !slots.isEmpty
+        let fistOnPainting = settled && states.contains { hand in
+            hand.tracking && hand.pose == .fist
+                && paintingFrame.contains(CGPoint(x: CGFloat(hand.position.x), y: CGFloat(hand.position.y)))
+        }
+        let held = fistHold.update(hoveredID: fistOnPainting ? Self.paintingID : nil, dt: Double(dt))
+        let fistRing = fistHold.progress?.value
+        if fistRing != fistProgress { fistProgress = fistRing }
+        if held != nil { onPress?(Self.paintingID) }
+
         let next = states.filter(\.tracking).map { Cursor(slot: $0.slot, position: $0.position, fist: $0.pose == .fist) }
         if next != cursors { cursors = next }
 
@@ -690,6 +719,13 @@ struct GalleryView: View {
                                       y: CGFloat(cursor.position.y) * proxy.size.height)
                     }
                     .allowsHitTesting(false)
+                    // The ring a held fist fills over the painting.
+                    if let progress = hall.fistProgress {
+                        HoldRing(progress: progress)
+                            .scaleEffect(1.8)
+                            .position(x: hall.paintingFrame.midX * proxy.size.width,
+                                      y: hall.paintingFrame.midY * proxy.size.height)
+                    }
                 }
                 .onAppear { hall.layout(size: proxy.size) }
                 .onChange(of: proxy.size) { _, size in hall.layout(size: size) }
@@ -727,7 +763,7 @@ struct GalleryView: View {
                                action: show2D)
                     Spacer()
                     if gallery.paintings.count > 1 {
-                        PaddleHint()
+                        SwipeHint()
                     }
                     Spacer()
                     PillButton(title: "Watch it being painted", symbol: "play.fill", tint: .pink) {
@@ -783,18 +819,18 @@ struct GalleryView: View {
             hall.hang(gallery.paintings.map(\.url))
             hall.focus(index, animated: false)
             if cheerOnOpen { hall.cheer() }
-            hall.onPaddle = { stroke in step(stroke == .next ? 1 : -1) }
+            hall.onSwipe = { swipe in step(swipe == .next ? 1 : -1) }
             hall.onPress = { id in
-                if id == Self.watchID, let current { watch(current) }
+                if id == Self.watchID || id == GalleryHall.paintingID, let current { watch(current) }
             }
             updateTargets()
             let hall = hall
-            relay.listener = { frame in hall.ingest(frame) }
+            relay.listen(owner: hall) { frame in hall.ingest(frame) }
             hall.start()
         }
         .onDisappear {
-            relay.listener = nil
-            hall.onPaddle = nil
+            relay.stopListening(owner: hall)
+            hall.onSwipe = nil
             hall.onPress = nil
             hall.stop()
         }
@@ -856,25 +892,28 @@ struct PillButton: View {
     }
 }
 
-/// Shows how to walk with the hands: an open hand paddling down on either side.
-private struct PaddleHint: View {
+/// Shows how to use the hands: swipe an open palm to walk, hold a fist on the painting to watch it.
+private struct SwipeHint: View {
     @Environment(\.uiScale) private var scale
-    @State private var down = false
+    @State private var swiped = false
 
     var body: some View {
         HStack(spacing: 10 * scale) {
             Text("🖐️")
                 .font(.system(size: 24 * scale))
-                .offset(y: down ? 6 * scale : -6 * scale)
-            Text("Paddle down on the right to walk on, on the left to go back")
-                .font(.system(size: 14 * scale, weight: .bold, design: .rounded))
-                .foregroundStyle(Color(red: 0.25, green: 0.2, blue: 0.35))
+                .offset(x: swiped ? -10 * scale : 10 * scale)
+            VStack(alignment: .leading, spacing: 2 * scale) {
+                Text("Swipe your palm left to walk on, right to go back")
+                Text("Hold a fist on the painting to watch it being painted")
+            }
+            .font(.system(size: 14 * scale, weight: .bold, design: .rounded))
+            .foregroundStyle(Color(red: 0.25, green: 0.2, blue: 0.35))
         }
         .padding(.horizontal, 16 * scale)
         .padding(.vertical, 10 * scale)
         .background(.white.opacity(0.85), in: Capsule())
         .onAppear {
-            withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) { down = true }
+            withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) { swiped = true }
         }
     }
 }

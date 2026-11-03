@@ -82,12 +82,12 @@ struct ReviewView: View {
                 }
             }
             let stage = stage
-            relay.listener = { frame in stage.ingest(frame) }
+            relay.listen(owner: stage) { frame in stage.ingest(frame) }
             stage.start()
         }
         .onDisappear {
             audio.setTune(.groove)
-            relay.listener = nil
+            relay.stopListening(owner: stage)
             stage.stop()
         }
     }
