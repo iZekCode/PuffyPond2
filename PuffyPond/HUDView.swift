@@ -86,8 +86,8 @@ struct HUDView: View {
             case .raiseHands: return ("hand.raised.fill", "Raise both hands — a paint buddy follows each one")
             case .swimming: return ("hand.raised.fill", "Make a fist to paint · rub a pot for a color, a bubble for a new tool")
             case .drawing: return ("paintbrush.pointed.fill", "Swoosh! Keep your fist closed and sweep your arm")
-            case .erasing: return ("star.fill", "Starfish scrub! Keep your fist closed to wipe the paint away")
-            case .tracing: return ("scribble.variable", "Make a fist and follow the dotted line · the starfish wipes it away")
+            case .erasing: return ("leaf.fill", "Caterpillar munch! Keep your fist closed to eat the paint away")
+            case .tracing: return ("scribble.variable", "Make a fist and follow the dotted line · the caterpillar nibbles it away")
             default: break
             }
         }
@@ -174,7 +174,7 @@ struct HUDView: View {
                 if playground.hasDrawing { confirmingHome = true } else { goHome() }
             }
             #if os(iOS)
-            RoundButton(symbol: playground.pointerErases ? "star.fill" : "paintbrush.pointed.fill",
+            RoundButton(symbol: playground.pointerErases ? (playground.controlScheme == .fist ? "leaf.fill" : "star.fill") : "paintbrush.pointed.fill",
                         tint: playground.pointerErases ? .orange : .blue) {
                 playground.pointerErases.toggle()
             }
@@ -196,7 +196,7 @@ struct HUDView: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: playground.hasDrawing)
     }
 
-    /// How big the octopus is: bigger paints a wider stroke.
+    /// How big the brush animal is (spider or octopus): bigger paints a wider stroke.
     private var brushSizeSlider: some View {
         HStack(spacing: 8 * scale) {
             Image(systemName: "circle.fill").font(.system(size: 8 * scale)).foregroundStyle(.secondary)
@@ -297,9 +297,9 @@ private struct GuideCard: View {
         Row(symbol: "drop.fill", color: .mint, title: "Rub a paint pot = new color",
             detail: "Swipe your buddy back and forth through a pot on the right until it soaks up the color."),
         Row(symbol: "sparkles", color: .indigo, title: "Rub a bubble = new tool",
-            detail: "Snail thick oil, jelly liquid oil, octopus brush, starfish eraser, sponge blender."),
-        Row(symbol: "star.fill", color: .pink, title: "Starfish = eraser",
-            detail: "Pick the starfish bubble and make a fist to scrub paint and the dotted guide away."),
+            detail: "Snail thick oil, ladybug liquid oil, spider brush, caterpillar eraser, bee blender."),
+        Row(symbol: "leaf.fill", color: .pink, title: "Caterpillar = eraser",
+            detail: "Pick the caterpillar bubble and make a fist to munch paint and the dotted guide away."),
         Row(symbol: "photo.artframe", color: .purple, title: "All done? Save it",
             detail: "Tap Save image to look it over, then hang it in the gallery for the critters to admire."),
     ]

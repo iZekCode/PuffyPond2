@@ -1,6 +1,6 @@
 # Puffy Pond
 
-Paint in the air with your hands. Make a fist and sweep your arm: a little paint character follows each hand and lays real-looking wet oil paint on an easel. Pick a template or paint freely, play with the finished painting on a wobbly sheet, hang it in a walkable 3D gallery, and look back at a calendar of what you painted and how your arms moved.
+Paint in the air with your hands. Make a fist and sweep your arm: a little paint character follows each hand and lays real-looking wet oil paint on an easel. Pick a template or paint freely, play with the finished painting on a wobbly sheet, hang it in a walkable 3D treehouse gallery, and look back at a calendar of what you painted and how your arms moved.
 
 ## Run it
 
@@ -34,7 +34,7 @@ Home ──► Start drawing ──► Freeform ──────────�
 | **Get ready** | A skeleton outline shows where to stand. Step back until your shoulders fit the band (about 1 m) and hold still while the ring fills; the canvas opens by itself. **Skip** is always there. |
 | **Canvas** | Paint with your fists (see below). The chosen template shows as a dotted guide. **Save image** takes you to the review; the house button goes Home (it asks first if the painting isn't saved). |
 | **Review** | The bare canvas stays put; the paint floats above it on an elastic see-through sheet. Fist = grab a small patch of paint and pull it along while the rest stays put, two fists = two patches pulled apart (slide whistle), a moving open palm = push ripples with a splat (sometimes a duck). Let go and the paint jiggles back. A silly kazoo-and-tuba tune plays here. The play never changes the saved picture. **Save to gallery** or **Keep drawing** (back to the same canvas). |
-| **3D gallery** | A museum hall with your paintings along the wall, newest first, and the brush animals visiting. Paddle with an open hand: sweep down on the right side to walk to the next painting, on the left to go back. Arrows and swipes work too. **View gallery in 2D** (bottom left) shows a grid grouped by day; tap one to walk to it. |
+| **3D gallery** | A treehouse deck among the branches with your paintings on wooden partitions, newest first, and the five garden critters visiting. Paddle with an open hand: sweep down on the right side to walk to the next painting, on the left to go back. Arrows and swipes work too. **View gallery in 2D** (bottom left) shows a grid grouped by day; tap one to walk to it. |
 | **Report** | A month calendar on the left: days with paintings get a dot, a star when the daily quest was done. The selected day on the right: its paintings, **Highest ROM** (shoulder abduction, left and right), elbow extension, reach height and area, grip cycles, a lean flag, a **heatmap** of where you painted on the canvas, and **hand dominance** (share of painting time per hand). |
 
 The movement stats are 2D estimates from the front camera (Vision body and hand pose), not clinical measurements. They are recorded only on the canvas page and only from camera hands; a painting made by touch or mouse shows "No movement data". Left and right are always the person's own sides.
@@ -51,10 +51,10 @@ The movement stats are 2D estimates from the front camera (Vision body and hand 
 | Tool | Character | How it paints |
 |---|---|---|
 | Thick oil | Snail | Heavy impasto: a wide knife-like sheet, piled high with ridged edges. |
-| Liquid oil | Jellyfish | Thinned oil: a translucent glaze that spreads and runs downhill while wet. |
-| Brush | Octopus | A regular bristle brush line. |
-| Eraser | Starfish | Scrubs paint away and wipes the template's dotted guide. |
-| Blender | Sponge | Lays no paint; smudges and mixes the wet paint underneath. |
+| Liquid oil | Ladybug | Thinned oil: a translucent glaze that spreads and runs downhill while wet. |
+| Brush | Garden spider | Eight long legs lie on the canvas and wipe a thin watercolor wash with a grown-in texture. |
+| Eraser | Hungry caterpillar | Scrubs paint away and wipes the template's dotted guide. |
+| Blender | Bee | Lays no paint; smudges and mixes the wet paint underneath. |
 
 The paint is simulated: flat wet strokes with bristle grooves and ragged edges, it levels out, blends with wet neighbours, thick blobs sag a little, and it dries over time.
 
@@ -62,7 +62,7 @@ The buttons down the left side: Home, eraser for touch (iPad only), music, camer
 
 ### Legacy controls
 
-The original controls are still in the code: pinch to paint with six brush animals (octopus, snail, pufferfish, seahorse, jellyfish, frog), fist turns into the starfish, and template bubbles on the easel tray. Start the playground with `Playground(controlScheme: .legacy)` in `ContentView` to use them.
+The original controls and their sea animals are still in the code: pinch to paint with six brush animals (octopus, snail, pufferfish, seahorse, jellyfish, frog), fist turns into the starfish, and template bubbles on the easel tray (they now swim in the garden world). Start the playground with `Playground(controlScheme: .legacy)` in `ContentView` to use them.
 
 ## Without a camera
 
@@ -101,12 +101,13 @@ Everything stays on the device in `Application Support/Gallery/`: one PNG per pa
 | `HandInput.swift`, `OneEuroFilter.swift` | Palm tracking, open/pinch/fist with hysteresis, smoothing + prediction |
 | `Canvas/ControlScheme.swift`, `Canvas/PaintTool.swift` | Fist vs legacy controls; the five tools and the dabs each one lays |
 | `Playground.swift` | The easel: world, buddies, painting, erasing, pots and bubbles, stats recording |
-| `Critter.swift`, `Characters.swift`, `Tentacles.swift` | Character base (springs, faces, moods), starfish rig, pots, bubbles, buddies, springy limbs |
-| `Octopus.swift`, `Snail.swift`, `Jellyfish.swift`, `Sponge.swift`, `Pufferfish.swift`, `Seahorse.swift`, `Frog.swift` | The paint characters and legacy brush animals |
+| `Critter.swift`, `Characters.swift`, `Tentacles.swift` | Character base (springs, faces, moods), starfish rig (legacy eraser), pots, bubbles, buddies, springy limbs, the shared limb brush |
+| `Spider.swift`, `Snail.swift`, `Ladybug.swift`, `Caterpillar.swift`, `Bee.swift` | The five garden paint characters; `LimbBrush.swift` is the leg brush the spider shares with the octopus |
+| `Octopus.swift`, `Jellyfish.swift`, `Sponge.swift`, `Pufferfish.swift`, `Seahorse.swift`, `Frog.swift` | The legacy sea brush animals |
 | `Strokes.swift` | Stroke paths (what's been drawn, for erasing) and geometry helpers |
 | `PaintLayer.swift`, `PaintShaders.metal` | Wet paint simulated on the GPU (Metal compute): dabs, advection, leveling, mixing, drips, drying, normal map |
-| `Studio.swift`, `Toybox.swift`, `Effects.swift` | Studio backdrop, linen and easel textures; glossy materials; particles |
-| `GrooveDSP.swift` | Live-synthesized music (toy-pop groove, plus a silly tune for the review page), sound effects and beat clock |
+| `Studio.swift`, `Toybox.swift`, `Effects.swift` | Treehouse backdrop, linen and easel textures; glossy materials; petals and fireflies |
+| `GrooveDSP.swift` | Live-synthesized music (a bouncy garden tune, plus a silly tune for the review page), sound effects and beat clock |
 | `HUDView.swift`, `Platform.swift` | Canvas overlay and Mac/iOS differences (mouse, views, camera preview) |
 
 Tests live in `PuffyPondTests/` (Swift Testing): run them on **My Mac** with **⌘U**.
