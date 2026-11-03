@@ -54,11 +54,15 @@ struct PaintingRecord: Codable, Equatable {
     var isDailyQuest: Bool
     /// Nil for paintings made before stats existed and for paintings drawn by touch or mouse.
     var stats: SessionStats?
+    /// The format version of the stored timelapse; nil when the painting has none (older ones, or nothing recorded).
+    var timelapseVersion: Int?
 
-    init(date: Date, templateID: String? = nil, isDailyQuest: Bool = false, stats: SessionStats? = nil) {
+    init(date: Date, templateID: String? = nil, isDailyQuest: Bool = false, stats: SessionStats? = nil,
+         timelapseVersion: Int? = nil) {
         self.date = date
         self.templateID = templateID
         self.isDailyQuest = isDailyQuest
         self.stats = stats
+        self.timelapseVersion = timelapseVersion
     }
 }

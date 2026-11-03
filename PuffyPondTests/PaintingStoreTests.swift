@@ -129,4 +129,108 @@ struct PaintingStoreTests {
 
         #expect(gallery.savedTemplateIDs == ["fish", "duck"])
     }
+
+    // MARK: Timelapse files
+
+    private func image(side: Int) -> CGImage {
+        let context = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: 0,
+                                space: CGColorSpaceCreateDeviceRGB(),
+                                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.setFillColor(CGColor(red: 0, green: 0.5, blue: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: side, height: side))
+        return context.makeImage()!
+    }
+
+    private func photos() -> CanvasPhotos {
+        CanvasPhotos(whole: image(side: 4), canvas: image(side: 5), paint: image(side: 6))
+    }
+
+    private func recording() -> StrokeRecording {
+        let dab = RecordedDab(t: 0, from: .zero, to: SIMD2(1, 1), radius: 0.1, speed: 1, color: SIMD3(1, 0, 0), seed: 1,
+                              strokeSeed: 1, style: .brush, drag: nil, ncaModel: 0, brush: .butterfly)
+        var later = dab
+        later.t = 2
+        return StrokeRecording(events: [.dab(dab), .dab(later)])
+    }
+
+    private let stamp = Date(timeIntervalSince1970: 1_700_000_000)
+
+    @Test func addStoresPaintLayerAndRecording() throws {
+        let gallery = Gallery(folder: makeFolder())
+        let saved = recording()
+        let painting = try #require(gallery.add(photos(), recording: saved, record: PaintingRecord(date: stamp)))
+
+        let back = try #require(Gallery.photos(of: painting))
+        #expect(back.whole.width == 4)
+        #expect(back.canvas.width == 5)
+        #expect(back.paint.width == 6)
+        #expect(Gallery.recording(of: painting) == saved)
+        #expect(painting.record.timelapseVersion == StrokeRecording.formatVersion)
+    }
+
+    @Test func extraFilesAreNotPaintings() throws {
+        let folder = makeFolder()
+        _ = Gallery(folder: folder).add(photos(), recording: recording(), record: PaintingRecord(date: stamp))
+
+        #expect(Gallery(folder: folder).paintings.count == 1)
+    }
+
+    @Test func removeDeletesTheExtrasButKeepsTheSharedCanvas() throws {
+        let folder = makeFolder()
+        let gallery = Gallery(folder: folder)
+        let painting = try #require(gallery.add(photos(), recording: recording(), record: PaintingRecord(date: stamp)))
+
+        gallery.remove(painting)
+
+        let left = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+        #expect(left == ["canvas.bare"])
+    }
+
+    @Test func canvasIsStoredOnce() throws {
+        let folder = makeFolder()
+        let gallery = Gallery(folder: folder)
+        gallery.add(photos(), recording: nil, record: PaintingRecord(date: stamp))
+        gallery.add(photos(), recording: nil, record: PaintingRecord(date: stamp + 5))
+
+        let files = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+        #expect(files.filter { $0 == "canvas.bare" }.count == 1)
+        #expect(files.filter { $0.hasSuffix(".paint") }.count == 2)
+    }
+
+    @Test func emptyRecordingStoresNone() throws {
+        let gallery = Gallery(folder: makeFolder())
+        for (offset, saved) in [nil, StrokeRecording()].enumerated() {
+            let painting = try #require(gallery.add(photos(), recording: saved,
+                                                    record: PaintingRecord(date: stamp + Double(offset))))
+            #expect(painting.record.timelapseVersion == nil)
+            #expect(!FileManager.default.fileExists(atPath: painting.timelapseURL.path))
+            #expect(Gallery.recording(of: painting) == nil)
+            #expect(Gallery.photos(of: painting) != nil)
+        }
+    }
+
+    @Test func oldRecordsStillDecode() throws {
+        let json = Data(#"{"date": 700000000, "isDailyQuest": false}"#.utf8)
+        let record = try JSONDecoder().decode(PaintingRecord.self, from: json)
+        #expect(record.timelapseVersion == nil)
+    }
+
+    @Test func legacyPaintingHasNoRecording() throws {
+        let folder = makeFolder()
+        writePNG(makeImage(), to: folder.appendingPathComponent("painting-1000.png"))
+        let painting = try #require(Gallery(folder: folder).paintings.first)
+
+        #expect(Gallery.recording(of: painting) == nil)
+        let back = try #require(Gallery.photos(of: painting))
+        #expect(back.paint.width == 4)
+        #expect(back.canvas.width == 4)
+    }
+
+    @Test func corruptRecordingIsIgnored() throws {
+        let gallery = Gallery(folder: makeFolder())
+        let painting = try #require(gallery.add(photos(), recording: recording(), record: PaintingRecord(date: stamp)))
+        try Data(repeating: 0xAB, count: 300).write(to: painting.timelapseURL)
+
+        #expect(Gallery.recording(of: painting) == nil)
+    }
 }

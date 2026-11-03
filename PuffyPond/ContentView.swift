@@ -111,7 +111,7 @@ struct ContentView: View {
     private func save(_ draft: ReviewDraft) {
         let record = PaintingRecord(date: Date(), templateID: draft.choice?.templateID,
                                     isDailyQuest: draft.choice?.isDailyQuest ?? false, stats: draft.stats)
-        guard gallery.add(draft.image, record: record) != nil else { return }
+        guard gallery.add(draft.photos, recording: draft.recording, record: record) != nil else { return }
         playground.clearCanvas()
         router.go(.gallery3D(start: 0, justHung: true))
     }

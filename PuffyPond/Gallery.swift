@@ -17,6 +17,11 @@ struct Painting: Identifiable, Equatable {
     /// The JSON file with the record, next to the PNG.
     var sidecarURL: URL { Self.sidecarURL(for: url) }
 
+    /// The paint alone on a clear background (PNG bytes, kept out of the `.png` files the gallery lists).
+    var paintURL: URL { url.deletingPathExtension().appendingPathExtension("paint") }
+    /// What was painted, stroke by stroke.
+    var timelapseURL: URL { url.deletingPathExtension().appendingPathExtension("timelapse") }
+
     static func sidecarURL(for png: URL) -> URL {
         png.deletingPathExtension().appendingPathExtension("json")
     }
@@ -68,10 +73,7 @@ final class Gallery {
     @discardableResult
     func add(_ image: CGImage, record: PaintingRecord = PaintingRecord(date: Date())) -> Painting? {
         let url = folder.appendingPathComponent("painting-\(Int(record.date.timeIntervalSince1970 * 1000)).png")
-        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
-        else { return nil }
-        CGImageDestinationAddImage(destination, image, nil)
-        guard CGImageDestinationFinalize(destination) else { return nil }
+        guard Self.writePNG(image, to: url) else { return nil }
         Self.write(record, to: Painting.sidecarURL(for: url))
         let painting = Painting(url: url, record: record)
         paintings.append(painting)
@@ -79,9 +81,60 @@ final class Gallery {
         return painting
     }
 
+    /// Hangs a finished painting with everything the review page needs to play with it again: the paint alone, the
+    /// stroke-by-stroke timelapse (when something was recorded), and, once for all paintings, the bare canvas.
+    @discardableResult
+    func add(_ photos: CanvasPhotos, recording: StrokeRecording?, record: PaintingRecord = PaintingRecord(date: Date()))
+        -> Painting? {
+        var record = record
+        let usable = recording.flatMap { $0.isEmpty ? nil : $0 }
+        record.timelapseVersion = usable == nil ? nil : StrokeRecording.formatVersion
+        guard let painting = add(photos.whole, record: record) else { return nil }
+        _ = Self.writePNG(photos.paint, to: painting.paintURL)
+        if let usable { try? usable.encoded().write(to: painting.timelapseURL, options: .atomic) }
+        let canvas = Self.bareCanvasURL(in: folder)
+        if !FileManager.default.fileExists(atPath: canvas.path) { _ = Self.writePNG(photos.canvas, to: canvas) }
+        return painting
+    }
+
+    private static func bareCanvasURL(in folder: URL) -> URL { folder.appendingPathComponent("canvas.bare") }
+
+    private static func writePNG(_ image: CGImage, to url: URL) -> Bool {
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
+        else { return false }
+        CGImageDestinationAddImage(destination, image, nil)
+        return CGImageDestinationFinalize(destination)
+    }
+
+    /// What was painted, or nil when the painting has no recording or it cannot be read.
+    nonisolated static func recording(of painting: Painting) -> StrokeRecording? {
+        guard let data = try? Data(contentsOf: painting.timelapseURL) else { return nil }
+        return StrokeRecording(data: data)
+    }
+
+    /// The painting's three photos for the review page, or nil when its image cannot be read. A painting made before
+    /// the paint layer was kept comes back with the whole picture as its paint, over a plain white canvas.
+    nonisolated static func photos(of painting: Painting) -> CanvasPhotos? {
+        guard let whole = loadImage(at: painting.url) else { return nil }
+        let paint = loadImage(at: painting.paintURL) ?? whole
+        let canvas = loadImage(at: bareCanvasURL(in: painting.url.deletingLastPathComponent())) ?? plainCanvas(like: whole)
+        return CanvasPhotos(whole: whole, canvas: canvas, paint: paint)
+    }
+
+    private nonisolated static func plainCanvas(like image: CGImage) -> CGImage {
+        let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0,
+                                space: CGColorSpaceCreateDeviceRGB(),
+                                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return context.makeImage()!
+    }
+
     func remove(_ painting: Painting) {
         try? FileManager.default.removeItem(at: painting.url)
         try? FileManager.default.removeItem(at: painting.sidecarURL)
+        try? FileManager.default.removeItem(at: painting.paintURL)
+        try? FileManager.default.removeItem(at: painting.timelapseURL)
         paintings.removeAll { $0 == painting }
     }
 
