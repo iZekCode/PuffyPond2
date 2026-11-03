@@ -60,7 +60,6 @@ final class Mushroom: Critter {
         squashNode.addChildNode(emitter)
     }
 
-    override var blowsInk: Bool { false }
     override var eraseRadius: Float { Self.eraseRadius }
     override var bob: Float { sin(clock * 3) * 0.03 }
 

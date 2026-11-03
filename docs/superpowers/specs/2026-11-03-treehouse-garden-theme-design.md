@@ -1,6 +1,6 @@
 # Treehouse garden theme: design
 
-> **Amended 2026-11-03 (second cast).** The owner changed the cast to four tools: **butterfly** (liquid oil), **ladybug** (brush, six legs on `LimbBrush`), **mushroom** (eraser, spore puffs) and **snail** (blender). Thick oil was removed (archived in `docs/archive/2026-11-03-thick-oil-tool.md`), and the spider, caterpillar and bee were deleted. Where this document still names them, read it with the cast above; everything else (backdrops, effects, sound approach, legacy scheme kept) stands. New sound effects: `slurp` (blender) and `poof` (eraser) replace `buzz` and `crunch`.
+> **Amended 2026-11-03 (second cast).** The owner changed the cast to four tools: **butterfly** (liquid oil), **ladybug** (brush, six legs on `LimbBrush`), **mushroom** (eraser, spore puffs) and **snail** (blender). Thick oil was removed (archived in `docs/archive/2026-11-03-thick-oil-tool.md`), and the spider, caterpillar and bee were deleted. Where this document still names them, read it with the cast above; everything else (backdrops, effects, sound approach, legacy scheme kept) stands. **Third round:** the canvas page now fills the whole screen (pots and bubbles float over its edges; no easel or studio room is visible), there are no petals or fireflies on the canvas page (petals are gone entirely; fireflies stay in the 3D gallery), and a ladybug held still plays a rising `ooze` sound. New sound effects: `slurp` (blender) and `poof` (eraser) replace `buzz` and `crunch`.
 
 ## Intent
 

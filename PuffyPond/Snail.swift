@@ -84,8 +84,6 @@ final class Snail: Critter {
         }
     }
 
-    override var blowsInk: Bool { false }
-
     override func dabs(from a: SIMD2<Float>, to b: SIMD2<Float>, radius: Float, speed: Float) -> [BrushDab] {
         // The blade lies across the direction of travel: a wide sheet, crisp ridged edges.
         let d = b - a

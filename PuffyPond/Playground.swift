@@ -73,12 +73,13 @@ final class Playground {
     @ObservationIgnored private let frameDriver = FrameDriver()
     @ObservationIgnored private(set) var buddies: [Buddy] = []
     @ObservationIgnored private var lastSlurp: Double = 0
+    @ObservationIgnored private var lastHoldSound: Double = 0
     @ObservationIgnored private var strokes: [Stroke] = []
     @ObservationIgnored private var activeStroke: [Int: Stroke] = [:]
     @ObservationIgnored private var lastBead: [Int: SIMD2<Float>] = [:]
     @ObservationIgnored private var blipDistance: [Int: Float] = [:]
-    @ObservationIgnored private var pots: [PaintPot] = []
-    @ObservationIgnored private var critterPots: [CritterPot] = []
+    @ObservationIgnored private(set) var pots: [PaintPot] = []
+    @ObservationIgnored private(set) var critterPots: [CritterPot] = []
     @ObservationIgnored private var templatePots: [TemplatePot] = []
     /// The dotted animal to trace, if one is on the canvas.
     @ObservationIgnored private var template: TemplateOutline?
@@ -233,27 +234,11 @@ final class Playground {
                                        chamferRadius: 0.012), linen, at: SIMD3(0, 0, Self.canvasZ - depth / 2))
         canvasNode.addChildNode(board)
         canvasBoard = board
-        let woodAlong = Studio.woodMaterial(grainAlongV: true)     // upright beams
-        let woodAcross = Studio.woodMaterial(grainAlongV: false)   // horizontal beams
-        func beam(_ w: Float, _ h: Float, _ d: Float, at p: SIMD3<Float>, tilt: Float = 0) {
-            let n = Toybox.node(SCNBox(width: CGFloat(w), height: CGFloat(h), length: CGFloat(d), chamferRadius: 0.012),
-                                h > w ? woodAlong : woodAcross, at: p)
-            n.simdEulerAngles = SIMD3(0, 0, tilt)
-            canvasNode.addChildNode(n)
-        }
-        let back = Self.canvasZ - depth - 0.06
-        beam(0.14, 8.4, 0.1, at: SIMD3(0, -0.6, back))                                   // mast
-        for side: Float in [-1, 1] {                                                       // splayed front legs
-            beam(0.12, 7.2, 0.09, at: SIMD3(side * 1.25, -1.6, back - 0.04), tilt: side * 0.33)
-        }
-        beam(size.x + 0.5, 0.12, 0.3, at: SIMD3(0, -size.y * 0.5 - 0.06, Self.canvasZ - 0.04))   // tray
-        beam(size.x + 0.5, 0.1, 0.05, at: SIMD3(0, -size.y * 0.5 + 0.02, Self.canvasZ + 0.1))    // tray lip
-        beam(0.6, 0.16, 0.26, at: SIMD3(0, size.y * 0.5 + 0.06, Self.canvasZ - 0.06))           // top clamp
+        // The canvas fills the whole view, so there is no easel frame around it.
         canvasNode.simdPosition = SIMD3(0, 0.1, 0)
         scene.rootNode.addChildNode(canvasNode)
 
         scene.rootNode.addChildNode(paintLayer.node)
-        Effects.addFireflies(to: cameraNode, in: SIMD3(5, 3, 0.6), at: SIMD3(0, 0, -2.4))
         // Two columns just outside the canvas, so dipping never smears the painting:
         // paint pots down the right (rub a critter in one to pick up its color),
         // critter bubbles down the left (rub one to become that brush animal, or to pick up that paint tool).
@@ -298,28 +283,44 @@ final class Playground {
             scene.rootNode.addChildNode(buddy.starfish.root)
             buddies.append(buddy)
         }
+        layout(size: CGSize(width: 1600, height: 1000))
     }
 
-    /// Fit the canvas (plus the pot columns) into any window shape.
+    /// The canvas fills the whole window, edge to edge: the tighter side of the window is matched exactly and the
+    /// other side overflows. The pots and bubbles float over the left and right edges of the view.
     func layout(size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
         aspect = Float(size.width / size.height)
-        // The canvas nearly fills the window.
-        let needHalfH = Self.canvasSize.y * 0.5 * 1.06
-        let needHalfW = (Self.shelfX + PaintPot.radius + 0.12) * 1.02   // canvas plus the two pot columns
-        cameraDistance = max(needHalfH / tanHalfFOV, needHalfW / (tanHalfFOV * aspect))
+        let fitHeight = Self.canvasSize.y * 0.5 / tanHalfFOV
+        let fitWidth = Self.canvasSize.x * 0.5 / (tanHalfFOV * aspect)
+        cameraDistance = Self.canvasZ + min(fitHeight, fitWidth) * 0.999
         cameraNode.simdPosition = SIMD3(0, cameraY, cameraDistance)
+        placeShelves()
+    }
+
+    /// Puts the paint pots on the right and the bubbles on the left, just inside the edges of the view.
+    private func placeShelves() {
+        let x = max(visibleHalfSize(atZ: 0.3).x - PaintPot.radius - 0.2, 0.5)
+        for pot in pots { pot.root.simdPosition.x = x }
+        for pot in critterPots { pot.root.simdPosition.x = -x }
+    }
+
+    /// Whether `p` (canvas plane) is under a pot or bubble: rubbing one must not paint or erase behind it.
+    func isOverShelf(_ p: SIMD2<Float>) -> Bool {
+        let reach = PaintPot.radius + 0.14
+        return pots.contains { simd_distance(p, SIMD2($0.root.simdPosition.x, $0.root.simdPosition.y + 0.04)) < reach }
+            || critterPots.contains { simd_distance(p, SIMD2($0.root.simdPosition.x, $0.root.simdPosition.y + 0.04)) < reach }
     }
 
     /// Visible half-size of the view at depth z.
-    private func halfSize(atZ z: Float) -> SIMD2<Float> {
+    func visibleHalfSize(atZ z: Float) -> SIMD2<Float> {
         let halfH = (cameraDistance - z) * tanHalfFOV
         return SIMD2(halfH * aspect, halfH)
     }
 
     /// View UV (0…1, y down) → point in the world at depth z.
     private func worldPoint(_ uv: SIMD2<Float>, z: Float) -> SIMD3<Float> {
-        let h = halfSize(atZ: z)
+        let h = visibleHalfSize(atZ: z)
         return SIMD3((uv.x * 2 - 1) * h.x, cameraY + (1 - uv.y * 2) * h.y, z)
     }
 
@@ -405,7 +406,7 @@ final class Playground {
                 target = worldPoint(hand.position, z: buddyZ)
             } else {
                 // Idle: swim lazy loops so the buddies always feel alive.
-                let h = halfSize(atZ: buddyZ)
+                let h = visibleHalfSize(atZ: buddyZ)
                 let t = clock * 0.35 + Float(buddy.slot) * 3.1
                 target = SIMD3(sin(t) * h.x * 0.6, cameraY - h.y * 0.62 + sin(t * 2.3) * 0.15, buddyZ)
             }
@@ -484,7 +485,7 @@ final class Playground {
     }
 
     private func panFor(_ x: Float) -> Float {
-        max(-1, min(1, x / max(halfSize(atZ: 0.5).x, 0.1)))
+        max(-1, min(1, x / max(visibleHalfSize(atZ: 0.5).x, 0.1)))
     }
 
     // MARK: - Painting
@@ -502,7 +503,7 @@ final class Playground {
             let c = pot.root.simdPosition
             return simd_distance(p, SIMD2(c.x, c.y + 0.04)) < PaintPot.radius + 0.14
         }
-        guard onCanvas, !onTemplatePot else {
+        guard onCanvas, !onTemplatePot, !isOverShelf(p) else {
             finishStroke(slot: slot)
             return
         }
@@ -516,6 +517,10 @@ final class Playground {
             : buddy.critter.dabs(from: from, to: p, radius: Self.strokeRadius, speed: buddy.critter.speed)
         lay(dabs, color: buddy.color, ncaModel: buddy.colorIndex, seed: Float(slot) * 13.7 + Float(strokes.count) * 2.3)
         lastStamp[slot] = p
+        if let hold = buddy.critter.holdProgress, now - lastHoldSound > 0.45 {
+            lastHoldSound = now
+            audio.play(.ooze, a: hold, pan: panFor(p.x))
+        }
         // The blender only moves paint that's already there: it doesn't start a stroke of its own.
         if controlScheme == .fist && buddy.tool == .blender {
             if now - lastSlurp > 0.25 {
@@ -584,6 +589,7 @@ final class Playground {
     private func erase(with buddy: Buddy, now: Double) {
         let s = buddy.toolPosition
         let p = SIMD2(s.x, s.y)
+        if isOverShelf(p) { return }
         let r = buddy.eraseRadius
         paintLayer.erase(at: p, radius: r, dt: frameDT)
         var erasedAny = template?.erase(at: p, radius: r) ?? false

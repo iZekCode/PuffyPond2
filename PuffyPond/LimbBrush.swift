@@ -23,6 +23,11 @@ final class LimbBrush {
     /// How fast the oozing paint flows outward (world units/s; slow enough that the texture grows fully).
     private static let oozeSpeed: Float = 0.28
 
+    /// How long it has been held still while pressing, as 0…1 (nil while it moves or isn't pressing).
+    var holdProgress: Float? {
+        holdTime > Self.oozeDelay ? min((holdTime - Self.oozeDelay) / Self.oozeGrowth, 1) : nil
+    }
+
     init(bundle: TentacleBundle, limbZ: Float) {
         self.bundle = bundle
         self.limbZ = limbZ

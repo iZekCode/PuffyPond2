@@ -41,6 +41,8 @@ The movement stats are 2D estimates from the front camera (Vision body and hand 
 
 ## Painting on the canvas
 
+The canvas fills the whole screen, edge to edge. The paint pots float over its right edge and the tool bubbles over its left edge; nothing is painted or erased behind them. On windows that are not 8:5 the tighter side matches exactly and the other side of the canvas runs past the edge of the screen.
+
 | Move | What happens |
 |---|---|
 | Open hand | Your hand's paint character swims along with you. No paint. |

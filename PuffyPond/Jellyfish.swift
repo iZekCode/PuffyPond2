@@ -73,7 +73,6 @@ final class Jellyfish: Critter {
                 cheeks: [SIMD3(-0.1, 0.0, 0.11), SIMD3(0.1, 0.0, 0.11)], parent: bellNode)
     }
 
-    override var blowsInk: Bool { false }
     override var followStiffness: Float { 60 }
     override var followDamping: Float { 11 }
     override var bob: Float { sin(clock * 1.6) * 0.035 }

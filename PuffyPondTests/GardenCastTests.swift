@@ -173,4 +173,62 @@ struct GardenCastTests {
         playground.pointerErases = false
         #expect(playground.buddies[0].critter is Ladybug)
     }
+
+    // MARK: Full-screen canvas
+
+    private static let windows: [CGSize] = [CGSize(width: 1600, height: 1000), CGSize(width: 1024, height: 768),
+                                            CGSize(width: 2400, height: 1000), CGSize(width: 900, height: 1200)]
+
+    @Test func canvasFillsTheWholeWindow() {
+        for size in Self.windows {
+            let playground = Playground(controlScheme: .fist)
+            playground.layout(size: size)
+            let visible = playground.visibleHalfSize(atZ: Playground.canvasZ)
+            let canvas = Playground.canvasSize * 0.5
+            // Never wider or taller than the canvas, so no room shows around it ...
+            #expect(visible.x <= canvas.x * 1.001 && visible.y <= canvas.y * 1.001, "\(size)")
+            // ... and the tighter side is matched exactly (edge to edge).
+            #expect(visible.x >= canvas.x * 0.98 || visible.y >= canvas.y * 0.98, "\(size)")
+        }
+    }
+
+    @Test func potsAndBubblesFloatInsideTheView() {
+        for size in Self.windows {
+            let playground = Playground(controlScheme: .fist)
+            playground.layout(size: size)
+            let visible = playground.visibleHalfSize(atZ: 0.3)
+            #expect(!playground.pots.isEmpty && !playground.critterPots.isEmpty)
+            for pot in playground.pots {
+                #expect(pot.root.simdPosition.x + PaintPot.radius <= visible.x, "\(size)")
+                #expect(pot.root.simdPosition.x > 0)
+            }
+            for pot in playground.critterPots {
+                #expect(pot.root.simdPosition.x - PaintPot.radius >= -visible.x, "\(size)")
+                #expect(pot.root.simdPosition.x < 0)
+            }
+        }
+    }
+
+    @Test func nothingPaintsUnderAPotOrBubble() {
+        let playground = Playground(controlScheme: .fist)
+        playground.layout(size: Self.windows[0])
+        let pot = playground.pots[0].root.simdPosition
+        #expect(playground.isOverShelf(SIMD2(pot.x, pot.y)))
+        let bubble = playground.critterPots[0].root.simdPosition
+        #expect(playground.isOverShelf(SIMD2(bubble.x, bubble.y)))
+        #expect(!playground.isOverShelf(SIMD2(0, 0.1)))
+    }
+
+    // MARK: Ladybug held still
+
+    @Test func ladybugHoldIsNilWhileMovingAndGrowsWhenHeldStill() {
+        let bug = Ladybug(color: Paint.colors[0], at: .zero)
+        LimbBrushTests.settle(bug, frames: 120, target: hover, painting: true)
+        let early = bug.holdProgress
+        #expect(early != nil)
+        LimbBrushTests.settle(bug, frames: 120, target: hover, painting: true)
+        #expect((bug.holdProgress ?? 0) > (early ?? 1))
+        LimbBrushTests.settle(bug, frames: 8, target: SIMD3(2, 0, Playground.paintHoverZ), painting: true)
+        #expect(bug.holdProgress == nil)
+    }
 }

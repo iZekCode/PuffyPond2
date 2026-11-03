@@ -28,6 +28,7 @@ nonisolated enum Sfx: UInt8, Sendable, CaseIterable {
     case chicken   // a rubber chicken squawk (b = pan)
     case slurp     // a wet smear for the blender (a = speed 0…1, b = pan)
     case poof      // a soft spore puff (b = pan)
+    case ooze      // a gloopy rising bubble while a brush is held still (a = hold 0…1, b = pan)
 }
 
 /// Which tune the background music plays.
@@ -506,6 +507,12 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
                   vibrato: (0.12, 22))
             start(.noise, 0, peak: 0.12, decay: 0.18, at: 0, pan: pan, attack: 0.01,
                   filter: .bandPass(900, q: 1.4, sr: sampleRate))
+        case .ooze:
+            let top = 220 + 260 * min(max(e.a, 0), 1)
+            start(.sine, top, peak: 0.2, decay: 0.3, at: 0, pan: pan, attack: 0.01, glideFrom: top * 0.45, glideTime: 0.14,
+                  vibrato: (0.1, 16))
+            start(.fm, top * 2, peak: 0.06, decay: 0.12, at: Int(0.05 * sampleRate), pan: pan, fm: (2.5, 1.5, 0.05))
+            start(.noise, 0, peak: 0.05, decay: 0.1, at: 0, pan: pan, filter: .bandPass(700, q: 1.5, sr: sampleRate))
         case .poof:
             start(.noise, 0, peak: 0.22, decay: 0.22, at: 0, pan: pan, attack: 0.01,
                   filter: .bandPass(1200, q: 0.6, sr: sampleRate))

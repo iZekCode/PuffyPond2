@@ -80,6 +80,7 @@ final class Ladybug: Critter {
     }
 
     override var usesSizeSlider: Bool { true }
+    override var holdProgress: Float? { limbs.holdProgress }
 
     override func flare(_ amount: Float) {
         legs.flare(amount, body: leanNode.simdWorldTransform)

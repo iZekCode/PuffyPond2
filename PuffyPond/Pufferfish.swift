@@ -54,8 +54,6 @@ final class Pufferfish: Critter {
                 cheeks: [SIMD3(-0.09, -0.02, 0.12), SIMD3(0.09, -0.02, 0.12)], parent: ballNode)
     }
 
-    override var blowsInk: Bool { false }
-
     override func flare(_ amount: Float) {
         for i in spikes.indices { spikes[i].jiggle.velocity += Float.random(in: 4...9) * amount }
     }

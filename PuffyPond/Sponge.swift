@@ -34,8 +34,6 @@ final class Sponge: Critter {
                 cheeks: [SIMD3(-0.09, -0.04, 0.09), SIMD3(0.09, -0.04, 0.09)], parent: body)
     }
 
-    override var blowsInk: Bool { false }
-
     override func flare(_ amount: Float) {
         squeeze.velocity += 4 * amount
     }

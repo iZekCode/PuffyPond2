@@ -141,7 +141,6 @@ class Critter {
     private var brows: [SCNNode] = []
     private var cheekNodes: [SCNNode] = []
     private var mouthNode: SCNNode?
-    private var ink: SCNParticleSystem?
 
     var speed: Float { simd_length(position.velocity) }
     /// The displayed size right now (presence × size), for rigs that build world-space meshes.
@@ -172,7 +171,7 @@ class Critter {
         var browSign: Float     // mirrors the brow tilt for left/right eyes
     }
 
-    /// Googly eyes with brows, blushing cheeks and pouty lips (with an ink nozzle).
+    /// Googly eyes with brows, blushing cheeks and pouty lips.
     func addFace(eyes spots: [EyeSpot], eyeRadius: Float, mouth: SIMD3<Float>, mouthYaw: Float = 0,
                  mouthRadius: Float, cheeks: [SIMD3<Float>], parent: SCNNode? = nil) {
         let host = parent ?? squashNode
@@ -205,12 +204,6 @@ class Critter {
         lips.simdEulerAngles = SIMD3(0, mouthYaw, 0)
         host.addChildNode(lips)
         mouthNode = lips
-        let particles = Effects.petals()
-        let nozzle = SCNNode()
-        nozzle.simdPosition = SIMD3(0, 0, 0.03)
-        nozzle.addParticleSystem(particles)
-        lips.addChildNode(nozzle)
-        ink = particles
     }
 
     // MARK: Reactions
@@ -292,8 +285,6 @@ class Critter {
             let m = face.mouth + chomp
             mouthNode.simdScale = SIMD3(m, m, 1)
         }
-        ink?.birthRate = painting && blowsInk ? 45 + CGFloat(speed) * 25 : 0
-        ink?.particleColor = Paint.platform(displayedColor)
 
         let scale = currentScale * (painting ? 1.08 : 1)
         bodyNode.simdPosition = position.value + SIMD3(0, bob, 0)
@@ -310,7 +301,8 @@ class Critter {
     var followStiffness: Float { 95 }
     var followDamping: Float { 19.5 }
     var leanAmount: Float { 1 }
-    var blowsInk: Bool { true }
+    /// How long a held-still brush has been pressing, as 0…1 (nil when it isn't held still): drives a sound.
+    var holdProgress: Float? { nil }
     /// Whether the brush-size slider scales this critter (the limb brushes: octopus, ladybug).
     var usesSizeSlider: Bool { false }
     /// How much paint this critter wipes away around itself while its tool is the eraser (world units).

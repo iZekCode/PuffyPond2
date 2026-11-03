@@ -42,7 +42,6 @@ final class Frog: Critter {
                 cheeks: [SIMD3(-0.12, 0.0, 0.11), SIMD3(0.12, 0.0, 0.11)])
     }
 
-    override var blowsInk: Bool { false }
     override var leanAmount: Float { 0.35 }
     override var bob: Float { hop == nil ? sin(clock * 3) * 0.006 : 0 }
 

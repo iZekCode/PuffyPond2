@@ -27,7 +27,6 @@ final class Effects {
     let scene: SCNScene
     private var flyers: [Flyer] = []
     private static let starImage = Toybox.platformImage(makeStar())
-    private static let petalImage = Toybox.platformImage(makePetal())
     private static let glowImage = Toybox.platformImage(makeGlow())
 
     init(scene: SCNScene) {
@@ -96,7 +95,7 @@ final class Effects {
         Self.sparkles(in: scene, at: center, color: SIMD3(1, 0.95, 0.6), count: 40, speed: 2.6)
     }
 
-    /// Paint splash, sparkles and petals when a critter picks up a new color.
+    /// Paint splash and sparkles when a critter picks up a new color.
     func colorSplash(at point: SIMD3<Float>, color: SIMD3<Float>) {
         for _ in 0..<8 {
             let drop = Toybox.node(SCNSphere(radius: CGFloat(Float.random(in: 0.025...0.045))),
@@ -108,7 +107,6 @@ final class Effects {
                                 baseScale: SIMD3(repeating: 1)))
         }
         Self.sparkles(in: scene, at: point, color: SIMD3(1, 1, 1), count: 18, speed: 1.4)
-        Self.petalBurst(in: scene, at: point, color: color, count: 10)
         Toybox.burst(in: scene, at: point, color: color, count: 24, speed: 1.8, size: 0.05, gravity: -2)
     }
 
@@ -211,50 +209,6 @@ final class Effects {
         emitter.runAction(.sequence([.wait(duration: 1.5), .removeFromParentNode()]))
     }
 
-    /// Continuous petals from a critter's mouth while it works (birth rate is driven per frame).
-    static func petals() -> SCNParticleSystem {
-        let p = SCNParticleSystem()
-        p.particleImage = petalImage
-        p.birthRate = 0
-        p.loops = true
-        p.particleLifeSpan = 0.8
-        p.particleLifeSpanVariation = 0.3
-        p.particleVelocity = 0.8
-        p.particleVelocityVariation = 0.4
-        p.emittingDirection = SCNVector3(0, 0, 1)
-        p.spreadingAngle = 40
-        p.particleSize = 0.05
-        p.particleSizeVariation = 0.02
-        p.particleAngularVelocity = 180
-        p.particleAngularVelocityVariation = 240
-        p.dampingFactor = 2
-        p.acceleration = SCNVector3(0, -0.5, 0)
-        p.blendMode = .alpha
-        p.isLightingEnabled = false
-        let grow = CAKeyframeAnimation()
-        grow.values = [0.4, 1.2, 0.0]
-        grow.keyTimes = [0, 0.4, 1]
-        p.propertyControllers = [.size: SCNParticlePropertyController(animation: grow)]
-        return p
-    }
-
-    /// A one-off puff of petals in the given color.
-    static func petalBurst(in scene: SCNScene, at position: SIMD3<Float>, color: SIMD3<Float>, count: CGFloat) {
-        let p = petals()
-        p.birthRate = count / 0.05
-        p.emissionDuration = 0.05
-        p.loops = false
-        p.spreadingAngle = 180
-        p.particleVelocity = 1.4
-        p.particleSize = 0.07
-        p.particleColor = Paint.platform(color)
-        let emitter = SCNNode()
-        emitter.simdPosition = position
-        emitter.addParticleSystem(p)
-        scene.rootNode.addChildNode(emitter)
-        emitter.runAction(.sequence([.wait(duration: 1.8), .removeFromParentNode()]))
-    }
-
     /// Slow, glowing specks drifting around the room (emit them from a wide, flat box).
     static func fireflies() -> SCNParticleSystem {
         let p = SCNParticleSystem()
@@ -304,24 +258,6 @@ final class Effects {
             ctx.addPath(path)
             ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
             ctx.fillPath()
-        }
-    }
-
-    private static func makePetal() -> CGImage? {
-        Toybox.image(width: 64, height: 64) { ctx in
-            // A teardrop petal pointing up, with a soft lighter vein.
-            let path = CGMutablePath()
-            path.move(to: CGPoint(x: 32, y: 4))
-            path.addCurve(to: CGPoint(x: 32, y: 60), control1: CGPoint(x: 62, y: 20), control2: CGPoint(x: 56, y: 56))
-            path.addCurve(to: CGPoint(x: 32, y: 4), control1: CGPoint(x: 8, y: 56), control2: CGPoint(x: 2, y: 20))
-            ctx.addPath(path)
-            ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 0.95))
-            ctx.fillPath()
-            ctx.setStrokeColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
-            ctx.setLineWidth(2)
-            ctx.move(to: CGPoint(x: 32, y: 10))
-            ctx.addLine(to: CGPoint(x: 32, y: 50))
-            ctx.strokePath()
         }
     }
 
