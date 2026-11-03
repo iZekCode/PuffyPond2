@@ -100,28 +100,27 @@ nonisolated private struct Voice {
     var right: Float = 0.7
 }
 
-/// A cheerful 118 BPM toy-pop groove, synthesized live:
-/// four-on-the-floor kick, claps on 2 & 4, offbeat hats, a bouncy bass, chord stabs and a
-/// sing-along lead over I–V–vi–IV in C. Layers swell with how much you're moving.
+/// A bouncy 104 BPM garden tune, synthesized live: a soft thumpy kick, wood blocks, a shaker, a plucky
+/// pizzicato bass, ukulele strums and a xylophone melody over G–C–D–Em. Layers swell with how much you're moving.
 /// Also renders every sound effect, and publishes a beat clock for animations.
 nonisolated final class GrooveDSP: @unchecked Sendable {
-    static let bpm: Double = 118
+    static let bpm: Double = 104
     private static let voiceCount = 64
     private static let tableSize = 4096
     private static let queueCapacity = 64
 
-    private static let roots: [Float] = [36, 43, 45, 41]            // C G A F
-    private static let triads: [[Float]] = [[60, 64, 67], [59, 62, 67], [60, 64, 69], [60, 65, 69]]
+    private static let roots: [Float] = [43, 48, 50, 40]            // G C D E
+    private static let triads: [[Float]] = [[62, 67, 71], [64, 67, 72], [62, 66, 69], [64, 67, 71]]
     private static let bassSteps: [Int: Float] = [0: 0, 3: 0, 6: 12, 8: 0, 10: 7, 14: 12]
     private static let melody: [[Float]] = [
-        [72, -1, 76, -1, 79, -1, 76, -1, 81, -1, 79, 76, 74, -1, 72, -1],
-        [74, -1, 79, -1, 83, -1, 79, -1, 81, -1, 79, -1, 74, 76, 79, -1],
-        [76, -1, 72, -1, 76, -1, 81, -1, 79, -1, 76, -1, 72, -1, 74, -1],
-        [77, -1, 76, -1, 74, -1, 72, -1, 69, -1, 72, 74, 76, -1, -1, -1],
-        [84, -1, -1, 79, -1, -1, 76, -1, 79, -1, 81, -1, 79, -1, 76, -1],
-        [79, -1, -1, 74, -1, -1, 79, -1, 83, -1, 81, -1, 79, -1, 74, -1],
-        [81, -1, -1, 76, -1, -1, 72, -1, 76, -1, 79, -1, 81, -1, 84, -1],
-        [81, -1, 79, -1, 77, -1, 76, -1, 74, -1, 72, -1, -1, -1, -1, -1],
+        [74, -1, 79, -1, 74, -1, 71, -1, 74, -1, 79, -1, 83, -1, 79, -1],
+        [76, -1, 79, -1, 84, -1, 79, -1, 76, -1, 72, -1, 76, -1, -1, -1],
+        [78, -1, 81, -1, 78, -1, 74, -1, 78, -1, 81, -1, 86, -1, 81, -1],
+        [79, -1, 76, -1, 71, -1, 76, -1, 79, 76, 71, -1, 76, -1, -1, -1],
+        [79, -1, 83, -1, 86, -1, 83, -1, 79, -1, 74, -1, 79, -1, 83, -1],
+        [84, -1, -1, 79, -1, -1, 76, -1, 79, -1, 84, -1, 88, -1, 84, -1],
+        [81, -1, 78, -1, 74, -1, 78, -1, 81, 78, 74, -1, 78, -1, 81, -1],
+        [79, -1, 76, -1, 74, 76, 79, -1, 83, -1, 79, -1, -1, -1, -1, -1],
     ]
     private static let blipScale: [Float] = [79, 81, 84, 86, 88, 91, 93, 96, 98, 100]
 
@@ -290,53 +289,56 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
         let root = Self.roots[chord]
         let groove: Float = 0.75 + 0.25 * energy
 
-        // Drums
-        if step % 4 == 0 {
-            start(.sine, 48, peak: 0.85, decay: 0.38, at: offset, attack: 0.001, glideFrom: 170, glideTime: 0.035)
-            start(.noise, 0, peak: 0.12, decay: 0.012, at: offset, filter: .highPass(3000, q: 0.7, sr: sampleRate))
+        // Soft thumpy kick on the beat, wood blocks on 2 and 4.
+        if step % 8 == 0 {
+            start(.sine, 62, peak: 0.55, decay: 0.2, at: offset, attack: 0.002, glideFrom: 150, glideTime: 0.04)
         }
         if step == 4 || step == 12 || (section == 7 && step >= 12) {
-            let peak: Float = step == 12 || step == 4 ? 0.42 : 0.25
-            start(.noise, 0, peak: peak, decay: 0.16, at: offset, filter: .bandPass(1350, q: 0.9, sr: sampleRate))
-            start(.noise, 0, peak: peak * 0.6, decay: 0.12, at: offset + Int(0.011 * sampleRate),
-                  filter: .bandPass(1600, q: 1.1, sr: sampleRate))
+            let peak: Float = step == 12 || step == 4 ? 0.16 : 0.1
+            start(.sine, 1100, peak: peak, decay: 0.05, at: offset, pan: 0.2, attack: 0.001, glideFrom: 1300, glideTime: 0.01)
+            start(.noise, 0, peak: peak * 0.7, decay: 0.02, at: offset, pan: 0.2,
+                  filter: .bandPass(2000, q: 3, sr: sampleRate))
         }
-        if step % 4 == 2 {
-            start(.noise, 0, peak: 0.16 * groove, decay: 0.05, at: offset, pan: 0.3,
-                  filter: .highPass(7500, q: 0.8, sr: sampleRate))
-        } else if step % 2 == 1 && energy > 0.35 {
-            start(.noise, 0, peak: 0.06, decay: 0.03, at: offset, pan: -0.3,
-                  filter: .highPass(9000, q: 0.8, sr: sampleRate))
+        // Shaker: eighths, with the offbeats accented; sixteenths join in when you move.
+        if step % 2 == 0 {
+            let accent: Float = step % 4 == 2 ? 0.1 : 0.05
+            start(.noise, 0, peak: accent * groove, decay: 0.045, at: offset, pan: -0.3,
+                  filter: .highPass(6500, q: 0.8, sr: sampleRate))
+        } else if energy > 0.35 {
+            start(.noise, 0, peak: 0.03, decay: 0.025, at: offset, pan: 0.3, filter: .highPass(8000, q: 0.8, sr: sampleRate))
         }
 
-        // Bouncy bass
+        // Pizzicato bass
         if let interval = Self.bassSteps[step] {
-            start(.square, Self.hz(root + interval), peak: 0.26, decay: 0.22, at: offset,
-                  attack: 0.003, cutoff: 650 + 500 * energy)
+            start(.triangle, Self.hz(root + interval), peak: 0.3, decay: 0.16, at: offset, attack: 0.002, cutoff: 700 + 400 * energy)
         }
 
-        // Chord stabs on the offbeats ("and" of 2 and 4, plus one push)
-        if step == 6 || step == 14 || step == 10 {
-            let stab: Float = (0.04 + 0.05 * energy) * (step == 10 ? 0.7 : 1)
-            for (k, note) in Self.triads[chord].enumerated() {
-                start(.square, Self.hz(note), peak: stab, decay: 0.16, at: offset,
-                      pan: Float(k - 1) * 0.5, attack: 0.002, cutoff: 2600)
+        // Ukulele strums on the offbeats: four plucks, a hair apart.
+        if step == 6 || step == 10 || step == 14 || (step == 2 && energy > 0.6) {
+            let level: Float = (0.05 + 0.04 * energy) * (step == 10 ? 0.75 : 1)
+            let strum = Self.triads[chord] + [Self.triads[chord][0] + 12]
+            for (k, note) in strum.enumerated() {
+                start(.triangle, Self.hz(note), peak: level, decay: 0.22, at: offset + Int(Float(k) * 0.011 * sampleRate),
+                      pan: Float(k) * 0.3 - 0.45, attack: 0.001, cutoff: 3000)
             }
         }
 
-        // Lead melody — always there, louder when you play.
+        // Xylophone melody: always there, louder when you play.
         let note = Self.melody[section][step]
         if note > 0 {
-            let lead: Float = 0.07 + 0.09 * energy
-            start(.square, Self.hz(note), peak: lead, decay: 0.32, at: offset, pan: 0.1,
-                  attack: 0.004, vibrato: (0.006, 5.5), cutoff: 3200)
-            start(.fm, Self.hz(note + 12), peak: lead * 0.35, decay: 0.45, at: offset, pan: -0.15,
-                  fm: (3.5, 1.6, 0.12))
+            let lead: Float = 0.1 + 0.08 * energy
+            start(.sine, Self.hz(note), peak: lead, decay: 0.3, at: offset, pan: 0.1, attack: 0.001)
+            start(.fm, Self.hz(note + 12), peak: lead * 0.45, decay: 0.14, at: offset, pan: -0.1,
+                  fm: (3.5, 1.6, 0.05))
+        }
+
+        // A little boing to close the phrase.
+        if section == 7 && step == 15 {
+            start(.sine, Self.hz(91), peak: 0.1, decay: 0.3, at: offset, attack: 0.005, glideFrom: Self.hz(67), glideTime: 0.12,
+                  vibrato: (0.02, 9))
         }
     }
 
-    /// The silly tune: soft thump and tuba "oom" on 1 and 3, chord "pah" on 2 and 4, wood-block ticks,
-    /// and a kazoo that sometimes scoops up into its notes. A slide whistle closes every second round.
     private func playSillyStep(at offset: Int) {
         let chord = bar % 4
         let section = bar % 8

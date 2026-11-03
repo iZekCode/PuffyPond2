@@ -38,3 +38,45 @@ struct GardenSoundTests {
         }
     }
 }
+
+struct GardenTuneTests {
+    private static let rate: Float = 48_000
+
+    private func peak(of audio: (left: [Float], right: [Float])) -> Float {
+        var peak: Float = 0
+        for i in 0..<audio.left.count {
+            let l = audio.left[i], r = audio.right[i]
+            guard l.isFinite, r.isFinite else { return .infinity }
+            peak = max(peak, abs(l), abs(r))
+        }
+        return peak
+    }
+
+    @Test func gardenTuneUsesTheGardenTempo() {
+        #expect(GrooveDSP.bpm == 104)
+    }
+
+    @Test func gardenTuneIsAudibleAndBounded() {
+        let bars = 8
+        let frames = Int(Self.rate * Float(bars * 4) * 60 / Float(GrooveDSP.bpm))
+        for energy: Float in [0, 1] {
+            let dsp = GrooveDSP(sampleRate: Self.rate)
+            dsp.setEnergy(energy)
+            let p = peak(of: dsp.renderOffline(frames: frames))
+            #expect(p > 0.05 && p < 0.95, "energy \(energy) peak \(p)")
+        }
+    }
+
+    @Test func beatClockAdvances() {
+        let dsp = GrooveDSP(sampleRate: Self.rate)
+        _ = dsp.renderOffline(frames: Int(Self.rate * 4))
+        #expect(abs(dsp.beat - 4 * GrooveDSP.bpm / 60) < 0.1)
+    }
+
+    @Test func sillyTuneStillPlays() {
+        let dsp = GrooveDSP(sampleRate: Self.rate)
+        dsp.setTune(.silly)
+        let p = peak(of: dsp.renderOffline(frames: Int(Self.rate * 6)))
+        #expect(p > 0.05 && p < 0.95)
+    }
+}
