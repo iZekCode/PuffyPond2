@@ -74,4 +74,58 @@ struct GardenCastTests {
         LimbBrushTests.settle(bee, frames: 60, target: .zero, painting: false)
         #expect(bee.wiggle < 0.1)
     }
+
+    // MARK: Eraser
+
+    @Test func legacyEraserStillSwapsToTheStarfish() {
+        let buddy = Buddy(slot: 0, colorIndex: 0, kind: .octopus, start: .zero)
+        #expect(buddy.setMode(.erase))
+        #expect(buddy.showsStarfish)
+        #expect(buddy.eraseRadius == Starfish.eraseRadius)
+    }
+
+    @Test func gardenEraserIsTheCaterpillar() {
+        let buddy = Buddy(slot: 0, colorIndex: 0, kind: .spider, start: .zero, erasesWithStarfish: false)
+        let old = buddy.equip(.eraser)
+        #expect(old is Spider)
+        #expect(buddy.critter is Caterpillar)
+        #expect(!buddy.showsStarfish)
+        #expect(!buddy.setMode(.erase))
+        #expect(buddy.eraseRadius == Caterpillar.eraseRadius)
+    }
+
+    @Test func eraserBubbleHoldsNoStarfishInTheGardenScheme() {
+        #expect(PaintTool.eraser.critterKind == .caterpillar)
+        #expect(CritterPot(tool: .eraser, at: .zero).starfish == nil)
+    }
+
+    @Test func scrubbedOpensTheMouth() {
+        let bug = Caterpillar(color: Paint.colors[4], at: .zero)
+        #expect(bug.chomp == 0)
+        bug.scrubbed()
+        LimbBrushTests.settle(bug, frames: 5, target: .zero, painting: true)
+        #expect(bug.chomp > 0)
+    }
+
+    @Test func caterpillarSurvivesATeleport() {
+        let bug = Caterpillar(color: Paint.colors[4], at: .zero)
+        LimbBrushTests.settle(bug, frames: 30, target: hover, painting: true)
+        LimbBrushTests.settle(bug, frames: 30, target: SIMD3(3, 0, 0.4), painting: true)
+        let p = bug.bodyNode.simdPosition
+        #expect(p.x.isFinite && p.y.isFinite && p.z.isFinite)
+    }
+
+    @Test func caterpillarErasesAtLeastAsWideAsTheStarfish() {
+        #expect(Caterpillar.eraseRadius >= Starfish.eraseRadius)
+    }
+
+    @Test func pointerEraserEquipsTheCaterpillar() {
+        let playground = Playground(controlScheme: .fist)
+        playground.pointerErases = true
+        let buddy = playground.buddies[0]
+        #expect(buddy.critter is Caterpillar)
+        #expect(!buddy.showsStarfish)
+        playground.pointerErases = false
+        #expect(playground.buddies[0].critter is Spider)
+    }
 }

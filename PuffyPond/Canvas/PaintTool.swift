@@ -24,13 +24,13 @@ enum PaintTool: Int, CaseIterable, Equatable {
         }
     }
 
-    /// The brush animal that carries this tool (the eraser is the starfish, which isn't a brush animal).
+    /// The brush animal that carries this tool (the legacy scheme's eraser is the starfish, which isn't a brush animal).
     var critterKind: CritterKind? {
         switch self {
         case .thickOil: return .snail
         case .liquidOil: return .ladybug
         case .brush: return .spider
-        case .eraser: return nil
+        case .eraser: return .caterpillar
         case .blender: return .bee
         }
     }

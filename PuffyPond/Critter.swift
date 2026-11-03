@@ -5,7 +5,7 @@ import simd
 enum CritterKind: Int, CaseIterable, Equatable {
     case octopus, snail, pufferfish, seahorse, jellyfish, frog, sponge
     /// The garden cast (fist controls).
-    case spider, ladybug, bee
+    case spider, ladybug, bee, caterpillar
 
     /// The six brush animals of the legacy controls (the sponge only carries the fist controls' blender).
     static let legacyBrushes: [CritterKind] = [.octopus, .snail, .pufferfish, .seahorse, .jellyfish, .frog]
@@ -22,6 +22,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .spider: return "Spider"
         case .ladybug: return "Ladybug"
         case .bee: return "Bee"
+        case .caterpillar: return "Caterpillar"
         }
     }
 
@@ -38,6 +39,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .spider: return "bundle brush"
         case .ladybug: return "watercolor"
         case .bee: return "blender"
+        case .caterpillar: return "eraser"
         }
     }
 
@@ -53,6 +55,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .spider: return "scribble.variable"
         case .ladybug: return "drop.halffull"
         case .bee: return "tornado"
+        case .caterpillar: return "leaf.fill"
         }
     }
 
@@ -69,6 +72,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .spider: return Paint.colors[0]
         case .ladybug: return Paint.colors[5]
         case .bee: return SIMD3(1.0, 0.86, 0.38)
+        case .caterpillar: return Paint.colors[4]
         }
     }
 
@@ -84,6 +88,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .spider: return Spider(color: color, at: start)
         case .ladybug: return Ladybug(color: color, at: start)
         case .bee: return Bee(color: color, at: start)
+        case .caterpillar: return Caterpillar(color: color, at: start)
         }
     }
 }
@@ -310,12 +315,17 @@ class Critter {
     var blowsInk: Bool { true }
     /// Whether the brush-size slider scales this critter (the limb brushes: octopus, spider).
     var usesSizeSlider: Bool { false }
+    /// How much paint this critter wipes away around itself while its tool is the eraser (world units).
+    var eraseRadius: Float { Starfish.eraseRadius }
     var bob: Float { sin(clock * 2.2) * 0.02 }
 
     /// How the critter travels toward the hand (a spring by default; the frog hops).
     func move(dt: Float, target: SIMD3<Float>, painting: Bool) {
         position.step(to: target, stiffness: followStiffness, damping: followDamping, dt: dt)
     }
+
+    /// Called every frame the critter wipes away some paint (it munches, scrubs...).
+    func scrubbed() {}
 
     /// Secondary motion, after the body transforms are set for this frame.
     func animate(dt: Float, painting: Bool, beatPulse: Float, scale: Float, hidden: Bool) {}

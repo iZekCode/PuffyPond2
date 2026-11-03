@@ -412,7 +412,12 @@ final class Buddy {
     var rubbingPot: PotTarget?
     var rubAmount: Float = 0
 
-    init(slot: Int, colorIndex: Int, kind: CritterKind, start: SIMD3<Float>, tool: PaintTool = .brush) {
+    /// The legacy scheme erases with the starfish; the garden scheme's eraser is a normal critter (the caterpillar).
+    let erasesWithStarfish: Bool
+
+    init(slot: Int, colorIndex: Int, kind: CritterKind, start: SIMD3<Float>, tool: PaintTool = .brush,
+         erasesWithStarfish: Bool = true) {
+        self.erasesWithStarfish = erasesWithStarfish
         self.tool = tool
         self.slot = slot
         self.colorIndex = colorIndex
@@ -431,7 +436,7 @@ final class Buddy {
     /// Brings the starfish out (or back in) right where the other one was. True when it swapped.
     @discardableResult
     private func updateStarfish() -> Bool {
-        let wanted = mode == .erase || tool == .eraser
+        let wanted = erasesWithStarfish && (mode == .erase || tool == .eraser)
         guard wanted != showsStarfish else { return false }
         if wanted {
             starfish.appear(at: critter.position.value)
@@ -447,6 +452,14 @@ final class Buddy {
     }
 
     var toolSpeed: Float { showsStarfish ? starfish.speed : critter.speed }
+
+    /// How much paint the tool wipes away around itself.
+    var eraseRadius: Float { showsStarfish ? Starfish.eraseRadius : critter.eraseRadius }
+
+    /// The tool just wiped some paint away.
+    func scrubbed() {
+        if showsStarfish { starfish.scrubbed() } else { critter.scrubbed() }
+    }
 
     /// Picks up another paint tool. Returns the brush animal it replaced, if any (to remove from the scene).
     func equip(_ newTool: PaintTool) -> Critter? {

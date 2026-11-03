@@ -41,7 +41,20 @@ final class Playground {
     }
     var previewHands: [[CGPoint]] = []
     var imageAspect: CGFloat = 4.0 / 3.0
-    var pointerErases = false
+    var pointerErases = false {
+        didSet {
+            guard controlScheme == .fist, pointerErases != oldValue, let buddy = buddies.first else { return }
+            // The garden eraser is a critter: the mouse or finger eraser button turns its buddy into the caterpillar.
+            let next: PaintTool = pointerErases ? .eraser : (toolBeforePointerErase ?? .brush)
+            if pointerErases { toolBeforePointerErase = buddy.tool }
+            finishStroke(slot: buddy.slot)
+            if let old = buddy.equip(next) {
+                old.root.removeFromParentNode()
+                scene.rootNode.addChildNode(buddy.critter.root)
+            }
+        }
+    }
+    @ObservationIgnored private var toolBeforePointerErase: PaintTool?
     var buddyColors: [Int] = [0, 1]
     var buddyKinds: [CritterKind] = [.octopus, .seahorse]
     var buddyTools: [PaintTool] = [.brush, .brush]
@@ -58,7 +71,7 @@ final class Playground {
     @ObservationIgnored let audio = GrooveEngine()
     @ObservationIgnored private let input = HandInput()
     @ObservationIgnored private let frameDriver = FrameDriver()
-    @ObservationIgnored private var buddies: [Buddy] = []
+    @ObservationIgnored private(set) var buddies: [Buddy] = []
     @ObservationIgnored private var strokes: [Stroke] = []
     @ObservationIgnored private var activeStroke: [Int: Stroke] = [:]
     @ObservationIgnored private var lastBead: [Int: SIMD2<Float>] = [:]
@@ -277,7 +290,8 @@ final class Playground {
 
         for slot in 0..<2 {
             let start = SIMD3<Float>(slot == 0 ? -1.2 : 1.2, -0.9, 0.5)
-            let buddy = Buddy(slot: slot, colorIndex: slot == 0 ? 0 : 1, kind: buddyKinds[slot], start: start)
+            let buddy = Buddy(slot: slot, colorIndex: slot == 0 ? 0 : 1, kind: buddyKinds[slot], start: start,
+                              erasesWithStarfish: controlScheme == .legacy)
             scene.rootNode.addChildNode(buddy.critter.root)
             scene.rootNode.addChildNode(buddy.starfish.root)
             buddies.append(buddy)
@@ -393,7 +407,8 @@ final class Playground {
                 let t = clock * 0.35 + Float(buddy.slot) * 3.1
                 target = SIMD3(sin(t) * h.x * 0.6, cameraY - h.y * 0.62 + sin(t * 2.3) * 0.15, buddyZ)
             }
-            buddy.critter.update(dt: dt, target: target, visible: !buddy.showsStarfish, painting: mode == .paint,
+            buddy.critter.update(dt: dt, target: target, visible: !buddy.showsStarfish,
+                                 painting: (mode == .paint || mode == .erase) && !buddy.showsStarfish,
                               beatPulse: beatPulse)
             buddy.starfish.update(dt: dt, target: SIMD3(target.x, target.y, 0.3), visible: buddy.showsStarfish,
                                   beatPulse: beatPulse)
@@ -555,9 +570,9 @@ final class Playground {
     }
 
     private func erase(with buddy: Buddy, now: Double) {
-        let s = buddy.starfish.position.value
+        let s = buddy.toolPosition
         let p = SIMD2(s.x, s.y)
-        let r = Starfish.eraseRadius
+        let r = buddy.eraseRadius
         paintLayer.erase(at: p, radius: r, dt: frameDT)
         var erasedAny = template?.erase(at: p, radius: r) ?? false
         if let outline = template, outline.isEmpty {
@@ -597,7 +612,7 @@ final class Playground {
         }
         strokes = newStrokes
         if erasedAny {
-            buddy.starfish.scrubbed()
+            buddy.scrubbed()
             if now - lastSqueak > 0.09 {
                 lastSqueak = now
                 audio.play(.squeak, pan: panFor(p.x))
