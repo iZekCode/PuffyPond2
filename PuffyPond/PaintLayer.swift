@@ -14,7 +14,7 @@ private struct PaintStamp {
 }
 
 /// How one dab behaves: every brush animal paints with its own style.
-struct BrushStyle {
+struct BrushStyle: Equatable {
     var amount: Float?          // paint laid per dab; nil = from motion (moving coats, holding still pools)
     var push: Float = 0.55      // how hard it drags the wet paint it passes through
     var bristles: Float = 1     // 0 = smooth blob, 1 = full bristle grooves
