@@ -4,6 +4,8 @@ import simd
 /// The brush animals. Each one paints in its own way.
 enum CritterKind: Int, CaseIterable, Equatable {
     case octopus, snail, pufferfish, seahorse, jellyfish, frog, sponge
+    /// The garden cast (fist controls).
+    case spider
 
     /// The six brush animals of the legacy controls (the sponge only carries the fist controls' blender).
     static let legacyBrushes: [CritterKind] = [.octopus, .snail, .pufferfish, .seahorse, .jellyfish, .frog]
@@ -17,6 +19,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .jellyfish: return "Jelly"
         case .frog: return "Frog"
         case .sponge: return "Sponge"
+        case .spider: return "Spider"
         }
     }
 
@@ -30,6 +33,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .jellyfish: return "watercolor"
         case .frog: return "dot prints"
         case .sponge: return "blender"
+        case .spider: return "bundle brush"
         }
     }
 
@@ -42,6 +46,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .jellyfish: return "drop.halffull"
         case .frog: return "circle.grid.cross.fill"
         case .sponge: return "tornado"
+        case .spider: return "scribble.variable"
         }
     }
 
@@ -55,6 +60,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .jellyfish: return Paint.colors[5]
         case .frog: return Paint.colors[4]
         case .sponge: return SIMD3(1.0, 0.86, 0.38)
+        case .spider: return Paint.colors[0]
         }
     }
 
@@ -67,6 +73,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .jellyfish: return Jellyfish(color: color, at: start)
         case .frog: return Frog(color: color, at: start)
         case .sponge: return Sponge(color: color, at: start)
+        case .spider: return Spider(color: color, at: start)
         }
     }
 }
@@ -291,6 +298,8 @@ class Critter {
     var followDamping: Float { 19.5 }
     var leanAmount: Float { 1 }
     var blowsInk: Bool { true }
+    /// Whether the brush-size slider scales this critter (the limb brushes: octopus, spider).
+    var usesSizeSlider: Bool { false }
     var bob: Float { sin(clock * 2.2) * 0.02 }
 
     /// How the critter travels toward the hand (a spring by default; the frog hops).

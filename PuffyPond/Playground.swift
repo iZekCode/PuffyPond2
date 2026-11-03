@@ -114,7 +114,7 @@ final class Playground {
     init(controlScheme: ControlScheme = .fist) {
         self.controlScheme = controlScheme
         input.scheme = controlScheme
-        if controlScheme == .fist { buddyKinds = [.octopus, .octopus] }
+        if controlScheme == .fist { buddyKinds = [.spider, .spider] }
         buildWorld()
         frameDriver.onFrame = { [weak self] dt in self?.tick(dt: Float(dt)) }
     }
@@ -380,10 +380,10 @@ final class Playground {
             if mode != .paint { finishStroke(slot: buddy.slot) }
 
             // Painting, the animal comes down close to the canvas so its tentacles can lie on it.
-            // A bigger octopus hovers higher, so its body stays clear of the canvas.
-            let bigOctopus = buddy.critter is Octopus ? max(octopusSize, 1) : 1
-            let buddyZ: Float = mode == .paint ? Self.canvasZ + (Self.paintHoverZ - Self.canvasZ) * bigOctopus : 0.42
-            if buddy.critter is Octopus { buddy.critter.sizeScale = octopusSize }
+            // A bigger brush animal hovers higher, so its body stays clear of the canvas.
+            let bigBrush = buddy.critter.usesSizeSlider ? max(octopusSize, 1) : 1
+            let buddyZ: Float = mode == .paint ? Self.canvasZ + (Self.paintHoverZ - Self.canvasZ) * bigBrush : 0.42
+            if buddy.critter.usesSizeSlider { buddy.critter.sizeScale = octopusSize }
             let target: SIMD3<Float>
             if let hand {
                 target = worldPoint(hand.position, z: buddyZ)

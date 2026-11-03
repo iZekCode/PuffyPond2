@@ -38,6 +38,8 @@ final class Octopus: Critter {
                 cheeks: [SIMD3(-0.1, -0.05, 0.105), SIMD3(0.1, -0.05, 0.105)])
     }
 
+    override var usesSizeSlider: Bool { true }
+
     override func flare(_ amount: Float) {
         tentacles.flare(amount, body: leanNode.simdWorldTransform)
     }

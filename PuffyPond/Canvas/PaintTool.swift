@@ -29,7 +29,7 @@ enum PaintTool: Int, CaseIterable, Equatable {
         switch self {
         case .thickOil: return .snail
         case .liquidOil: return .jellyfish
-        case .brush: return .octopus
+        case .brush: return .spider
         case .eraser: return nil
         case .blender: return .sponge
         }

@@ -1,0 +1,44 @@
+import SceneKit
+import Testing
+import simd
+@testable import PuffyPond
+
+@MainActor
+struct GardenCastTests {
+    private let hover = SIMD3<Float>(0, 0, Playground.paintHoverZ)
+
+    @Test func brushToolIsTheSpider() {
+        #expect(PaintTool.brush.critterKind == .spider)
+    }
+
+    @Test func spiderIsBuiltByKind() {
+        let critter = CritterKind.spider.make(color: Paint.colors[0], at: .zero)
+        #expect(critter is Spider)
+        #expect(critter.kind == .spider)
+    }
+
+    @Test func spiderLaysLegsFlatWhilePressing() {
+        let spider = Spider(color: Paint.colors[0], at: .zero)
+        LimbBrushTests.settle(spider, frames: 180, target: hover, painting: true)
+        let dabs = spider.dabs(from: .zero, to: .zero, radius: 0.085, speed: 0)
+        #expect(!dabs.isEmpty)
+        #expect(dabs.allSatisfy { $0.style.nca == 1 })
+    }
+
+    @Test func spiderSurvivesATeleport() {
+        let spider = Spider(color: Paint.colors[0], at: .zero)
+        LimbBrushTests.settle(spider, frames: 30, target: hover, painting: true)
+        LimbBrushTests.settle(spider, frames: 30, target: SIMD3(3, 0, 0.4), painting: true)
+        let dabs = spider.dabs(from: .zero, to: .zero, radius: 0.085, speed: 0)
+        for dab in dabs {
+            #expect(dab.from.x.isFinite && dab.from.y.isFinite && dab.to.x.isFinite && dab.to.y.isFinite)
+        }
+        #expect(spider.bodyNode.simdPosition.x.isFinite)
+    }
+
+    @Test func spiderUsesTheSizeSlider() {
+        #expect(Spider(color: Paint.colors[0], at: .zero).usesSizeSlider)
+        #expect(Octopus(color: Paint.colors[0], at: .zero).usesSizeSlider)
+        #expect(!Snail(color: Paint.colors[0], at: .zero).usesSizeSlider)
+    }
+}
