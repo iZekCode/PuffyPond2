@@ -412,7 +412,7 @@ final class Buddy {
     var rubbingPot: PotTarget?
     var rubAmount: Float = 0
 
-    /// The legacy scheme erases with the starfish; the garden scheme's eraser is a normal critter (the caterpillar).
+    /// The legacy scheme erases with the starfish; the garden scheme's eraser is a normal critter (the mushroom).
     let erasesWithStarfish: Bool
 
     init(slot: Int, colorIndex: Int, kind: CritterKind, start: SIMD3<Float>, tool: PaintTool = .brush,

@@ -1,12 +1,11 @@
 import simd
 
-/// The five paint characters of the fist controls. Each one is its own animal and paints its own way.
+/// The four paint characters of the fist controls. Each one is its own animal and paints its own way.
 enum PaintTool: Int, CaseIterable, Equatable {
-    case thickOil, liquidOil, brush, eraser, blender
+    case liquidOil, brush, eraser, blender
 
     var name: String {
         switch self {
-        case .thickOil: return "Thick oil"
         case .liquidOil: return "Liquid oil"
         case .brush: return "Brush"
         case .eraser: return "Eraser"
@@ -16,7 +15,6 @@ enum PaintTool: Int, CaseIterable, Equatable {
 
     var symbol: String {
         switch self {
-        case .thickOil: return "rectangle.portrait.fill"
         case .liquidOil: return "drop.fill"
         case .brush: return "paintbrush.pointed.fill"
         case .eraser: return "star.fill"
@@ -27,11 +25,10 @@ enum PaintTool: Int, CaseIterable, Equatable {
     /// The brush animal that carries this tool (the legacy scheme's eraser is the starfish, which isn't a brush animal).
     var critterKind: CritterKind? {
         switch self {
-        case .thickOil: return .snail
-        case .liquidOil: return .ladybug
-        case .brush: return .spider
-        case .eraser: return .caterpillar
-        case .blender: return .bee
+        case .liquidOil: return .butterfly
+        case .brush: return .ladybug
+        case .eraser: return .mushroom
+        case .blender: return .snail
         }
     }
 
@@ -43,12 +40,6 @@ enum PaintTool: Int, CaseIterable, Equatable {
         let d = b - a
         let moving = smoothStep(0.002, 0.02, simd_length(d))
         switch self {
-        case .thickOil:
-            // Heavy impasto: a wide knife-like sheet, piled high with ridged edges.
-            let angle = simd_length(d) > 1e-5 ? atan2(d.y, d.x) + Float.pi / 2 : Float.pi / 2
-            var style = BrushStyle(push: 0.9, bristles: 0.4, nibAngle: angle, nibAspect: 1.4, knife: 0.6, impasto: 1)
-            style.amount = 0.08 + 0.4 * moving
-            return [BrushDab(from: a, to: b, radius: radius * 1.5, speed: speed, style: style)]
         case .liquidOil:
             // Thinned oil: a translucent glaze that spreads out and runs downhill.
             let style = BrushStyle(amount: 0.08 + 0.12 * moving, push: 0.35, bristles: 0.15, watery: 0.4, runs: 1)

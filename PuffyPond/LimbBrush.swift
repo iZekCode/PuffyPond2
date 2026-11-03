@@ -1,7 +1,7 @@
 import SceneKit
 import simd
 
-/// The brush behaviour of a critter whose limbs lie flat on the canvas and paint (the octopus, the spider):
+/// The brush behaviour of a critter whose limbs lie flat on the canvas and paint (the octopus, the ladybug):
 /// wiping gathers the limbs into one trailing bundle, holding still makes every limb ooze paint outward.
 final class LimbBrush {
     let bundle: TentacleBundle

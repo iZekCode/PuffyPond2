@@ -5,10 +5,10 @@ import simd
 enum CritterKind: Int, CaseIterable, Equatable {
     case octopus, snail, pufferfish, seahorse, jellyfish, frog, sponge
     /// The garden cast (fist controls).
-    case spider, ladybug, bee, caterpillar
+    case ladybug, butterfly, mushroom
 
-    /// The garden cast of the fist controls, in tool-column order (thick oil, liquid oil, brush, eraser, blender).
-    static let gardenCast: [CritterKind] = [.snail, .ladybug, .spider, .caterpillar, .bee]
+    /// The garden cast of the fist controls, in tool-column order (liquid oil, brush, eraser, blender).
+    static let gardenCast: [CritterKind] = [.butterfly, .ladybug, .mushroom, .snail]
 
     /// The six brush animals of the legacy controls (the sponge only carries the fist controls' blender).
     static let legacyBrushes: [CritterKind] = [.octopus, .snail, .pufferfish, .seahorse, .jellyfish, .frog]
@@ -22,10 +22,9 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .jellyfish: return "Jelly"
         case .frog: return "Frog"
         case .sponge: return "Sponge"
-        case .spider: return "Spider"
         case .ladybug: return "Ladybug"
-        case .bee: return "Bee"
-        case .caterpillar: return "Caterpillar"
+        case .butterfly: return "Butterfly"
+        case .mushroom: return "Mushroom"
         }
     }
 
@@ -39,10 +38,9 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .jellyfish: return "watercolor"
         case .frog: return "dot prints"
         case .sponge: return "blender"
-        case .spider: return "bundle brush"
-        case .ladybug: return "watercolor"
-        case .bee: return "blender"
-        case .caterpillar: return "eraser"
+        case .ladybug: return "bundle brush"
+        case .butterfly: return "glaze"
+        case .mushroom: return "eraser"
         }
     }
 
@@ -55,10 +53,9 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .jellyfish: return "drop.halffull"
         case .frog: return "circle.grid.cross.fill"
         case .sponge: return "tornado"
-        case .spider: return "scribble.variable"
-        case .ladybug: return "drop.halffull"
-        case .bee: return "tornado"
-        case .caterpillar: return "leaf.fill"
+        case .ladybug: return "scribble.variable"
+        case .butterfly: return "drop.halffull"
+        case .mushroom: return "cloud.fill"
         }
     }
 
@@ -72,10 +69,9 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .jellyfish: return Paint.colors[5]
         case .frog: return Paint.colors[4]
         case .sponge: return SIMD3(1.0, 0.86, 0.38)
-        case .spider: return Paint.colors[5]
         case .ladybug: return Paint.colors[0]
-        case .bee: return SIMD3(1.0, 0.86, 0.38)
-        case .caterpillar: return Paint.colors[4]
+        case .butterfly: return Paint.colors[1]
+        case .mushroom: return Paint.colors[3]
         }
     }
 
@@ -88,10 +84,9 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .jellyfish: return Jellyfish(color: color, at: start)
         case .frog: return Frog(color: color, at: start)
         case .sponge: return Sponge(color: color, at: start)
-        case .spider: return Spider(color: color, at: start)
         case .ladybug: return Ladybug(color: color, at: start)
-        case .bee: return Bee(color: color, at: start)
-        case .caterpillar: return Caterpillar(color: color, at: start)
+        case .butterfly: return Butterfly(color: color, at: start)
+        case .mushroom: return Mushroom(color: color, at: start)
         }
     }
 }
@@ -316,7 +311,7 @@ class Critter {
     var followDamping: Float { 19.5 }
     var leanAmount: Float { 1 }
     var blowsInk: Bool { true }
-    /// Whether the brush-size slider scales this critter (the limb brushes: octopus, spider).
+    /// Whether the brush-size slider scales this critter (the limb brushes: octopus, ladybug).
     var usesSizeSlider: Bool { false }
     /// How much paint this critter wipes away around itself while its tool is the eraser (world units).
     var eraseRadius: Float { Starfish.eraseRadius }

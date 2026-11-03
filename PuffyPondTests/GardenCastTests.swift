@@ -7,133 +7,22 @@ import simd
 struct GardenCastTests {
     private let hover = SIMD3<Float>(0, 0, Playground.paintHoverZ)
 
-    @Test func brushToolIsTheSpider() {
-        #expect(PaintTool.brush.critterKind == .spider)
+    // MARK: Tool column
+
+    @Test func toolColumnHasFourTools() {
+        #expect(PaintTool.allCases == [.liquidOil, .brush, .eraser, .blender])
     }
 
-    @Test func spiderIsBuiltByKind() {
-        let critter = CritterKind.spider.make(color: Paint.colors[0], at: .zero)
-        #expect(critter is Spider)
-        #expect(critter.kind == .spider)
+    @Test func toolsMapToTheCast() {
+        #expect(PaintTool.liquidOil.critterKind == .butterfly)
+        #expect(PaintTool.brush.critterKind == .ladybug)
+        #expect(PaintTool.eraser.critterKind == .mushroom)
+        #expect(PaintTool.blender.critterKind == .snail)
     }
-
-    @Test func spiderLaysLegsFlatWhilePressing() {
-        let spider = Spider(color: Paint.colors[0], at: .zero)
-        LimbBrushTests.settle(spider, frames: 180, target: hover, painting: true)
-        let dabs = spider.dabs(from: .zero, to: .zero, radius: 0.085, speed: 0)
-        #expect(!dabs.isEmpty)
-        #expect(dabs.allSatisfy { $0.style.nca == 1 })
-    }
-
-    @Test func spiderSurvivesATeleport() {
-        let spider = Spider(color: Paint.colors[0], at: .zero)
-        LimbBrushTests.settle(spider, frames: 30, target: hover, painting: true)
-        LimbBrushTests.settle(spider, frames: 30, target: SIMD3(3, 0, 0.4), painting: true)
-        let dabs = spider.dabs(from: .zero, to: .zero, radius: 0.085, speed: 0)
-        for dab in dabs {
-            #expect(dab.from.x.isFinite && dab.from.y.isFinite && dab.to.x.isFinite && dab.to.y.isFinite)
-        }
-        #expect(spider.bodyNode.simdPosition.x.isFinite)
-    }
-
-    @Test func spiderUsesTheSizeSlider() {
-        #expect(Spider(color: Paint.colors[0], at: .zero).usesSizeSlider)
-        #expect(Octopus(color: Paint.colors[0], at: .zero).usesSizeSlider)
-        #expect(!Snail(color: Paint.colors[0], at: .zero).usesSizeSlider)
-    }
-
-    @Test func liquidOilIsTheLadybug() {
-        #expect(PaintTool.liquidOil.critterKind == .ladybug)
-        #expect(CritterKind.ladybug.make(color: Paint.colors[5], at: .zero) is Ladybug)
-    }
-
-    @Test func ladybugWingsFlapWithTheBeat() {
-        let bug = Ladybug(color: Paint.colors[5], at: .zero)
-        var seen: [Float] = []
-        for _ in 0..<3 {
-            for pulse in [Float(1), 0] {
-                for _ in 0..<10 {
-                    bug.update(dt: 1.0 / 60, target: .zero, visible: true, painting: false, beatPulse: pulse)
-                    seen.append(bug.wingOpen)
-                }
-            }
-        }
-        #expect((seen.max() ?? 0) - (seen.min() ?? 0) > 0.3)
-        #expect(seen.allSatisfy { $0 >= 0 && $0 <= 1.2 })
-    }
-
-    @Test func blenderToolIsTheBee() {
-        #expect(PaintTool.blender.critterKind == .bee)
-        #expect(CritterKind.bee.make(color: Paint.colors[1], at: .zero) is Bee)
-    }
-
-    @Test func beeWigglesOnlyWhileBlending() {
-        let bee = Bee(color: Paint.colors[1], at: .zero)
-        LimbBrushTests.settle(bee, frames: 60, target: .zero, painting: true)
-        #expect(bee.wiggle > 0.8)
-        LimbBrushTests.settle(bee, frames: 60, target: .zero, painting: false)
-        #expect(bee.wiggle < 0.1)
-    }
-
-    // MARK: Eraser
-
-    @Test func legacyEraserStillSwapsToTheStarfish() {
-        let buddy = Buddy(slot: 0, colorIndex: 0, kind: .octopus, start: .zero)
-        #expect(buddy.setMode(.erase))
-        #expect(buddy.showsStarfish)
-        #expect(buddy.eraseRadius == Starfish.eraseRadius)
-    }
-
-    @Test func gardenEraserIsTheCaterpillar() {
-        let buddy = Buddy(slot: 0, colorIndex: 0, kind: .spider, start: .zero, erasesWithStarfish: false)
-        let old = buddy.equip(.eraser)
-        #expect(old is Spider)
-        #expect(buddy.critter is Caterpillar)
-        #expect(!buddy.showsStarfish)
-        #expect(!buddy.setMode(.erase))
-        #expect(buddy.eraseRadius == Caterpillar.eraseRadius)
-    }
-
-    @Test func eraserBubbleHoldsNoStarfishInTheGardenScheme() {
-        #expect(PaintTool.eraser.critterKind == .caterpillar)
-        #expect(CritterPot(tool: .eraser, at: .zero).starfish == nil)
-    }
-
-    @Test func scrubbedOpensTheMouth() {
-        let bug = Caterpillar(color: Paint.colors[4], at: .zero)
-        #expect(bug.chomp == 0)
-        bug.scrubbed()
-        LimbBrushTests.settle(bug, frames: 5, target: .zero, painting: true)
-        #expect(bug.chomp > 0)
-    }
-
-    @Test func caterpillarSurvivesATeleport() {
-        let bug = Caterpillar(color: Paint.colors[4], at: .zero)
-        LimbBrushTests.settle(bug, frames: 30, target: hover, painting: true)
-        LimbBrushTests.settle(bug, frames: 30, target: SIMD3(3, 0, 0.4), painting: true)
-        let p = bug.bodyNode.simdPosition
-        #expect(p.x.isFinite && p.y.isFinite && p.z.isFinite)
-    }
-
-    @Test func caterpillarErasesAtLeastAsWideAsTheStarfish() {
-        #expect(Caterpillar.eraseRadius >= Starfish.eraseRadius)
-    }
-
-    @Test func pointerEraserEquipsTheCaterpillar() {
-        let playground = Playground(controlScheme: .fist)
-        playground.pointerErases = true
-        let buddy = playground.buddies[0]
-        #expect(buddy.critter is Caterpillar)
-        #expect(!buddy.showsStarfish)
-        playground.pointerErases = false
-        #expect(playground.buddies[0].critter is Spider)
-    }
-
-    // MARK: Cast
 
     @Test func gardenCastIsTheToolColumn() {
-        #expect(Set(CritterKind.gardenCast) == Set(PaintTool.allCases.compactMap(\.critterKind)))
-        #expect(CritterKind.gardenCast.count == 5)
+        #expect(CritterKind.gardenCast == PaintTool.allCases.compactMap(\.critterKind))
+        #expect(CritterKind.gardenCast.count == 4)
     }
 
     @Test func gardenCastLooksDistinct() {
@@ -158,5 +47,130 @@ struct GardenCastTests {
 
     @Test func legacyBrushesAreUntouched() {
         #expect(CritterKind.legacyBrushes == [.octopus, .snail, .pufferfish, .seahorse, .jellyfish, .frog])
+    }
+
+    // MARK: Ladybug (brush)
+
+    @Test func ladybugIsBuiltByKind() {
+        let critter = CritterKind.ladybug.make(color: Paint.colors[0], at: .zero)
+        #expect(critter is Ladybug)
+        #expect(critter.kind == .ladybug)
+    }
+
+    @Test func ladybugLaysLegsFlatWhilePressing() {
+        let bug = Ladybug(color: Paint.colors[0], at: .zero)
+        LimbBrushTests.settle(bug, frames: 180, target: hover, painting: true)
+        let dabs = bug.dabs(from: .zero, to: .zero, radius: 0.085, speed: 0)
+        #expect(!dabs.isEmpty)
+        #expect(dabs.allSatisfy { $0.style.nca == 1 })
+    }
+
+    @Test func ladybugSurvivesATeleport() {
+        let bug = Ladybug(color: Paint.colors[0], at: .zero)
+        LimbBrushTests.settle(bug, frames: 30, target: hover, painting: true)
+        LimbBrushTests.settle(bug, frames: 30, target: SIMD3(3, 0, 0.4), painting: true)
+        for dab in bug.dabs(from: .zero, to: .zero, radius: 0.085, speed: 0) {
+            #expect(dab.from.x.isFinite && dab.from.y.isFinite && dab.to.x.isFinite && dab.to.y.isFinite)
+        }
+        #expect(bug.bodyNode.simdPosition.x.isFinite)
+    }
+
+    @Test func limbBrushesUseTheSizeSlider() {
+        #expect(Ladybug(color: Paint.colors[0], at: .zero).usesSizeSlider)
+        #expect(Octopus(color: Paint.colors[0], at: .zero).usesSizeSlider)
+        #expect(!Snail(color: Paint.colors[0], at: .zero).usesSizeSlider)
+    }
+
+    @Test func ladybugWingsFlapWithTheBeat() {
+        let bug = Ladybug(color: Paint.colors[0], at: .zero)
+        var seen: [Float] = []
+        for _ in 0..<3 {
+            for pulse in [Float(1), 0] {
+                for _ in 0..<10 {
+                    bug.update(dt: 1.0 / 60, target: .zero, visible: true, painting: false, beatPulse: pulse)
+                    seen.append(bug.wingOpen)
+                }
+            }
+        }
+        #expect((seen.max() ?? 0) - (seen.min() ?? 0) > 0.3)
+        #expect(seen.allSatisfy { $0 >= 0 && $0 <= 1.2 })
+    }
+
+    // MARK: Butterfly (liquid oil)
+
+    @Test func butterflyIsBuiltByKind() {
+        let critter = CritterKind.butterfly.make(color: Paint.colors[1], at: .zero)
+        #expect(critter is Butterfly)
+        #expect(critter.kind == .butterfly)
+    }
+
+    @Test func butterflyFlapsFasterWhilePainting() {
+        let fly = Butterfly(color: Paint.colors[1], at: .zero)
+        LimbBrushTests.settle(fly, frames: 90, target: .zero, painting: false)
+        let idle = fly.flapRate
+        LimbBrushTests.settle(fly, frames: 90, target: hover, painting: true)
+        #expect(fly.flapRate > idle * 1.5)
+        var seen: [Float] = []
+        for _ in 0..<60 {
+            fly.update(dt: 1.0 / 60, target: hover, visible: true, painting: true, beatPulse: 0)
+            seen.append(fly.wingOpen)
+        }
+        #expect((seen.max() ?? 0) - (seen.min() ?? 0) > 0.4)
+        #expect(seen.allSatisfy { $0 >= 0 && $0 <= 1 })
+    }
+
+    // MARK: Mushroom (eraser)
+
+    @Test func scrubbedPuffsSpores() {
+        let shroom = Mushroom(color: Paint.colors[3], at: .zero)
+        #expect(shroom.puff == 0)
+        shroom.scrubbed()
+        LimbBrushTests.settle(shroom, frames: 5, target: .zero, painting: true)
+        #expect(shroom.puff > 0)
+    }
+
+    @Test func mushroomSurvivesATeleport() {
+        let shroom = Mushroom(color: Paint.colors[3], at: .zero)
+        LimbBrushTests.settle(shroom, frames: 30, target: hover, painting: true)
+        LimbBrushTests.settle(shroom, frames: 30, target: SIMD3(3, 0, 0.4), painting: true)
+        let p = shroom.bodyNode.simdPosition
+        #expect(p.x.isFinite && p.y.isFinite && p.z.isFinite)
+    }
+
+    @Test func mushroomErasesAtLeastAsWideAsTheStarfish() {
+        #expect(Mushroom.eraseRadius >= Starfish.eraseRadius)
+    }
+
+    // MARK: Eraser plumbing
+
+    @Test func legacyEraserStillSwapsToTheStarfish() {
+        let buddy = Buddy(slot: 0, colorIndex: 0, kind: .octopus, start: .zero)
+        #expect(buddy.setMode(.erase))
+        #expect(buddy.showsStarfish)
+        #expect(buddy.eraseRadius == Starfish.eraseRadius)
+    }
+
+    @Test func gardenEraserIsTheMushroom() {
+        let buddy = Buddy(slot: 0, colorIndex: 0, kind: .ladybug, start: .zero, erasesWithStarfish: false)
+        let old = buddy.equip(.eraser)
+        #expect(old is Ladybug)
+        #expect(buddy.critter is Mushroom)
+        #expect(!buddy.showsStarfish)
+        #expect(!buddy.setMode(.erase))
+        #expect(buddy.eraseRadius == Mushroom.eraseRadius)
+    }
+
+    @Test func eraserBubbleHoldsNoStarfishInTheGardenScheme() {
+        #expect(CritterPot(tool: .eraser, at: .zero).starfish == nil)
+    }
+
+    @Test func pointerEraserEquipsTheMushroom() {
+        let playground = Playground(controlScheme: .fist)
+        playground.pointerErases = true
+        let buddy = playground.buddies[0]
+        #expect(buddy.critter is Mushroom)
+        #expect(!buddy.showsStarfish)
+        playground.pointerErases = false
+        #expect(playground.buddies[0].critter is Ladybug)
     }
 }

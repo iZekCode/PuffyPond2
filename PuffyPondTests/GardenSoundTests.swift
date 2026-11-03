@@ -31,7 +31,7 @@ struct GardenSoundTests {
     }
 
     @Test func repeatedEffectsStayBounded() {
-        for kind in [Sfx.bonk, .splorp, .chicken, .buzz, .crunch] {
+        for kind in [Sfx.bonk, .splorp, .chicken, .slurp, .poof] {
             let result = effectPeak(kind, repeats: 20)
             #expect(result.finite, "\(kind) is finite")
             #expect(result.peak < 1.0, "\(kind) stays under full scale")

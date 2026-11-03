@@ -44,7 +44,7 @@ final class Playground {
     var pointerErases = false {
         didSet {
             guard controlScheme == .fist, pointerErases != oldValue, let buddy = buddies.first else { return }
-            // The garden eraser is a critter: the mouse or finger eraser button turns its buddy into the caterpillar.
+            // The garden eraser is a critter: the mouse or finger eraser button turns its buddy into the mushroom.
             let next: PaintTool = pointerErases ? .eraser : (toolBeforePointerErase ?? .brush)
             if pointerErases { toolBeforePointerErase = buddy.tool }
             finishStroke(slot: buddy.slot)
@@ -61,7 +61,7 @@ final class Playground {
     /// How big the octopus is, and so how wide its brush paints (its mouth and every tentacle scale with it).
     var octopusSize: Float = 1
     var colorFlash: ColorFlash?
-    /// Fist paints with five tools (default), or the original pinch + six brush animals.
+    /// Fist paints with four tools (default), or the original pinch + six brush animals.
     let controlScheme: ControlScheme
 
     // MARK: World
@@ -72,7 +72,7 @@ final class Playground {
     @ObservationIgnored private let input = HandInput()
     @ObservationIgnored private let frameDriver = FrameDriver()
     @ObservationIgnored private(set) var buddies: [Buddy] = []
-    @ObservationIgnored private var lastBuzz: Double = 0
+    @ObservationIgnored private var lastSlurp: Double = 0
     @ObservationIgnored private var strokes: [Stroke] = []
     @ObservationIgnored private var activeStroke: [Int: Stroke] = [:]
     @ObservationIgnored private var lastBead: [Int: SIMD2<Float>] = [:]
@@ -128,7 +128,7 @@ final class Playground {
     init(controlScheme: ControlScheme = .fist) {
         self.controlScheme = controlScheme
         input.scheme = controlScheme
-        if controlScheme == .fist { buddyKinds = [.spider, .spider] }
+        if controlScheme == .fist { buddyKinds = [.ladybug, .ladybug] }
         buildWorld()
         frameDriver.onFrame = { [weak self] dt in self?.tick(dt: Float(dt)) }
     }
@@ -518,9 +518,9 @@ final class Playground {
         lastStamp[slot] = p
         // The blender only moves paint that's already there: it doesn't start a stroke of its own.
         if controlScheme == .fist && buddy.tool == .blender {
-            if now - lastBuzz > 0.25 {
-                lastBuzz = now
-                audio.play(.buzz, a: min(buddy.critter.speed / 3, 1), pan: panFor(p.x))
+            if now - lastSlurp > 0.25 {
+                lastSlurp = now
+                audio.play(.slurp, a: min(buddy.critter.speed / 3, 1), pan: panFor(p.x))
             }
             return
         }
@@ -627,7 +627,7 @@ final class Playground {
             buddy.scrubbed()
             if now - lastSqueak > 0.09 {
                 lastSqueak = now
-                audio.play(buddy.showsStarfish ? .squeak : .crunch, pan: panFor(p.x))
+                audio.play(buddy.showsStarfish ? .squeak : .poof, pan: panFor(p.x))
                 Toybox.burst(in: scene, at: SIMD3(p.x, p.y, 0.2), color: SIMD3(1, 1, 1), count: 10, speed: 1.2,
                              size: 0.04, gravity: -1)
             }

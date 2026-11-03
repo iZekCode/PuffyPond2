@@ -1,5 +1,7 @@
 # Treehouse garden theme: design
 
+> **Amended 2026-11-03 (second cast).** The owner changed the cast to four tools: **butterfly** (liquid oil), **ladybug** (brush, six legs on `LimbBrush`), **mushroom** (eraser, spore puffs) and **snail** (blender). Thick oil was removed (archived in `docs/archive/2026-11-03-thick-oil-tool.md`), and the spider, caterpillar and bee were deleted. Where this document still names them, read it with the cast above; everything else (backdrops, effects, sound approach, legacy scheme kept) stands. New sound effects: `slurp` (blender) and `poof` (eraser) replace `buzz` and `crunch`.
+
 ## Intent
 
 Puffy Pond is a painting game for children (and, through the report page, a movement-tracking tool): you make a fist, sweep an arm, and a little paint character lays paint on an easel. Today the five paint characters are sea animals and the world is a blurry studio room and a museum hall, with a pond-like name and sea-flavoured effects and copy.

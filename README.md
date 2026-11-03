@@ -34,7 +34,7 @@ Home ──► Start drawing ──► Freeform ──────────�
 | **Get ready** | A skeleton outline shows where to stand. Step back until your shoulders fit the band (about 1 m) and hold still while the ring fills; the canvas opens by itself. **Skip** is always there. |
 | **Canvas** | Paint with your fists (see below). The chosen template shows as a dotted guide. **Save image** takes you to the review; the house button goes Home (it asks first if the painting isn't saved). |
 | **Review** | The bare canvas stays put; the paint floats above it on an elastic see-through sheet. Fist = grab a small patch of paint and pull it along while the rest stays put, two fists = two patches pulled apart (slide whistle), a moving open palm = push ripples with a splat (sometimes a duck). Let go and the paint jiggles back. A silly kazoo-and-tuba tune plays here. The play never changes the saved picture. **Save to gallery** or **Keep drawing** (back to the same canvas). |
-| **3D gallery** | A treehouse deck among the branches with your paintings on wooden partitions, newest first, and the five garden critters visiting. Paddle with an open hand: sweep down on the right side to walk to the next painting, on the left to go back. Arrows and swipes work too. **View gallery in 2D** (bottom left) shows a grid grouped by day; tap one to walk to it. |
+| **3D gallery** | A treehouse deck among the branches with your paintings on wooden partitions, newest first, and the four garden critters visiting. Paddle with an open hand: sweep down on the right side to walk to the next painting, on the left to go back. Arrows and swipes work too. **View gallery in 2D** (bottom left) shows a grid grouped by day; tap one to walk to it. |
 | **Report** | A month calendar on the left: days with paintings get a dot, a star when the daily quest was done. The selected day on the right: its paintings, **Highest ROM** (shoulder abduction, left and right), elbow extension, reach height and area, grip cycles, a lean flag, a **heatmap** of where you painted on the canvas, and **hand dominance** (share of painting time per hand). |
 
 The movement stats are 2D estimates from the front camera (Vision body and hand pose), not clinical measurements. They are recorded only on the canvas page and only from camera hands; a painting made by touch or mouse shows "No movement data". Left and right are always the person's own sides.
@@ -46,15 +46,14 @@ The movement stats are 2D estimates from the front camera (Vision body and hand 
 | Open hand | Your hand's paint character swims along with you. No paint. |
 | **Fist** | Paint with the character's tool. Keep the fist closed and sweep your arm; open the hand to stop. A loosening fist keeps painting for a moment, so strokes don't break. |
 | Rub a **paint pot** | Pots stand in a column on the right. Swipe your character back and forth through one until the ring fills: new color. |
-| Rub a **tool bubble** | Bubbles in a column on the left hold the five paint characters. Rub one to switch to its tool. |
+| Rub a **tool bubble** | Bubbles in a column on the left hold the four paint characters. Rub one to switch to its tool. |
 
 | Tool | Character | How it paints |
 |---|---|---|
-| Thick oil | Snail | Heavy impasto: a wide knife-like sheet, piled high with ridged edges. |
-| Liquid oil | Ladybug | Thinned oil: a translucent glaze that spreads and runs downhill while wet. |
-| Brush | Garden spider | Eight long legs lie on the canvas and wipe a thin watercolor wash with a grown-in texture. |
-| Eraser | Hungry caterpillar | Scrubs paint away and wipes the template's dotted guide. |
-| Blender | Bee | Lays no paint; smudges and mixes the wet paint underneath. |
+| Liquid oil | Butterfly | Thinned oil: a translucent glaze that spreads and runs downhill while wet. |
+| Brush | Ladybug | Six legs lie on the canvas and wipe a thin watercolor wash with a grown-in texture. |
+| Eraser | Mushroom | Scrubs paint away in puffs of spores and wipes the template's dotted guide. |
+| Blender | Snail | Lays no paint; smudges and mixes the wet paint underneath. |
 
 The paint is simulated: flat wet strokes with bristle grooves and ragged edges, it levels out, blends with wet neighbours, thick blobs sag a little, and it dries over time.
 
@@ -99,10 +98,10 @@ Everything stays on the device in `Application Support/Gallery/`: one PNG per pa
 | `Input/HandFrameRelay.swift` | Passes camera hand frames to the review page and the 3D gallery |
 | `HandTracker.swift` | Camera + Vision hand pose (2 hands) and body pose (only while a page needs it), on device |
 | `HandInput.swift`, `OneEuroFilter.swift` | Palm tracking, open/pinch/fist with hysteresis, smoothing + prediction |
-| `Canvas/ControlScheme.swift`, `Canvas/PaintTool.swift` | Fist vs legacy controls; the five tools and the dabs each one lays |
+| `Canvas/ControlScheme.swift`, `Canvas/PaintTool.swift` | Fist vs legacy controls; the four tools and the dabs each one lays |
 | `Playground.swift` | The easel: world, buddies, painting, erasing, pots and bubbles, stats recording |
 | `Critter.swift`, `Characters.swift`, `Tentacles.swift` | Character base (springs, faces, moods), starfish rig (legacy eraser), pots, bubbles, buddies, springy limbs, the shared limb brush |
-| `Spider.swift`, `Snail.swift`, `Ladybug.swift`, `Caterpillar.swift`, `Bee.swift` | The five garden paint characters; `LimbBrush.swift` is the leg brush the spider shares with the octopus |
+| `Ladybug.swift`, `Butterfly.swift`, `Mushroom.swift`, `Snail.swift` | The four garden paint characters; `LimbBrush.swift` is the leg brush the ladybug shares with the octopus |
 | `Octopus.swift`, `Jellyfish.swift`, `Sponge.swift`, `Pufferfish.swift`, `Seahorse.swift`, `Frog.swift` | The legacy sea brush animals |
 | `Strokes.swift` | Stroke paths (what's been drawn, for erasing) and geometry helpers |
 | `PaintLayer.swift`, `PaintShaders.metal` | Wet paint simulated on the GPU (Metal compute): dabs, advection, leveling, mixing, drips, drying, normal map |

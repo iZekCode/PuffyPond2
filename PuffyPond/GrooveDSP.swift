@@ -26,8 +26,8 @@ nonisolated enum Sfx: UInt8, Sendable, CaseIterable {
     case bonk      // a wooden cartoon "bonk" (b = pan)
     case splorp    // a wet, silly splorp (b = pan)
     case chicken   // a rubber chicken squawk (b = pan)
-    case buzz      // a short bee buzz (a = speed 0…1, b = pan)
-    case crunch    // a quick leafy munch (b = pan)
+    case slurp     // a wet smear for the blender (a = speed 0…1, b = pan)
+    case poof      // a soft spore puff (b = pan)
 }
 
 /// Which tune the background music plays.
@@ -500,17 +500,17 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
                       glideFrom: base * 0.65, glideTime: 0.03, vibrato: (0.08, 33), cutoff: 1800)
             }
             start(.noise, 0, peak: 0.05, decay: 0.3, at: 0, pan: pan, filter: .bandPass(1500, q: 1.2, sr: sampleRate))
-        case .buzz:
-            let f = 140 + 120 * min(max(e.a, 0), 1)
-            start(.square, f, peak: 0.16, decay: 0.2, at: 0, pan: pan, attack: 0.01, vibrato: (0.03, 60), cutoff: 1200)
-            start(.square, f * 1.03, peak: 0.12, decay: 0.2, at: 0, pan: pan, attack: 0.01, vibrato: (0.03, 55), cutoff: 1200)
-        case .crunch:
-            for k in 0..<3 {
-                let at = Int(Float(k) * 0.06 * sampleRate)
-                start(.noise, 0, peak: 0.25, decay: 0.04, at: at, pan: pan, attack: 0.001,
-                      filter: .bandPass(2200, q: 1.2, sr: sampleRate))
-                start(.sine, 160, peak: 0.1, decay: 0.05, at: at, pan: pan, attack: 0.001, glideFrom: 300, glideTime: 0.02)
-            }
+        case .slurp:
+            let f = 260 - 80 * min(max(e.a, 0), 1)
+            start(.sine, f * 0.6, peak: 0.16, decay: 0.2, at: 0, pan: pan, attack: 0.01, glideFrom: f * 1.6, glideTime: 0.12,
+                  vibrato: (0.12, 22))
+            start(.noise, 0, peak: 0.12, decay: 0.18, at: 0, pan: pan, attack: 0.01,
+                  filter: .bandPass(900, q: 1.4, sr: sampleRate))
+        case .poof:
+            start(.noise, 0, peak: 0.22, decay: 0.22, at: 0, pan: pan, attack: 0.01,
+                  filter: .bandPass(1200, q: 0.6, sr: sampleRate))
+            start(.sine, 220, peak: 0.12, decay: 0.12, at: 0, pan: pan, glideFrom: 420, glideTime: 0.05)
+            start(.fm, Self.hz(88), peak: 0.05, decay: 0.3, at: Int(0.04 * sampleRate), pan: pan, fm: (3.5, 1.2, 0.1))
         }
     }
 
