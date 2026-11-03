@@ -59,7 +59,7 @@ The canvas fills the whole screen, edge to edge. The paint pots float over its r
 
 The paint is simulated: flat wet strokes with bristle grooves and ragged edges, it levels out, blends with wet neighbours, thick blobs sag a little, and it dries over time.
 
-The buttons down the left side: Home, eraser for touch (iPad only), music, camera preview, help card, clear canvas.
+The buttons along the bottom: brush size, Home, eraser for touch (iPad only), music, camera preview, help card, clear canvas, Save image, and the **eye**. The eye hides everything that is not paint or a brush character (buttons, hints, camera preview, pots and bubbles); the eye itself stays, dimmed, in the bottom right corner to bring it all back. There are no cast shadows under the pots, bubbles or brush animals.
 
 ### Legacy controls
 

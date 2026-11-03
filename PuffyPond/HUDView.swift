@@ -17,6 +17,7 @@ struct HUDView: View {
 
     var body: some View {
         ZStack {
+            if !playground.focusMode {
                 VStack(spacing: 10 * scale) {
                     if onePieceHeader {
                         HStack(alignment: .center, spacing: 24 * scale) {
@@ -56,6 +57,8 @@ struct HUDView: View {
                 if playground.cameraStatus == .denied || playground.cameraStatus == .unavailable {
                     CameraNotice(denied: playground.cameraStatus == .denied)
                 }
+            }
+            focusButton
         }
         .confirmationDialog("Leave without saving?", isPresented: $confirmingHome, titleVisibility: .visible) {
             Button("Leave", role: .destructive, action: goHome)
@@ -167,6 +170,21 @@ struct HUDView: View {
 
     // MARK: Controls
 
+    /// The eye: hides everything except the paint and the brush characters. It stays on screen, dimmed, to bring the rest back.
+    private var focusButton: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                RoundButton(symbol: playground.focusMode ? "eye.slash.fill" : "eye.fill", tint: .gray) {
+                    withAnimation(.easeInOut(duration: 0.25)) { playground.focusMode.toggle() }
+                }
+                .opacity(playground.focusMode ? 0.45 : 1)
+            }
+        }
+        .padding(16 * scale)
+    }
+
     private var controls: some View {
         HStack(spacing: 10 * scale) {
             brushSizeSlider
@@ -194,6 +212,7 @@ struct HUDView: View {
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: playground.hasDrawing)
+        .padding(.trailing, 56 * scale)   // room for the eye button
     }
 
     /// How big the brush animal is (ladybug or octopus): bigger paints a wider stroke.

@@ -352,6 +352,15 @@ final class CritterPot {
         resident.map { $0.kind.signatureColor } ?? SIMD3(1, 1, 1)
     }
 
+    /// Whether the bubble (and its resident, which lives outside the bubble's node) is on screen.
+    private(set) var isShown = true
+
+    func setShown(_ shown: Bool) {
+        isShown = shown
+        root.isHidden = !shown
+        residentRoot.isHidden = !shown
+    }
+
     func bounce(_ strength: Float = 1) {
         squash.velocity += SIMD3(3, -5, 3) * strength
         resident?.react(.surprised, for: 0.5)
@@ -363,6 +372,7 @@ final class CritterPot {
     ///   - selectedCount: how many buddies are this animal right now.
     ///   - color: the paint of a buddy that's this animal, if any (otherwise the animal's own color).
     func update(dt: Float, beatPulse: Float, rubProgress: Float, selectedCount: Int, color: SIMD3<Float>?) {
+        guard isShown else { return }
         clock += dt
         let jiggle = rubProgress > 0 ? sin(clock * 30) * 0.05 * rubProgress : 0
         squash.step(to: SIMD3(1 + beatPulse * 0.04 + jiggle, 1 - beatPulse * 0.05 - jiggle, 1 + jiggle),

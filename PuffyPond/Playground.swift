@@ -41,6 +41,21 @@ final class Playground {
     }
     var previewHands: [[CGPoint]] = []
     var imageAspect: CGFloat = 4.0 / 3.0
+    /// Hides everything that isn't paint or a brush character: the buttons, hints and camera preview, and the pots
+    /// and bubbles on the canvas.
+    var focusMode = false {
+        didSet {
+            guard focusMode != oldValue else { return }
+            for pot in pots { pot.root.isHidden = focusMode }
+            for pot in critterPots { pot.setShown(!focusMode) }
+            for pot in templatePots { pot.root.isHidden = focusMode }
+            for buddy in buddies {
+                buddy.rubbingPot = nil
+                buddy.rubAmount = 0
+                buddy.critter.colorPreview = nil
+            }
+        }
+    }
     var pointerErases = false {
         didSet {
             guard controlScheme == .fist, pointerErases != oldValue, let buddy = buddies.first else { return }
@@ -179,8 +194,7 @@ final class Playground {
         camera.exposureOffset = Self.exposureOffset
         camera.minimumExposure = -2
         camera.maximumExposure = 2
-        camera.screenSpaceAmbientOcclusionIntensity = 0.6
-        camera.screenSpaceAmbientOcclusionRadius = 0.25
+        camera.screenSpaceAmbientOcclusionIntensity = 0   // no contact shadows under the pots and brush animals
         camera.vignettingIntensity = 0.35
         camera.vignettingPower = 0.9
         camera.bloomIntensity = 0.12
@@ -191,7 +205,7 @@ final class Playground {
         scene.rootNode.addChildNode(cameraNode)
 
         // Overhead light from the top centre: a neutral spot that lights the canvas almost evenly (like Splash
-        // Canvas's far lights), with soft shadows from the critters and the normal map showing the paint ridges.
+        // Canvas's far lights), with the normal map showing the paint ridges (no cast shadows).
         let key = SCNLight()
         key.type = .spot
         key.intensity = Self.keyIntensity
@@ -201,7 +215,7 @@ final class Playground {
         key.attenuationStartDistance = 4
         key.attenuationEndDistance = 40
         key.attenuationFalloffExponent = 0
-        key.castsShadow = true
+        key.castsShadow = false
         key.shadowMode = .deferred
         key.shadowRadius = 14
         key.shadowSampleCount = 24
@@ -307,6 +321,7 @@ final class Playground {
 
     /// Whether `p` (canvas plane) is under a pot or bubble: rubbing one must not paint or erase behind it.
     func isOverShelf(_ p: SIMD2<Float>) -> Bool {
+        guard !focusMode else { return false }
         let reach = PaintPot.radius + 0.14
         return pots.contains { simd_distance(p, SIMD2($0.root.simdPosition.x, $0.root.simdPosition.y + 0.04)) < reach }
             || critterPots.contains { simd_distance(p, SIMD2($0.root.simdPosition.x, $0.root.simdPosition.y + 0.04)) < reach }
@@ -761,7 +776,7 @@ final class Playground {
             buddy.rubAmount = 0
             buddy.critter.colorPreview = nil
         }
-        guard buddy.mode == .swim || buddy.mode == .paint else { return stop() }
+        guard !focusMode, buddy.mode == .swim || buddy.mode == .paint else { return stop() }
         let p = buddy.toolPosition
         func near(_ c: SIMD3<Float>) -> Bool {
             simd_distance(SIMD2(p.x, p.y), SIMD2(c.x, c.y + 0.04)) < PaintPot.radius + 0.14
