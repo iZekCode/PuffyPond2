@@ -176,8 +176,23 @@ extension TemplateChoice {
     }
 }
 
+/// The ring that fills while an open hand rests on a button.
+struct HoldRing: View {
+    let progress: Double
+    @Environment(\.uiScale) private var scale
+
+    var body: some View {
+        Circle()
+            .trim(from: 0, to: progress)
+            .stroke(.white, style: StrokeStyle(lineWidth: 6 * scale, lineCap: .round))
+            .rotationEffect(.degrees(-90))
+            .frame(width: 40 * scale, height: 40 * scale)
+            .allowsHitTesting(false)
+    }
+}
+
 /// A `HomeButton` that also fills a ring while an open hand rests on it.
-private struct DwellButton: View {
+struct DwellButton: View {
     let title: String
     let symbol: String
     let tint: Color
@@ -189,13 +204,7 @@ private struct DwellButton: View {
         HomeButton(title: title, symbol: symbol, tint: tint, action: action)
             .overlay(alignment: .trailing) {
                 if progress > 0 {
-                    Circle()
-                        .trim(from: 0, to: progress)
-                        .stroke(.white, style: StrokeStyle(lineWidth: 6 * scale, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                        .frame(width: 40 * scale, height: 40 * scale)
-                        .padding(.trailing, 22 * scale)
-                        .allowsHitTesting(false)
+                    HoldRing(progress: progress).padding(.trailing, 22 * scale)
                 }
             }
             .scaleEffect(1 + 0.05 * progress)

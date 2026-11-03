@@ -78,7 +78,11 @@ struct ContentView: View {
         case let .gallery3D(start, justHung):
             GalleryView(gallery: gallery, relay: pageHands, startAt: start, justHung: justHung,
                         home: router.home, show2D: { router.go(.gallery2D) },
-                        startDrawing: { router.go(.modePicker) })
+                        startDrawing: { router.go(.modePicker) },
+                        watch: { painting in
+                            let index = gallery.paintings.firstIndex(of: painting) ?? start
+                            router.go(.viewPainting(painting, origin: .gallery3D(index: index)))
+                        })
                 .id(start)
                 .transition(.opacity)
         case .modePicker:
@@ -93,6 +97,11 @@ struct ContentView: View {
                        date: Date(), mode: .fresh, audio: playground.audio, relay: pageHands,
                        keepDrawing: { router.go(.canvas(draft.choice)) }, save: { save(draft) }, back: {})
                 .id(draft.id)
+                .transition(.opacity)
+        case let .viewPainting(painting, origin):
+            PaintingViewerPage(painting: painting, origin: origin, router: router, audio: playground.audio,
+                               relay: pageHands)
+                .id(painting.id)
                 .transition(.opacity)
         case .gallery2D:
             Gallery2DView(gallery: gallery, router: router).transition(.opacity)

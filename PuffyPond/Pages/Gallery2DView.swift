@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Every saved painting as a flat grid of thumbnails, newest first, grouped by the day it was made.
-/// Tapping one walks to it in the 3D gallery.
+/// Tapping one opens its timelapse; the "3D" button walks the 3D gallery.
 struct Gallery2DView: View {
     let gallery: Gallery
     let router: AppRouter
@@ -57,7 +57,7 @@ struct Gallery2DView: View {
                                           spacing: 14 * scale) {
                                     ForEach(day.paintings, id: \.painting.id) { item in
                                         Button {
-                                            router.go(.gallery3D(start: item.index, justHung: false))
+                                            router.go(.viewPainting(item.painting, origin: .gallery2D))
                                         } label: {
                                             Thumbnail(painting: item.painting)
                                         }

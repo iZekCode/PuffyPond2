@@ -649,19 +649,24 @@ struct GalleryView: View {
     let home: () -> Void
     let show2D: () -> Void
     let startDrawing: () -> Void
+    let watch: (Painting) -> Void
     @State private var index: Int
     @State private var hall = GalleryHall()
     @State private var confirmingRemoval = false
+    @State private var viewSize = CGSize.zero
+    @State private var watchFrame = CGRect.zero
     @Environment(\.uiScale) private var scale
     private let cheerOnOpen: Bool
 
     init(gallery: Gallery, relay: HandFrameRelay, startAt index: Int = 0, justHung: Bool = false,
-         home: @escaping () -> Void, show2D: @escaping () -> Void, startDrawing: @escaping () -> Void) {
+         home: @escaping () -> Void, show2D: @escaping () -> Void, startDrawing: @escaping () -> Void,
+         watch: @escaping (Painting) -> Void) {
         self.gallery = gallery
         self.relay = relay
         self.home = home
         self.show2D = show2D
         self.startDrawing = startDrawing
+        self.watch = watch
         _index = State(initialValue: index)
         cheerOnOpen = justHung
     }
@@ -725,9 +730,20 @@ struct GalleryView: View {
                         PaddleHint()
                     }
                     Spacer()
-                    // Balances the 2D button so the hint stays centered.
-                    PillButton(title: "View gallery in 2D", symbol: "square.grid.2x2.fill", tint: .orange) {}
-                        .hidden()
+                    PillButton(title: "Watch it being painted", symbol: "play.fill", tint: .pink) {
+                        if let current { watch(current) }
+                    }
+                    .overlay(alignment: .trailing) {
+                        if let ring = hall.dwell, ring.id == Self.watchID {
+                            HoldRing(progress: ring.progress).padding(.trailing, 10)
+                        }
+                    }
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: {
+                        watchFrame = $0
+                        updateTargets()
+                    }
+                    .opacity(current == nil ? 0 : 1)
+                    .disabled(current == nil)
                 }
             }
             .padding(16 * scale)
@@ -754,6 +770,12 @@ struct GalleryView: View {
                 .background(.white.opacity(0.85), in: RoundedRectangle(cornerRadius: 36 * scale, style: .continuous))
             }
         }
+        .coordinateSpace(.named(Self.space))
+        .onGeometryChange(for: CGSize.self) { $0.size } action: {
+            viewSize = $0
+            updateTargets()
+        }
+        .onChange(of: index) { _, _ in updateTargets() }
         .confirmationDialog("Take this painting down?", isPresented: $confirmingRemoval, titleVisibility: .visible) {
             Button("Take it down", role: .destructive, action: removeCurrent)
         }
@@ -762,6 +784,10 @@ struct GalleryView: View {
             hall.focus(index, animated: false)
             if cheerOnOpen { hall.cheer() }
             hall.onPaddle = { stroke in step(stroke == .next ? 1 : -1) }
+            hall.onPress = { id in
+                if id == Self.watchID, let current { watch(current) }
+            }
+            updateTargets()
             let hall = hall
             relay.listener = { frame in hall.ingest(frame) }
             hall.start()
@@ -769,8 +795,24 @@ struct GalleryView: View {
         .onDisappear {
             relay.listener = nil
             hall.onPaddle = nil
+            hall.onPress = nil
             hall.stop()
         }
+    }
+
+    private static let watchID = "watch"
+    private static let space = "gallery"
+
+    /// The Watch button in view UV, so a camera hand can hold on it.
+    private func updateTargets() {
+        guard current != nil, viewSize.width > 0, viewSize.height > 0, !watchFrame.isEmpty else {
+            hall.targets = []
+            return
+        }
+        hall.targets = [HoverTarget(id: Self.watchID,
+                                    frame: CGRect(x: watchFrame.minX / viewSize.width, y: watchFrame.minY / viewSize.height,
+                                                  width: watchFrame.width / viewSize.width,
+                                                  height: watchFrame.height / viewSize.height))]
     }
 
     private func step(_ delta: Int) {
@@ -786,6 +828,7 @@ struct GalleryView: View {
         index = min(index, max(gallery.paintings.count - 1, 0))
         hall.hang(gallery.paintings.map(\.url))
         hall.focus(index, animated: false)
+        updateTargets()
     }
 }
 

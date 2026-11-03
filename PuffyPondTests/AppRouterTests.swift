@@ -23,6 +23,11 @@ struct AppRouterTests {
         #expect(!Route.instruction(nil).isCanvas)
         #expect(!Route.gallery3D(start: 0, justHung: false).isCanvas)
     }
+
+    @Test func viewOriginReturnsToWhereItStarted() {
+        #expect(ViewOrigin.gallery3D(index: 4).route == .gallery3D(start: 4, justHung: false))
+        #expect(ViewOrigin.gallery2D.route == .gallery2D)
+    }
 }
 
 @MainActor

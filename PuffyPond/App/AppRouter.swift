@@ -32,6 +32,19 @@ struct ReviewDraft: Equatable {
     static func == (lhs: ReviewDraft, rhs: ReviewDraft) -> Bool { lhs.id == rhs.id }
 }
 
+/// Where a painting was opened from, so the viewing page can go back there.
+enum ViewOrigin: Equatable {
+    case gallery3D(index: Int)
+    case gallery2D
+
+    var route: Route {
+        switch self {
+        case .gallery3D(let index): .gallery3D(start: index, justHung: false)
+        case .gallery2D: .gallery2D
+        }
+    }
+}
+
 /// Every full-screen page of the app.
 enum Route: Equatable {
     case home
@@ -42,6 +55,8 @@ enum Route: Equatable {
     case review(ReviewDraft)
     case gallery3D(start: Int, justHung: Bool)
     case gallery2D
+    /// A saved painting: its timelapse, then the sheet to play with.
+    case viewPainting(Painting, origin: ViewOrigin)
     case report
 
     /// The easel is live (hands paint) only on the canvas page.
