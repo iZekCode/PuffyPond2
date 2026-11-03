@@ -77,34 +77,42 @@ Everything stays on the device in `Application Support/Gallery/`: one PNG per pa
 
 ## Under the hood
 
+Code is grouped by feature (`Input`, `Canvas`, `Critters`, `Review`, `Gallery`, `Timelapse`, `Templates`, `Stats`, `Audio`), and each feature splits into:
+
+- `Core/`: pure logic (functional core). Imports only Foundation, simd or CoreGraphics; no SceneKit, Metal, Vision, AVFoundation or SwiftUI, no clock, randomness or file I/O. This is where the unit tests go.
+- `Shell/`: everything that touches the outside world (SceneKit nodes, Metal, camera, audio, files) and the `@Observable` stages that drive a page.
+- `Views/`: SwiftUI pages and overlays.
+
+Paths in the table are relative to `PuffyPond/`.
+
 | File | Role |
 |---|---|
-| `ContentView.swift` | Owns the long-lived `Playground`, `HandTracker` and `Gallery` and swaps the full-screen page for the current route |
+| `App/PuffyPondApp.swift` | Owns the long-lived `Playground`, `HandTracker` and `Gallery` and swaps the full-screen page for the current route |
 | `App/AppRouter.swift` | The routes (`Route`) and the router that moves between pages |
-| `Pages/HomeView.swift`, `ModePickerView.swift`, `TemplatesView.swift` | Home, freeform-or-template choice, template list with the daily quest and unlocks |
-| `Pages/InstructionView.swift` | Get ready page: skeleton outline and distance ring |
-| `Pages/ReviewView.swift`, `Review/ReviewStage.swift` | Review page and its 3D stage (orthographic camera, sheet mesh rebuilt every frame) |
-| `Review/SheetSolver.swift`, `Review/SheetGestures.swift` | The paint as one elastic grid that always springs back to rest; hands → grab, stretch, push (a fist drags a small patch in small steps, so the rest stays put and the grid hardly bunches) |
-| `Gallery.swift` | Saved paintings with their records, the 3D museum hall, and the gallery screen |
-| `Pages/Gallery2DView.swift` | Flat grid of every painting grouped by day |
-| `Pages/ReportView.swift`, `Stats/DayReport.swift` | Report page; one day's paintings and their merged stats |
-| `Stats/SessionRecorder.swift`, `Stats/SessionStats.swift` | Records painting time, heatmap, grip cycles and ROM during a canvas session; the saved stats |
-| `Templates/TemplateCatalog.swift`, `Templates/DailyQuest.swift` | Template order and unlocks; the daily quest pool and the roll of the day |
-| `Template.swift` | Outline art (SVG-style paths), the nine abstract templates and the dotted guide on the canvas |
-| `Input/DistanceGate.swift` | Shoulder width in the camera image → too close / too far / good, with the hold timer |
-| `Input/PaddleDetector.swift` | Open hand sweeping down → walk on or back in the 3D gallery |
-| `Input/HandFrameRelay.swift` | Passes camera hand frames to the review page and the 3D gallery |
-| `HandTracker.swift` | Camera + Vision hand pose (2 hands) and body pose (only while a page needs it), on device |
-| `HandInput.swift`, `OneEuroFilter.swift` | Palm tracking, open/fist with hysteresis, smoothing + prediction |
-| `Canvas/PaintTool.swift` | The four tools and the dabs each one lays |
-| `Playground.swift` | The easel: world, buddies, painting, erasing, pots and bubbles, stats recording |
-| `Critter.swift`, `Characters.swift`, `LimbBundle.swift` | Character base (springs, faces, moods), pots, bubbles, buddies, springy limbs, the shared limb brush |
-| `Ladybug.swift`, `Butterfly.swift`, `Mushroom.swift`, `Snail.swift` | The four garden paint characters; `LimbBrush.swift` is the leg brush the ladybug uses |
-| `Strokes.swift` | Stroke paths (what's been drawn, for erasing) and geometry helpers |
-| `PaintLayer.swift`, `PaintShaders.metal` | Wet paint simulated on the GPU (Metal compute): dabs, advection, leveling, mixing, drips, drying, normal map |
-| `Studio.swift`, `Toybox.swift`, `Effects.swift` | Treehouse backdrop, linen and easel textures; glossy materials; petals and fireflies |
-| `GrooveDSP.swift` | Live-synthesized music (a bouncy garden tune, plus a silly tune for the review page), sound effects and beat clock |
-| `HUDView.swift`, `Platform.swift` | Canvas overlay and Mac/iOS differences (mouse, views, camera preview) |
+| `Home/HomeView.swift`, `Templates/Views/ModePickerView.swift`, `Templates/Views/TemplatesView.swift` | Home, freeform-or-template choice, template list with the daily quest and unlocks |
+| `Canvas/Views/InstructionView.swift` | Get ready page: skeleton outline and distance ring |
+| `Review/Views/ReviewView.swift`, `Review/Shell/ReviewStage.swift` | Review page and its 3D stage (orthographic camera, sheet mesh rebuilt every frame) |
+| `Review/Core/SheetSolver.swift`, `Review/Core/SheetGestures.swift` | The paint as one elastic grid that always springs back to rest; hands → grab, stretch, push (a fist drags a small patch in small steps, so the rest stays put and the grid hardly bunches) |
+| `Gallery/Shell/Gallery.swift` | Saved paintings with their records, the 3D museum hall, and the gallery screen |
+| `Gallery/Views/Gallery2DView.swift` | Flat grid of every painting grouped by day |
+| `Stats/Views/ReportView.swift`, `Stats/Core/DayReport.swift` | Report page; one day's paintings and their merged stats |
+| `Stats/Core/SessionRecorder.swift`, `Stats/Core/SessionStats.swift` | Records painting time, heatmap, grip cycles and ROM during a canvas session; the saved stats |
+| `Templates/Core/TemplateCatalog.swift`, `Templates/Core/DailyQuest.swift` | Template order and unlocks; the daily quest pool and the roll of the day |
+| `Templates/Shell/Template.swift` | Outline art (SVG-style paths), the nine abstract templates and the dotted guide on the canvas |
+| `Input/Core/DistanceGate.swift` | Shoulder width in the camera image → too close / too far / good, with the hold timer |
+| `Input/Core/SwipeDetector.swift` | Open hand sweeping down → walk on or back in the 3D gallery |
+| `Input/Shell/HandFrameRelay.swift` | Passes camera hand frames to the review page and the 3D gallery |
+| `Input/Shell/HandTracker.swift` | Camera + Vision hand pose (2 hands) and body pose (only while a page needs it), on device |
+| `Input/Shell/HandInput.swift`, `Input/Core/OneEuroFilter.swift` | Palm tracking, open/fist with hysteresis, smoothing + prediction |
+| `Canvas/Core/PaintTool.swift` | The four tools and the dabs each one lays |
+| `Canvas/Shell/Playground.swift` | The easel: world, buddies, painting, erasing, pots and bubbles, stats recording |
+| `Critters/Shell/Critter.swift`, `Characters.swift`, `LimbBundle.swift` | Character base (springs, faces, moods), pots, bubbles, buddies, springy limbs, the shared limb brush |
+| `Critters/Shell/Ladybug.swift`, `Butterfly.swift`, `Mushroom.swift`, `Snail.swift` | The four garden paint characters; `LimbBrush.swift` is the leg brush the ladybug uses |
+| `Canvas/Shell/Strokes.swift` | Stroke paths (what's been drawn, for erasing) and geometry helpers |
+| `Canvas/Shell/PaintLayer.swift`, `PaintShaders.metal` | Wet paint simulated on the GPU (Metal compute): dabs, advection, leveling, mixing, drips, drying, normal map |
+| `Canvas/Shell/Studio.swift`, `Toybox.swift`, `Effects.swift` | Treehouse backdrop, linen and easel textures; glossy materials; petals and fireflies |
+| `Audio/Shell/GrooveDSP.swift` | Live-synthesized music (a bouncy garden tune, plus a silly tune for the review page), sound effects and beat clock |
+| `Canvas/Views/HUDView.swift`, `App/Platform.swift` | Canvas overlay and Mac/iOS differences (mouse, views, camera preview) |
 
 Tests live in `PuffyPondTests/` (Swift Testing): run them on **My Mac** with **⌘U**.
 
