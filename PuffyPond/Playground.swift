@@ -72,6 +72,7 @@ final class Playground {
     @ObservationIgnored private let input = HandInput()
     @ObservationIgnored private let frameDriver = FrameDriver()
     @ObservationIgnored private(set) var buddies: [Buddy] = []
+    @ObservationIgnored private var lastBuzz: Double = 0
     @ObservationIgnored private var strokes: [Stroke] = []
     @ObservationIgnored private var activeStroke: [Int: Stroke] = [:]
     @ObservationIgnored private var lastBead: [Int: SIMD2<Float>] = [:]
@@ -516,7 +517,13 @@ final class Playground {
         lay(dabs, color: buddy.color, ncaModel: buddy.colorIndex, seed: Float(slot) * 13.7 + Float(strokes.count) * 2.3)
         lastStamp[slot] = p
         // The blender only moves paint that's already there: it doesn't start a stroke of its own.
-        if controlScheme == .fist && buddy.tool == .blender { return }
+        if controlScheme == .fist && buddy.tool == .blender {
+            if now - lastBuzz > 0.25 {
+                lastBuzz = now
+                audio.play(.buzz, a: min(buddy.critter.speed / 3, 1), pan: panFor(p.x))
+            }
+            return
+        }
 
         let spacing = Self.strokeRadius * 0.6
         if let stroke = activeStroke[slot], let last = lastBead[slot] {
@@ -542,7 +549,11 @@ final class Playground {
             activeStroke[slot] = stroke
             lastBead[slot] = p
             buddy.critter.gulp()
-            audio.play(.blip, a: (p.y - center.y) / Self.canvasSize.y + 0.5, pan: panFor(p.x))
+            if controlScheme == .fist && buddy.tool == .liquidOil {
+                audio.play(.splorp, pan: panFor(p.x))
+            } else {
+                audio.play(.blip, a: (p.y - center.y) / Self.canvasSize.y + 0.5, pan: panFor(p.x))
+            }
         }
     }
 
@@ -616,7 +627,7 @@ final class Playground {
             buddy.scrubbed()
             if now - lastSqueak > 0.09 {
                 lastSqueak = now
-                audio.play(.squeak, pan: panFor(p.x))
+                audio.play(buddy.showsStarfish ? .squeak : .crunch, pan: panFor(p.x))
                 Toybox.burst(in: scene, at: SIMD3(p.x, p.y, 0.2), color: SIMD3(1, 1, 1), count: 10, speed: 1.2,
                              size: 0.04, gravity: -1)
             }
@@ -785,7 +796,7 @@ final class Playground {
         case .color(let index):
             buddy.pick(index)
             effects.colorSplash(at: potPosition + SIMD3(0, 0.15, 0.1), color: Paint.colors[index])
-            audio.play(.pick, a: Float(index), pan: pan)
+            audio.play(Int.random(in: 0..<12) == 0 ? .chicken : .pick, a: Float(index), pan: pan)
             flashCounter += 1
             colorFlash = ColorFlash(slot: buddy.slot, colorIndex: index, id: flashCounter)
         case .critter(let kind):
@@ -802,7 +813,7 @@ final class Playground {
                 scene.rootNode.addChildNode(buddy.critter.root)
             }
             effects.colorSplash(at: potPosition + SIMD3(0, 0.15, 0.1), color: tool.usesColor ? buddy.color : SIMD3(1, 1, 1))
-            audio.play(.swap, pan: pan)
+            audio.play(.bonk, pan: pan)
         case .template(let kind):
             showTemplate(kind)
             effects.colorSplash(at: potPosition + SIMD3(0, 0.15, 0.1), color: kind.signatureColor)

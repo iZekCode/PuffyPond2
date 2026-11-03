@@ -2,7 +2,7 @@ import AVFoundation
 import os
 
 /// Sound effects the game can ask for.
-nonisolated enum Sfx: UInt8, Sendable {
+nonisolated enum Sfx: UInt8, Sendable, CaseIterable {
     case blip      // a fish blows a bead (a = height 0…1, b = pan)
     case squeak    // starfish scrubbing (b = pan)
     case pop       // something pops (b = pan)
@@ -23,6 +23,11 @@ nonisolated enum Sfx: UInt8, Sendable {
     case splat     // a hard slap of wet paint (a = strength 0…1, b = pan)
     case honk      // clown horn: "ha-HONK"
     case bloop     // a cartoon bubble (b = pan)
+    case bonk      // a wooden cartoon "bonk" (b = pan)
+    case splorp    // a wet, silly splorp (b = pan)
+    case chicken   // a rubber chicken squawk (b = pan)
+    case buzz      // a short bee buzz (a = speed 0…1, b = pan)
+    case crunch    // a quick leafy munch (b = pan)
 }
 
 /// Which tune the background music plays.
@@ -474,10 +479,59 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
         case .fizzle:
             start(.sine, 220, peak: 0.12, decay: 0.4, at: 0, glideFrom: 500, glideTime: 0.2)
             start(.noise, 0, peak: 0.1, decay: 0.3, at: 0, filter: .bandPass(700, q: 0.8, sr: sampleRate))
+        case .bonk:
+            start(.sine, 110, peak: 0.35, decay: 0.18, at: 0, pan: pan, attack: 0.001, glideFrom: 320, glideTime: 0.04)
+            start(.sine, 900, peak: 0.12, decay: 0.05, at: 0, pan: pan, attack: 0.001)
+            start(.noise, 0, peak: 0.2, decay: 0.015, at: 0, pan: pan, filter: .bandPass(1800, q: 4, sr: sampleRate))
+        case .splorp:
+            start(.noise, 0, peak: 0.2, decay: 0.2, at: 0, pan: pan, attack: 0.02,
+                  filter: .bandPass(400, q: 2, sr: sampleRate))
+            start(.sine, 160, peak: 0.22, decay: 0.25, at: 0, pan: pan, glideFrom: 420, glideTime: 0.12,
+                  vibrato: (0.15, 16))
+            start(.sine, 80, peak: 0.16, decay: 0.2, at: Int(0.05 * sampleRate), pan: pan, glideFrom: 160, glideTime: 0.1)
+        case .chicken:
+            for (k, base) in [Float(600), 560].enumerated() {
+                let at = Int(Float(k) * 0.17 * sampleRate)
+                start(.square, base, peak: 0.13, decay: 0.3, at: at, pan: pan, attack: 0.01, glideFrom: base * 0.65,
+                      glideTime: 0.03, vibrato: (0.08, 30), cutoff: 1800)
+                start(.square, base * 1.03, peak: 0.1, decay: 0.3, at: at, pan: pan, attack: 0.01,
+                      glideFrom: base * 0.65, glideTime: 0.03, vibrato: (0.08, 33), cutoff: 1800)
+            }
+            start(.noise, 0, peak: 0.05, decay: 0.3, at: 0, pan: pan, filter: .bandPass(1500, q: 1.2, sr: sampleRate))
+        case .buzz:
+            let f = 140 + 120 * min(max(e.a, 0), 1)
+            start(.square, f, peak: 0.16, decay: 0.2, at: 0, pan: pan, attack: 0.01, vibrato: (0.03, 60), cutoff: 1200)
+            start(.square, f * 1.03, peak: 0.12, decay: 0.2, at: 0, pan: pan, attack: 0.01, vibrato: (0.03, 55), cutoff: 1200)
+        case .crunch:
+            for k in 0..<3 {
+                let at = Int(Float(k) * 0.06 * sampleRate)
+                start(.noise, 0, peak: 0.25, decay: 0.04, at: at, pan: pan, attack: 0.001,
+                      filter: .bandPass(2200, q: 1.2, sr: sampleRate))
+                start(.sine, 160, peak: 0.1, decay: 0.05, at: at, pan: pan, attack: 0.001, glideFrom: 300, glideTime: 0.02)
+            }
         }
     }
 
     // MARK: Render
+
+    /// Renders `frames` frames of the whole mix (queued effects, the tune and the beat clock) without a
+    /// sound device: for tests and tools.
+    func renderOffline(frames: Int) -> (left: [Float], right: [Float]) {
+        let left = UnsafeMutablePointer<Float>.allocate(capacity: frames)
+        let right = UnsafeMutablePointer<Float>.allocate(capacity: frames)
+        defer {
+            left.deallocate()
+            right.deallocate()
+        }
+        let list = AudioBufferList.allocate(maximumBuffers: 2)
+        defer { free(list.unsafeMutablePointer) }
+        let bytes = UInt32(frames * MemoryLayout<Float>.size)
+        list[0] = AudioBuffer(mNumberChannels: 1, mDataByteSize: bytes, mData: left)
+        list[1] = AudioBuffer(mNumberChannels: 1, mDataByteSize: bytes, mData: right)
+        render(frameCount: frames, bufferList: list.unsafeMutablePointer)
+        return (Array(UnsafeBufferPointer(start: left, count: frames)),
+                Array(UnsafeBufferPointer(start: right, count: frames)))
+    }
 
     private func render(frameCount: Int, bufferList: UnsafeMutablePointer<AudioBufferList>) {
         let buffers = UnsafeMutableAudioBufferListPointer(bufferList)
