@@ -61,8 +61,10 @@ final class PaintLayer {
     private static let leveling: Float = 2            // how quickly wet paint relaxes
     private static let damping: Float = 5             // 1/s: how fast smears stop moving
     private static let gravity: Float = 260           // texels/s² pull on thick wet paint
-    private static let normalStrength: Float = 20
-    private static let cavity: Float = 3
+    private static let normalStrength: Float = 10
+    private static let cavity: Float = 1.2
+    /// How much of the paint colour shows regardless of the light (the studio lights alone would dull it).
+    static let emission: CGFloat = 1.0
     private static let reliefHeight: Float = 0.12     // bristle texture depth
     private static let bodyHeight: Float = 0.15       // how much the paint's thickness itself shows
     private static let weaveDepth: Float = 0.012      // canvas weave showing through thin paint
@@ -82,7 +84,7 @@ final class PaintLayer {
     private static let ncaDT: Float = 1               // --dt
     private static let ncaFireRate: Float = 0.5       // --fire-rate
     private static let ncaHeight: Float = 0.2         // how much the grown texture lifts and lowers the paint
-    private static let ncaColor: Float = 0.6          // how far the pigment gives way to the texture's own colours
+    private static let ncaColor: Float = 0.9          // how far the pigment gives way to the texture's own colours
     private static let ncaLifePerSecond: Float = 0.3  // a stroke keeps growing for about 1 / this many seconds
     // The texture takes hold in patches along a stroke, not everywhere: a soft noise field decides where.
     private static let ncaPatchSize: Float = 0.4      // patch width, in world units
@@ -115,6 +117,7 @@ final class PaintLayer {
     private var ncaUsed = false                       // an NCA brush has painted since the last clear
     private var frameNumber: UInt32 = 0
     private var albedo: MTLTexture?
+    private var glow: MTLTexture?
     private var normalMap: MTLTexture?
     private var roughness: MTLTexture?
     private var stamps: [PaintStamp] = []
@@ -122,6 +125,11 @@ final class PaintLayer {
     private var settleTime: Float = 0                 // keep simulating while paint may still move
     private let surface: SCNNode
     /// False when Metal or a shader could not be set up: the layer then paints nothing.
+    private var material: SCNMaterial?
+    /// The paint's own glow, 0 for none. A scene lit differently from the easel's scales it with its lights.
+    var emission: CGFloat = PaintLayer.emission {
+        didSet { material?.emission.intensity = emission }
+    }
     private(set) var isAvailable = false
 
     init(center: SIMD2<Float>, size: SIMD2<Float>, z: Float, pixelsAcross: Int = PaintLayer.defaultResolution) {
@@ -169,16 +177,20 @@ final class PaintLayer {
         ncaLife = (0..<2).compactMap { _ in texture(.rgba16Float) }
         flow = (0..<2).compactMap { _ in texture(.rgba16Float) }
         albedo = texture(.rgba8Unorm)
+        glow = texture(.rgba8Unorm)
         normalMap = texture(.rgba8Unorm)
         roughness = texture(.rgba8Unorm)
 
         let m = SCNMaterial()
         m.lightingModel = .physicallyBased
         m.diffuse.contents = albedo
+        m.emission.contents = glow                         // the pigment glows a little, so the studio light doesn't dull it
+        m.emission.intensity = Self.emission
+        material = m
         m.normal.contents = normalMap
         m.roughness.contents = roughness
         m.metalness.contents = NSNumber(value: 0.0)
-        m.clearCoat.contents = NSNumber(value: 0.55)        // oil-paint sheen
+        m.clearCoat.contents = NSNumber(value: 0.3)        // oil-paint sheen
         m.clearCoatRoughness.contents = NSNumber(value: 0.15)
         m.transparencyMode = .aOne
         m.blendMode = .alpha
@@ -271,7 +283,7 @@ final class PaintLayer {
         guard needsClear || !stamps.isEmpty || settleTime > 0 else { return }
         settleTime -= dt
         guard let commandQueue, let stepPipeline, let shadePipeline, paint.count == 2, flow.count == 2,
-              let albedo, let normalMap, let roughness,
+              let albedo, let glow, let normalMap, let roughness,
               let ncaPipeline, let ncaWeights, let ncaMeans, ncaA.count == 2, ncaB.count == 2, ncaC.count == 2, ncaLife.count == 2,
               let buffer = commandQueue.makeCommandBuffer(),
               let encoder = buffer.makeComputeCommandEncoder() else { return }
@@ -335,6 +347,7 @@ final class PaintLayer {
         encoder.setTexture(roughness, index: 4)
         encoder.setTexture(ncaA[ncaCurrent], index: 5)
         encoder.setTexture(ncaLife[ncaCurrent], index: 6)
+        encoder.setTexture(glow, index: 7)
         encoder.setBytes(&params, length: MemoryLayout<PaintParams>.stride, index: 0)
         encoder.setBuffer(ncaMeans, offset: 0, index: 1)
         encoder.dispatchThreadgroups(groups, threadsPerThreadgroup: groupSize)

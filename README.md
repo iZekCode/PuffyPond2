@@ -41,7 +41,7 @@ The movement stats are 2D estimates from the front camera (Vision body and hand 
 
 ## Painting on the canvas
 
-The canvas fills the whole screen, edge to edge. The paint pots float over its right edge and the tool bubbles over its left edge; nothing is painted or erased behind them. On windows that are not 8:5 the tighter side matches exactly and the other side of the canvas runs past the edge of the screen.
+The whole canvas is always on screen, with a column of paint pots beside its right edge and a column of tool bubbles beside its left edge, so they never cover the painting; nothing is painted or erased behind them either. The window is fitted around the canvas and the two columns, whatever its shape.
 
 | Move | What happens |
 |---|---|

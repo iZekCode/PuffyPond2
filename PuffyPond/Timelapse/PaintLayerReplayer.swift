@@ -46,6 +46,7 @@ final class PaintLayerReplayer: ReplayRenderer {
         layer = PaintLayer(center: SIMD2(0, 0.1), size: Playground.canvasSize, z: 0,
                            pixelsAcross: Self.resolution(forSpeedUp: timeline.speedUp))
         guard layer.isAvailable else { return nil }
+        layer.emission = PaintLayer.emission * Self.lightScale   // the paint's glow follows the lights
         let canvas = SCNNode()
         canvas.simdPosition = SIMD3(0, -0.1, 0)
         canvas.addChildNode(layer.node)

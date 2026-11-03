@@ -258,6 +258,9 @@ constant int kNCAInputs = kNCAChannels * 4;
 constant int kNCAHidden = 96;
 constant int kNCAB1 = kNCAHidden * kNCAInputs;
 constant int kNCAW2 = kNCAB1 + kNCAHidden;
+constant float kPaintLift = 0.9;         // < 1 lifts the mid tones of the displayed paint
+constant float kNCASaturation = 1.1;    // how much more colourful the displayed texture is than the trained one
+constant float kNCAGain = 1.1;          // and how much brighter
 constant int kNCAWeightCount = kNCAW2 + kNCAChannels * kNCAHidden;   // one model; the buffer holds one per paint colour
 
 static float hash3(int2 p, uint salt) {
@@ -451,6 +454,7 @@ kernel void paintShade(texture2d<float, access::read> paint [[texture(0)]],
                        texture2d<float, access::write> roughness [[texture(4)]],
                        texture2d<float, access::read> ncaA [[texture(5)]],
                        texture2d<float, access::read> ncaLife [[texture(6)]],
+                       texture2d<float, access::write> glow [[texture(7)]],
                        constant PaintParams &P [[buffer(0)]],
                        constant float4 *ncaMeans [[buffer(1)]],
                        uint2 gid [[thread_position_in_grid]]) {
@@ -480,9 +484,16 @@ kernel void paintShade(texture2d<float, access::read> paint [[texture(0)]],
     // on a texture of that colour).
     float grown = ncaGrown(ncaLife.read(gid), coverage);
     float3 ncaColor = saturate(ncaA.read(gid).rgb + 0.5);
-    float3 linearColor = pow(saturate(mix(p.rgb, ncaColor, grown * P.ncaShade.y) * cavity), 2.2);
+    // The grown texture would be duller than the fresh pigment it replaces (it has its own shadows and the studio light
+    // flattens it): lift it back so a stroke keeps its colour as the texture grows in.
+    ncaColor = saturate(mix(float3(dot(ncaColor, float3(0.299, 0.587, 0.114))), ncaColor, kNCASaturation) * kNCAGain);
+    // A mild lift of the mid tones (whites stay white): wet paint reads bright and a dried coat would look dull next to it.
+    float3 shown = pow(saturate(mix(p.rgb, ncaColor, grown * P.ncaShade.y) * cavity), kPaintLift);
+    float3 linearColor = pow(shown, 2.2);
     albedo.write(float4(linearColor, coverage), gid);
+    // The paint's own glow (see PaintLayer.emission) only on a proper coat: a thin wash edge glowing would show as a white outline.
+    glow.write(float4(linearColor * smoothstep(0.04, 0.12, p.a), 1), gid);
     normalMap.write(float4(n * 0.5 + 0.5, 1), gid);
-    // Bare canvas is fully matte; paint is satin when dry and glossy while wet.
-    roughness.write(float4(float3(mix(1.0, mix(0.3, 0.02, wet), sqrt(coverage))), 1), gid);
+    // Bare canvas is fully matte; paint is glossy while wet and keeps a soft sheen when dry (a flat dry coat looks dull).
+    roughness.write(float4(float3(mix(1.0, mix(0.04, 0.02, wet), sqrt(coverage))), 1), gid);
 }

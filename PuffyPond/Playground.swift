@@ -239,7 +239,7 @@ final class Playground {
                                        chamferRadius: 0.012), linen, at: SIMD3(0, 0, Self.canvasZ - depth / 2))
         canvasNode.addChildNode(board)
         canvasBoard = board
-        // The canvas fills the whole view, so there is no easel frame around it.
+        // No easel frame: the canvas stands free, with the pot and bubble columns beside it.
         canvasNode.simdPosition = SIMD3(0, 0.1, 0)
         scene.rootNode.addChildNode(canvasNode)
 
@@ -292,23 +292,22 @@ final class Playground {
         layout(size: CGSize(width: 1600, height: 1000))
     }
 
-    /// The canvas fills the whole window, edge to edge: the tighter side of the window is matched exactly and the
-    /// other side overflows. The pots and bubbles float over the left and right edges of the view.
+    /// Fits the whole canvas and the two columns beside it (paint pots on the right, bubbles on the left) into any
+    /// window shape, with a little room around them, so nothing is hidden behind a pot or a bubble.
     func layout(size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
         aspect = Float(size.width / size.height)
-        let fitHeight = Self.canvasSize.y * 0.5 / tanHalfFOV
-        let fitWidth = Self.canvasSize.x * 0.5 / (tanHalfFOV * aspect)
-        cameraDistance = Self.canvasZ + min(fitHeight, fitWidth) * 0.999
+        let needHalfH = Self.canvasSize.y * 0.5 * 1.04
+        let needHalfW = (Self.shelfX + PaintPot.radius + 0.3) * 1.04   // the columns stand nearer the camera than the canvas
+        cameraDistance = Self.canvasZ + max(needHalfH / tanHalfFOV, needHalfW / (tanHalfFOV * aspect))
         cameraNode.simdPosition = SIMD3(0, cameraY, cameraDistance)
         placeShelves()
     }
 
-    /// Puts the paint pots on the right and the bubbles on the left, just inside the edges of the view.
+    /// Stands the paint pots in a column beside the right edge of the canvas and the bubbles beside the left edge.
     private func placeShelves() {
-        let x = max(visibleHalfSize(atZ: 0.3).x - PaintPot.radius - 0.2, 0.5)
-        for pot in pots { pot.root.simdPosition.x = x }
-        for pot in critterPots { pot.root.simdPosition.x = -x }
+        for pot in pots { pot.root.simdPosition.x = Self.shelfX }
+        for pot in critterPots { pot.root.simdPosition.x = -Self.shelfX }
     }
 
     /// Whether `p` (canvas plane) is under a pot or bubble: rubbing one must not paint or erase behind it.

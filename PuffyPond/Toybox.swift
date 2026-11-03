@@ -15,16 +15,16 @@ typealias PlatformImage = UIImage
 // MARK: - Colors
 
 enum Paint {
-    /// The six paint colours, each the main colour of an NCA texture (tools/nca/targets/).
+    /// The six paint colours, each the mid tone of its NCA texture (tools/nca/targets/), so a pot, an animal and its paint match.
     /// The order matches the NCA model file (PuffyPond/NCA/octopus.bin) and keeps the old palette's roles
     /// (templates and animals refer to colours by index: 0 warm, 1 cool, 2 light, 3 orange, 4 green, 5 purple).
     static let colors: [SIMD3<Float>] = [
-        SIMD3(0.93, 0.24, 0.22), // red      (ladybug)
-        SIMD3(0.16, 0.58, 0.92), // blue     (butterfly)
-        SIMD3(1.00, 0.90, 0.10), // yellow   (ladybug)
-        SIMD3(0.98, 0.58, 0.10), // orange   (ladybug)
-        SIMD3(0.12, 0.70, 0.40), // green    (butterfly)
-        SIMD3(0.52, 0.40, 0.77), // purple   (butterfly)
+        SIMD3(0.97, 0.38, 0.40), // red      (ladybug)
+        SIMD3(0.36, 0.64, 0.89), // blue     (butterfly)
+        SIMD3(0.97, 0.82, 0.10), // yellow   (ladybug)
+        SIMD3(0.99, 0.55, 0.12), // orange   (ladybug)
+        SIMD3(0.08, 0.66, 0.35), // green    (butterfly)
+        SIMD3(0.54, 0.42, 0.77), // purple   (butterfly)
     ]
 
     static let names = ["Red", "Blue", "Yellow", "Orange", "Green", "Purple"]

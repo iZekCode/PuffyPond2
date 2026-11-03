@@ -179,16 +179,21 @@ struct GardenCastTests {
     private static let windows: [CGSize] = [CGSize(width: 1600, height: 1000), CGSize(width: 1024, height: 768),
                                             CGSize(width: 2400, height: 1000), CGSize(width: 900, height: 1200)]
 
-    @Test func canvasFillsTheWholeWindow() {
+    @Test func wholeCanvasStaysInViewWithRoomBesideIt() {
         for size in Self.windows {
             let playground = Playground(controlScheme: .fist)
             playground.layout(size: size)
-            let visible = playground.visibleHalfSize(atZ: Playground.canvasZ)
             let canvas = Playground.canvasSize * 0.5
-            // Never wider or taller than the canvas, so no room shows around it ...
-            #expect(visible.x <= canvas.x * 1.001 && visible.y <= canvas.y * 1.001, "\(size)")
-            // ... and the tighter side is matched exactly (edge to edge).
-            #expect(visible.x >= canvas.x * 0.98 || visible.y >= canvas.y * 0.98, "\(size)")
+            let visible = playground.visibleHalfSize(atZ: Playground.canvasZ)
+            // The whole canvas is on screen, not cropped by a window edge ...
+            #expect(visible.x >= canvas.x && visible.y >= canvas.y, "\(size)")
+            // ... and the pots and bubbles stand beside it, not over it.
+            for pot in playground.pots {
+                #expect(pot.root.simdPosition.x - PaintPot.radius > canvas.x, "\(size)")
+            }
+            for pot in playground.critterPots {
+                #expect(pot.root.simdPosition.x + PaintPot.radius < -canvas.x, "\(size)")
+            }
         }
     }
 
