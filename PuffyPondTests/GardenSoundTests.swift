@@ -5,10 +5,10 @@ struct GardenSoundTests {
     private static let rate: Float = 48_000
 
     /// Peak of the difference between a render with `kind` queued and one without, over one second.
-    private func effectPeak(_ kind: Sfx, repeats: Int = 1) -> (peak: Float, finite: Bool) {
+    private func effectPeak(_ kind: Sfx, repeats: Int = 1, c: Float = 0) -> (peak: Float, finite: Bool) {
         let plain = GrooveDSP(sampleRate: Self.rate)
         let withEffect = GrooveDSP(sampleRate: Self.rate)
-        for _ in 0..<repeats { withEffect.play(SfxEvent(kind: kind, a: 0.5, b: 0)) }
+        for _ in 0..<repeats { withEffect.play(SfxEvent(kind: kind, a: 0.5, b: 0, c: c)) }
         let a = plain.renderOffline(frames: Int(Self.rate))
         let b = withEffect.renderOffline(frames: Int(Self.rate))
         var peak: Float = 0
@@ -31,10 +31,21 @@ struct GardenSoundTests {
     }
 
     @Test func repeatedEffectsStayBounded() {
-        for kind in [Sfx.bonk, .splorp, .chicken, .slurp, .poof, .ooze] {
+        for kind in [Sfx.bonk, .splorp, .chicken, .slurp, .poof, .ooze, .note] {
             let result = effectPeak(kind, repeats: 20)
             #expect(result.finite, "\(kind) is finite")
             #expect(result.peak < 1.0, "\(kind) stays under full scale")
+        }
+    }
+
+    @Test func everyNoteTimbreIsAudibleAndBounded() {
+        for timbre in NoteTimbre.allCases {
+            let once = effectPeak(.note, c: Float(timbre.rawValue))
+            #expect(once.finite, "\(timbre) is finite")
+            #expect(once.peak > 0.002, "\(timbre) is audible")
+            let many = effectPeak(.note, repeats: 20, c: Float(timbre.rawValue))
+            #expect(many.finite, "\(timbre) stays finite when repeated")
+            #expect(many.peak < 1.0, "\(timbre) stays under full scale")
         }
     }
 }

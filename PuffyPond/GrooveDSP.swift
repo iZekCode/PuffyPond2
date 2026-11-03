@@ -29,6 +29,7 @@ nonisolated enum Sfx: UInt8, Sendable, CaseIterable {
     case slurp     // a wet smear for the blender (a = speed 0…1, b = pan)
     case poof      // a soft spore puff (b = pan)
     case ooze      // a gloopy rising bubble while a brush is held still (a = hold 0…1, b = pan)
+    case note      // a timelapse note (a = place on the pentatonic scale 0…1, b = pan, c = NoteTimbre)
 }
 
 /// Which tune the background music plays.
@@ -41,6 +42,7 @@ nonisolated struct SfxEvent: Sendable {
     var kind: Sfx
     var a: Float
     var b: Float
+    var c: Float = 0
 }
 
 nonisolated private enum Wave: UInt8 { case sine, triangle, square, fm, noise }
@@ -124,6 +126,8 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
         [79, -1, 76, -1, 74, 76, 79, -1, 83, -1, 79, -1, -1, -1, -1, -1],
     ]
     private static let blipScale: [Float] = [79, 81, 84, 86, 88, 91, 93, 96, 98, 100]
+    /// C major pentatonic over two octaves: every note fits every other, and the silly tune is in C.
+    private static let noteScale: [Float] = [72, 74, 76, 79, 81, 84, 86, 88, 91, 93]
 
     // The silly tune: C F G C twice, a staccato kazoo over a tuba oom-pah.
     private static let sillyRoots: [Float] = [36, 41, 43, 36]
@@ -513,6 +517,24 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
                   vibrato: (0.1, 16))
             start(.fm, top * 2, peak: 0.06, decay: 0.12, at: Int(0.05 * sampleRate), pan: pan, fm: (2.5, 1.5, 0.05))
             start(.noise, 0, peak: 0.05, decay: 0.1, at: 0, pan: pan, filter: .bandPass(700, q: 1.5, sr: sampleRate))
+        case .note:
+            let i = min(max(Int((e.a * Float(Self.noteScale.count - 1)).rounded()), 0), Self.noteScale.count - 1)
+            let f = Self.hz(Self.noteScale[i])
+            switch Int(e.c.rounded()) {
+            case 1:   // pluck
+                start(.triangle, f, peak: 0.13, decay: 0.22, at: 0, pan: pan, attack: 0.001, cutoff: 2600)
+                start(.triangle, f * 2, peak: 0.03, decay: 0.1, at: 0, pan: pan, attack: 0.001, cutoff: 3500)
+            case 2:   // marimba
+                start(.sine, f * 0.5, peak: 0.17, decay: 0.3, at: 0, pan: pan, attack: 0.001)
+                start(.noise, 0, peak: 0.04, decay: 0.02, at: 0, pan: pan,
+                      filter: .bandPass(1800, q: 2, sr: sampleRate))
+            case 3:   // xylophone
+                start(.sine, f, peak: 0.12, decay: 0.3, at: 0, pan: pan, attack: 0.001)
+                start(.fm, f * 2, peak: 0.05, decay: 0.14, at: 0, pan: pan, fm: (3.5, 1.6, 0.05))
+            default:  // bell
+                start(.sine, f, peak: 0.11, decay: 0.6, at: 0, pan: pan, attack: 0.001)
+                start(.fm, f * 2, peak: 0.05, decay: 0.3, at: 0, pan: pan, fm: (3.5, 1.6, 0.08))
+            }
         case .poof:
             start(.noise, 0, peak: 0.22, decay: 0.22, at: 0, pan: pan, attack: 0.01,
                   filter: .bandPass(1200, q: 0.6, sr: sampleRate))
@@ -701,6 +723,11 @@ final class GrooveEngine {
 
     func play(_ kind: Sfx, a: Float = 0, pan: Float = 0) {
         dsp?.play(SfxEvent(kind: kind, a: a, b: pan))
+    }
+
+    /// One timelapse note: `pitch` is the place on the pentatonic scale, 0 (low) to 1 (high).
+    func playNote(timbre: NoteTimbre, pitch: Float, pan: Float) {
+        dsp?.play(SfxEvent(kind: .note, a: pitch, b: pan, c: Float(timbre.rawValue)))
     }
 
     func setMuted(_ muted: Bool) {
