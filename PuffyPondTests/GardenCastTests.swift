@@ -128,4 +128,35 @@ struct GardenCastTests {
         playground.pointerErases = false
         #expect(playground.buddies[0].critter is Spider)
     }
+
+    // MARK: Cast
+
+    @Test func gardenCastIsTheToolColumn() {
+        #expect(Set(CritterKind.gardenCast) == Set(PaintTool.allCases.compactMap(\.critterKind)))
+        #expect(CritterKind.gardenCast.count == 5)
+    }
+
+    @Test func gardenCastLooksDistinct() {
+        let colors = CritterKind.gardenCast.map(\.signatureColor)
+        for i in colors.indices {
+            for j in colors.indices where j > i {
+                #expect(simd_distance(colors[i], colors[j]) > 0.05)
+            }
+        }
+    }
+
+    @Test func everyGardenCritterBuildsAndAnimates() {
+        for kind in CritterKind.gardenCast {
+            let critter = kind.make(color: kind.signatureColor, at: .zero)
+            #expect(critter.kind == kind)
+            LimbBrushTests.settle(critter, frames: 60, target: hover, painting: true)
+            LimbBrushTests.settle(critter, frames: 60, target: .zero, painting: false, beatPulse: 0.5)
+            let p = critter.bodyNode.simdPosition
+            #expect(p.x.isFinite && p.y.isFinite && p.z.isFinite)
+        }
+    }
+
+    @Test func legacyBrushesAreUntouched() {
+        #expect(CritterKind.legacyBrushes == [.octopus, .snail, .pufferfish, .seahorse, .jellyfish, .frog])
+    }
 }

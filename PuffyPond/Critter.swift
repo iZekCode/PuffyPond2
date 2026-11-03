@@ -7,6 +7,9 @@ enum CritterKind: Int, CaseIterable, Equatable {
     /// The garden cast (fist controls).
     case spider, ladybug, bee, caterpillar
 
+    /// The garden cast of the fist controls, in tool-column order (thick oil, liquid oil, brush, eraser, blender).
+    static let gardenCast: [CritterKind] = [.snail, .ladybug, .spider, .caterpillar, .bee]
+
     /// The six brush animals of the legacy controls (the sponge only carries the fist controls' blender).
     static let legacyBrushes: [CritterKind] = [.octopus, .snail, .pufferfish, .seahorse, .jellyfish, .frog]
 
