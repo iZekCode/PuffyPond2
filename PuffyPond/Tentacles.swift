@@ -28,6 +28,7 @@ final class TentacleBundle {
         let phase: Float
         var lastTip: SIMD2<Float>?
         var lastXY: [SIMD2<Float>] = []   // every point's canvas position last frame (for contact drag)
+        var spoke = SIMD2<Float>(0, -1)   // which way it points when lying flat on the canvas (unit, canvas plane)
     }
 
     struct Shape {
@@ -63,6 +64,13 @@ final class TentacleBundle {
         }
     }
 
+    /// Which way each limb points when it lies flat on the canvas (`simulate(spread:)`), in limb order.
+    func setSpokes(_ spokes: [SIMD2<Float>]) {
+        for (k, s) in spokes.enumerated() where limbs.indices.contains(k) && simd_length(s) > 1e-4 {
+            limbs[k].spoke = simd_normalize(s)
+        }
+    }
+
     /// Kick every limb outward (Verlet: shift the previous positions backward).
     func flare(_ amount: Float, body m: simd_float4x4) {
         for k in limbs.indices {
@@ -95,8 +103,11 @@ final class TentacleBundle {
     ///   - snap: jump straight to the rest shape (after a teleport).
     ///   - press: 0…1, how hard the limbs are pushed down onto the canvas plane `minZ` (the tips most).
     ///   - trail: 0…1, how much the limbs gather into one bundle streaming along `trailDirection` (canvas plane).
+    ///   - spread: 0…1, how flat the limbs lie on the canvas, fanned out along their spokes like a star
+    ///     (the roots sink down to the canvas too, so the whole length touches it).
     func simulate(dt: Float, body m: simd_float4x4, scale: Float, clock: Float, beatPulse: Float, snap: Bool,
-                  press: Float = 0, minZ: Float = 0.1, trail: Float = 0, trailDirection: SIMD2<Float> = .zero) {
+                  press: Float = 0, minZ: Float = 0.1, trail: Float = 0, trailDirection: SIMD2<Float> = .zero,
+                  spread: Float = 0) {
         func world(_ local: SIMD3<Float>) -> SIMD3<Float> { simd_make_float3(m * SIMD4(local, 1)) }
         let length = shape.segmentLength * scale
         let steps = max(1, Int((dt * 120).rounded(.up)))
@@ -108,6 +119,22 @@ final class TentacleBundle {
 
         for k in limbs.indices {
             var rest = restShape(k, clock: clock).map(world)
+            if spread > 0.01 {
+                // Lying flat: each limb fans out along its spoke with a slow side-to-side ripple, root sunk to the canvas.
+                let spoke = limbs[k].spoke
+                let side = SIMD2(-spoke.y, spoke.x)
+                rest[0].z += (minZ + 0.025 - rest[0].z) * spread
+                for i in 1..<n {
+                    let t = Float(i) / Float(n - 1)
+                    let wave = sin(clock * 1.3 + limbs[k].phase + t * 4) * length * 0.35 * t
+                    let reach = Float(i) * length * 0.97
+                    var p = rest[0]
+                    p.x += spoke.x * reach + side.x * wave
+                    p.y += spoke.y * reach + side.y * wave
+                    p.z = rest[0].z + (minZ - rest[0].z) * min(1, t * 4)
+                    rest[i] += (p - rest[i]) * spread
+                }
+            }
             if trail > 0.01 {
                 // Wiping: the limb lies behind the head along the stroke, drawn in toward the middle so all of them
                 // end up side by side, with a little wobble along the way.
@@ -137,7 +164,7 @@ final class TentacleBundle {
                     let velocity = (points[i] - previous[i]) * shape.drag
                     previous[i] = points[i]
                     // Shape memory: stiff near the body, floppy toward the tip.
-                    let pull = shape.stiffness * (1 - 0.8 * t) * (1 + beatPulse * 0.5) * (1 + 3 * trail)
+                    let pull = shape.stiffness * (1 - 0.8 * t) * (1 + beatPulse * 0.5) * (1 + 3 * trail + 2 * spread)
                     points[i] += velocity + (rest[i] - points[i]) * pull + gravity
                 }
                 for _ in 0..<3 {
@@ -182,7 +209,7 @@ final class TentacleBundle {
     }
 
     /// The stretches of every limb that lie on the canvas this frame (only kept while `painting`).
-    /// Each covers two links, so a full limb makes about five.
+    /// Each covers two links, so a full limb (root to tip) makes five.
     func collectContacts(dt: Float, painting: Bool, scale: Float, contactZ: Float) {
         contacts.removeAll(keepingCapacity: true)
         let n = shape.segments
@@ -191,7 +218,8 @@ final class TentacleBundle {
             let xy = p.map { SIMD2($0.x, $0.y) }
             defer { limbs[k].lastXY = xy }
             guard painting, limbs[k].lastXY.count == n else { continue }
-            for i in stride(from: 1, to: n - 2, by: 2) where p[i].z <= contactZ && p[i + 2].z <= contactZ {
+            // The root end may still hang a little above the canvas under the head; the far end must touch.
+            for i in stride(from: 0, to: n - 1, by: 2) where p[i + 2].z <= contactZ && (i == 0 || p[i].z <= contactZ) {
                 let t = Float(i + 1) / Float(n - 1)
                 let radius = max((shape.rootRadius * (1 - t) + shape.tipRadius) * scale * 1.6, 0.016)
                 let drag = xy[i + 1] - limbs[k].lastXY[i + 1]

@@ -1,8 +1,8 @@
 import SceneKit
 import simd
 
-/// Bundle brush: a glossy head with a face and eight jiggly tentacles. The mouth blows the main
-/// stroke, and while painting the tentacles lie on the canvas: every stretch that touches it paints too.
+/// Bundle brush: a glossy head with a face and eight jiggly tentacles. While painting the tentacles lie flat on
+/// the canvas and are the brush: every stretch that touches it paints, and holding still makes them all ooze.
 final class Octopus: Critter {
     private let tentacles: TentacleBundle
     /// Height of a limb's centre when it lies on the canvas (just above the canvas face).
@@ -13,6 +13,8 @@ final class Octopus: Critter {
     /// How long the octopus has been holding still while painting (seconds).
     private var holdTime: Float = 0
     private var frameDT: Float = 1.0 / 60.0
+    /// 0…1, how flat the tentacles lie fanned out on the canvas (eases in and out).
+    private var spread: Float = 0
     /// Wiping faster than this (world units/s) gathers every tentacle into one trailing bundle.
     private static let trailSpeed: ClosedRange<Float> = 0.35...1.4
     /// Holding still for this long (seconds) starts the paint oozing out; it keeps growing for `oozeGrowth` seconds.
@@ -31,6 +33,11 @@ final class Octopus: Critter {
         }
         tentacles = TentacleBundle(shape: .init(), roots: roots, start: start)
         super.init(kind: .octopus, color: color, at: start)
+        // Lying on the canvas the eight limbs fan out evenly around the head, like a star.
+        tentacles.setSpokes((0..<count).map { k in
+            let a = (Float(k) + 0.5) / Float(count) * 2 * .pi
+            return SIMD2(cos(a), sin(a))
+        })
         tentacles.material = accentMaterial
         root.addChildNode(tentacles.node)
 
@@ -67,22 +74,25 @@ final class Octopus: Critter {
         } else if planarSpeed < 0.2 {
             holdTime += dt
         }
+        // Pressing, the limbs settle flat onto the canvas as a star until a wipe gathers them into a trailing bundle.
+        spread += ((pressing ? 1 - trail : 0) - spread) * min(1, dt * 10)
         tentacles.simulate(dt: dt, body: leanNode.simdWorldTransform, scale: scale, clock: clock,
                            beatPulse: beatPulse, snap: teleported, press: pressing ? 1 : 0, minZ: Self.limbZ,
-                           trail: trail, trailDirection: streamDirection)
+                           trail: trail, trailDirection: streamDirection, spread: spread)
         tentacles.collectTips(dt: dt, painting: pressing)
         tentacles.collectContacts(dt: dt, painting: pressing, scale: scale, contactZ: Self.limbZ + 0.03)
         tentacles.rebuild(scale: scale, clock: clock, hidden: hidden)
     }
 
     override func dabs(from a: SIMD2<Float>, to b: SIMD2<Float>, radius: Float, speed: Float) -> [BrushDab] {
-        // Holding still, the octopus keeps pushing paint out: it pools under the head and every tentacle,
-        // and flows outward from it, so the puddle spreads (and its texture keeps regrowing) the longer you hold.
+        // The head never paints: the tentacles lying on the canvas are the brush, like wiping with eight fingers.
+        // Holding still, every tentacle keeps pushing paint out along its whole length, and it flows outward
+        // from the head, so the puddle spreads (and its texture keeps regrowing) the longer you hold.
         let ooze = smoothStep(Self.oozeDelay, Self.oozeDelay + 0.35, holdTime)
         let swell = min(max(holdTime - Self.oozeDelay, 0), Self.oozeGrowth)
         var style = BrushStyle.octopus
         if ooze > 0 { style.amount = 0.05 + 0.1 * ooze }
-        var result = [BrushDab(from: a, to: b, radius: radius * sizeScale * (1 + 0.3 * swell), speed: speed, style: style)]
+        var result: [BrushDab] = []
         for c in tentacles.contacts {
             guard ooze > 0 else {
                 result.append(BrushDab(from: c.a, to: c.b, radius: c.radius, speed: c.speed, style: .octopus, drag: c.drag))
