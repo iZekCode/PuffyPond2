@@ -72,8 +72,8 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .jellyfish: return Paint.colors[5]
         case .frog: return Paint.colors[4]
         case .sponge: return SIMD3(1.0, 0.86, 0.38)
-        case .spider: return Paint.colors[0]
-        case .ladybug: return Paint.colors[5]
+        case .spider: return Paint.colors[5]
+        case .ladybug: return Paint.colors[0]
         case .bee: return SIMD3(1.0, 0.86, 0.38)
         case .caterpillar: return Paint.colors[4]
         }

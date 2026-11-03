@@ -20,11 +20,11 @@ final class Ladybug: Critter {
         let wingParent = SCNNode()
         super.init(kind: .ladybug, color: color, at: start, accentLift: 0.3)
 
-        // Round body that is all face, with dark spots on the back.
+        // Round body that is all face, with dark spots on top.
         squashNode.addChildNode(Toybox.node(SCNSphere(radius: 0.15), bodyMaterial, at: SIMD3(0, 0, 0),
                                             scale: SIMD3(1.08, 0.98, 1)))
-        for (x, y, r) in [(-0.07, 0.12, 0.028), (0.075, 0.115, 0.024), (0.0, 0.145, 0.02)] as [(Float, Float, Float)] {
-            squashNode.addChildNode(Toybox.node(SCNSphere(radius: CGFloat(r)), spots, at: SIMD3(x, y, -0.02),
+        for (x, y, z, r) in [(-0.092, 0.11, 0.065, 0.026), (0.092, 0.11, 0.065, 0.026), (0.0, 0.147, 0.03, 0.02)] as [(Float, Float, Float, Float)] {
+            squashNode.addChildNode(Toybox.node(SCNSphere(radius: CGFloat(r)), spots, at: SIMD3(x, y, z),
                                                 scale: SIMD3(1, 1, 0.5)))
         }
 
