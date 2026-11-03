@@ -5,7 +5,7 @@ import simd
 enum CritterKind: Int, CaseIterable, Equatable {
     case octopus, snail, pufferfish, seahorse, jellyfish, frog, sponge
     /// The garden cast (fist controls).
-    case spider, ladybug
+    case spider, ladybug, bee
 
     /// The six brush animals of the legacy controls (the sponge only carries the fist controls' blender).
     static let legacyBrushes: [CritterKind] = [.octopus, .snail, .pufferfish, .seahorse, .jellyfish, .frog]
@@ -21,6 +21,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .sponge: return "Sponge"
         case .spider: return "Spider"
         case .ladybug: return "Ladybug"
+        case .bee: return "Bee"
         }
     }
 
@@ -36,6 +37,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .sponge: return "blender"
         case .spider: return "bundle brush"
         case .ladybug: return "watercolor"
+        case .bee: return "blender"
         }
     }
 
@@ -50,6 +52,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .sponge: return "tornado"
         case .spider: return "scribble.variable"
         case .ladybug: return "drop.halffull"
+        case .bee: return "tornado"
         }
     }
 
@@ -65,6 +68,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .sponge: return SIMD3(1.0, 0.86, 0.38)
         case .spider: return Paint.colors[0]
         case .ladybug: return Paint.colors[5]
+        case .bee: return SIMD3(1.0, 0.86, 0.38)
         }
     }
 
@@ -79,6 +83,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .sponge: return Sponge(color: color, at: start)
         case .spider: return Spider(color: color, at: start)
         case .ladybug: return Ladybug(color: color, at: start)
+        case .bee: return Bee(color: color, at: start)
         }
     }
 }

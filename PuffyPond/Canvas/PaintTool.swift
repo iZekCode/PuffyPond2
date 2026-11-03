@@ -31,7 +31,7 @@ enum PaintTool: Int, CaseIterable, Equatable {
         case .liquidOil: return .ladybug
         case .brush: return .spider
         case .eraser: return nil
-        case .blender: return .sponge
+        case .blender: return .bee
         }
     }
 

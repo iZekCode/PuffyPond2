@@ -61,4 +61,17 @@ struct GardenCastTests {
         #expect((seen.max() ?? 0) - (seen.min() ?? 0) > 0.3)
         #expect(seen.allSatisfy { $0 >= 0 && $0 <= 1.2 })
     }
+
+    @Test func blenderToolIsTheBee() {
+        #expect(PaintTool.blender.critterKind == .bee)
+        #expect(CritterKind.bee.make(color: Paint.colors[1], at: .zero) is Bee)
+    }
+
+    @Test func beeWigglesOnlyWhileBlending() {
+        let bee = Bee(color: Paint.colors[1], at: .zero)
+        LimbBrushTests.settle(bee, frames: 60, target: .zero, painting: true)
+        #expect(bee.wiggle > 0.8)
+        LimbBrushTests.settle(bee, frames: 60, target: .zero, painting: false)
+        #expect(bee.wiggle < 0.1)
+    }
 }
