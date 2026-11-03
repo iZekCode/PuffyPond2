@@ -9,7 +9,7 @@ final class MaskReplayer: ReplayRenderer {
     let mask = RevealMask()
 
     private let events: [(time: Double, dab: RecordedDab)]
-    private let maskProperty = SCNMaterialProperty()
+    private let material = SCNMaterial()
     private var next = 0
 
     init(finalPaint: CGImage, recording: StrokeRecording, timeline: ReplayTimeline) {
@@ -18,7 +18,6 @@ final class MaskReplayer: ReplayRenderer {
             return (timeline.replayTime(forRecorded: dab.t), dab)
         }
 
-        let material = SCNMaterial()
         material.diffuse.contents = finalPaint
         material.lightingModel = .lambert
         material.isDoubleSided = true
@@ -29,15 +28,10 @@ final class MaskReplayer: ReplayRenderer {
         material.blendMode = .alpha
         material.writesToDepthBuffer = false
         material.readsFromDepthBuffer = false
-        // The picture shows only where the mask is white.
-        material.shaderModifiers = [.fragment: """
-            #pragma arguments
-            sampler2D reveal;
-            #pragma body
-            _output.color *= texture2D(reveal, _surface.diffuseTexcoord).r;
-            """]
-        maskProperty.contents = mask.image
-        material.setValue(maskProperty, forKey: "reveal")
+        // The picture shows only where the mask is white: the mask's alpha is the paint's.
+        material.transparent.contents = mask.image
+        material.transparent.wrapS = .clamp
+        material.transparent.wrapT = .clamp
 
         let plane = SCNPlane(width: CGFloat(SheetSolver.size.x), height: CGFloat(SheetSolver.size.y))
         plane.materials = [material]
@@ -52,12 +46,12 @@ final class MaskReplayer: ReplayRenderer {
             next += 1
             changed = true
         }
-        if changed { maskProperty.contents = mask.image }
+        if changed { material.transparent.contents = mask.image }
     }
 
     func reset() {
         next = 0
         mask.clear()
-        maskProperty.contents = mask.image
+        material.transparent.contents = mask.image
     }
 }

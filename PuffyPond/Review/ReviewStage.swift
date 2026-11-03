@@ -27,6 +27,19 @@ final class ReviewStage {
         var frame: CGRect
     }
 
+    /// The page is either replaying how the painting was made, or letting the hands play with the sheet.
+    enum Phase: Equatable {
+        case timelapse
+        case interactive
+    }
+
+    private(set) var phase: Phase = .interactive
+    /// There is a timelapse to play again.
+    private(set) var canReplay = false
+    /// Makes what draws the timelapse picture; swapped in tests.
+    @ObservationIgnored var makeRenderer: (CanvasPhotos, StrokeRecording, ReplayTimeline) -> ReplayRenderer = {
+        MaskReplayer(finalPaint: $0.paint, recording: $1, timeline: $2)
+    }
     /// Hands on screen, for the cursors.
     private(set) var cursors: [Cursor] = []
     /// Hover-and-hold progress (0…1) of the button an open hand rests on.
@@ -56,6 +69,8 @@ final class ReviewStage {
     @ObservationIgnored private let canvasMaterial = SCNMaterial()
     @ObservationIgnored private let frameDriver = FrameDriver()
     @ObservationIgnored private var audio: GrooveEngine?
+    @ObservationIgnored private var conductor: TimelapseConductor?
+    @ObservationIgnored private var renderer: ReplayRenderer?
     @ObservationIgnored private var ripples: [Ripple] = []
     @ObservationIgnored private var aspect: Float = 16 / 10
     @ObservationIgnored private var halfHeight: Float = 3
@@ -86,17 +101,91 @@ final class ReviewStage {
         frameDriver.onFrame = { [weak self] dt in self?.tick(dt: Float(dt)) }
     }
 
-    func show(_ photos: CanvasPhotos, audio: GrooveEngine) {
+    /// Shows the painting. With a recording that has something to replay the page starts in the timelapse phase.
+    func show(_ photos: CanvasPhotos, recording: StrokeRecording?, audio: GrooveEngine) {
         canvasMaterial.diffuse.contents = photos.canvas
         material.diffuse.contents = photos.paint
         self.audio = audio
         meshIsFlat = false
         updateMesh()
+
+        detachTimelapse()
+        sheet.removeAllActions()
+        sheet.opacity = 1
+        phase = .interactive
+        canReplay = false
+        guard let recording, !recording.isEmpty else { return }
+        let timeline = ReplayTimeline(eventTimes: recording.events.map(\.t))
+        guard timeline.duration > 0 else { return }
+
+        let renderer = makeRenderer(photos, recording, timeline)
+        renderer.node.simdPosition = SIMD3(0, 0, Self.canvasDepth + 0.15)
+        scene.rootNode.addChildNode(renderer.node)
+        self.renderer = renderer
+        conductor = TimelapseConductor(timeline: timeline, notes: NoteComposer.compose(recording, timeline: timeline))
+        canReplay = true
+        beginTimelapse()
+    }
+
+    /// Jumps to the end of the timelapse and lets the hands play.
+    func skipTimelapse() {
+        guard phase == .timelapse, let conductor else { return }
+        conductor.skip()
+        renderer?.advance(to: conductor.replayTime)
+        finishTimelapse()
+    }
+
+    /// Plays the timelapse again; the sheet is put away until it ends.
+    func replay() {
+        guard phase == .interactive, canReplay else { return }
+        gestures.reset(solver: solver)
+        beginTimelapse()
+    }
+
+    /// One frame of the timelapse: sounds the notes that are due, draws the picture, and ends the phase when the
+    /// replay has run out.
+    func advanceTimelapse(dt: Double) {
+        guard phase == .timelapse, let conductor, let renderer else { return }
+        for note in conductor.advance(dt: dt, beat: audio?.beat ?? 0) {
+            switch note.voice {
+            case .note(let timbre): audio?.playNote(timbre: timbre, pitch: note.pitch, pan: note.pan)
+            case .poof: audio?.play(.poof, pan: note.pan)
+            }
+        }
+        renderer.advance(to: conductor.replayTime)
+        if conductor.phase == .finished { finishTimelapse() }
+    }
+
+    private func beginTimelapse() {
+        phase = .timelapse
+        sheet.removeAllActions()
+        sheet.opacity = 0
+        renderer?.node.removeAllActions()
+        renderer?.node.opacity = 1
+        renderer?.reset()
+        conductor?.start(beat: audio?.beat ?? 0)
+    }
+
+    /// The picture gives way to the sheet, which wakes up with a wobble.
+    private func finishTimelapse() {
+        phase = .interactive
+        renderer?.node.runAction(.fadeOut(duration: 0.35))
+        sheet.runAction(.fadeIn(duration: 0.35))
+        addRipple(at: .zero, strength: 0.6)
+        audio?.play(.wobble)
+    }
+
+    private func detachTimelapse() {
+        conductor?.cancel()
+        conductor = nil
+        renderer?.node.removeFromParentNode()
+        renderer = nil
     }
 
     func start() { frameDriver.start() }
 
     func stop() {
+        detachTimelapse()
         frameDriver.stop()
         hands.reset()
         pointer = nil
@@ -135,6 +224,11 @@ final class ReviewStage {
         if let pointer {
             sheetHands.append(SheetHand(slot: 2, pose: .fist, position: sheetPoint(fromView: pointer),
                                         velocity: pointerVelocity * viewToSheetScale, tracking: true))
+        }
+        // The timelapse is watched, not touched: the sheet is hidden and no hand or finger reaches it.
+        if phase == .timelapse {
+            sheetHands.removeAll()
+            advanceTimelapse(dt: Double(dt))
         }
 
         // A hand resting on a button is pressing it, not playing with the sheet.

@@ -1,17 +1,27 @@
 import SceneKit
 import SwiftUI
 
-/// After "Save image": the paint on a wet, elastic sheet over the still canvas to push and grab, then hang
-/// it in the gallery or go back to the easel. The play never touches the saved image, which is always the
-/// undeformed photo.
+/// Whether the page is the one right after "Save image" or a painting opened from the gallery.
+enum ReviewMode {
+    case fresh
+    case viewing
+}
+
+/// A painting's timelapse, then the paint on a wet, elastic sheet over the still canvas to push and grab. After
+/// "Save image" it ends with hanging the painting in the gallery or going back to the easel; opened from the gallery
+/// it ends with going back. The play never touches the saved image, which is always the undeformed photo.
 struct ReviewView: View {
-    let draft: ReviewDraft
+    let photos: CanvasPhotos
+    let recording: StrokeRecording?
+    let title: String
+    let date: Date
+    let mode: ReviewMode
     let audio: GrooveEngine
     let relay: HandFrameRelay
     let keepDrawing: () -> Void
     let save: () -> Void
+    let back: () -> Void
     @State private var stage = ReviewStage()
-    @State private var date = Date()
     @State private var frames: [String: CGRect] = [:]
     @State private var leaving = false
     @Environment(\.uiScale) private var scale
@@ -19,6 +29,9 @@ struct ReviewView: View {
     private static let space = "review"
     private static let keepID = "keep"
     private static let saveID = "save"
+    private static let replayID = "replay"
+    private static let skipID = "skip"
+    private static let backID = "back"
 
     var body: some View {
         GeometryReader { proxy in
@@ -30,20 +43,9 @@ struct ReviewView: View {
                         .onEnded { _ in stage.pointer = nil })
 
                 VStack {
-                    title
+                    titleBadge
                     Spacer()
-                    HStack(spacing: 20 * scale) {
-                        DwellButton(title: "Keep drawing", symbol: "paintbrush.pointed.fill", tint: .orange,
-                                    progress: progress(Self.keepID)) { leave(keepDrawing) }
-                            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: {
-                                frames[Self.keepID] = $0
-                            }
-                        DwellButton(title: "Save to gallery", symbol: "building.columns.fill", tint: .pink,
-                                    progress: progress(Self.saveID)) { leave(save) }
-                            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: {
-                                frames[Self.saveID] = $0
-                            }
-                    }
+                    HStack(spacing: 20 * scale) { buttons }
                     hint
                 }
                 .padding(20 * scale)
@@ -69,8 +71,16 @@ struct ReviewView: View {
         .ignoresSafeArea()
         .onAppear {
             audio.setTune(.silly)
-            stage.show(draft.photos, audio: audio)
-            stage.onPress = { id in leave(id == Self.saveID ? save : keepDrawing) }
+            stage.show(photos, recording: recording, audio: audio)
+            stage.onPress = { id in
+                switch id {
+                case Self.skipID: stage.skipTimelapse()
+                case Self.replayID: stage.replay()
+                case Self.saveID: leave(save)
+                case Self.backID: leave(back)
+                default: leave(keepDrawing)
+                }
+            }
             let stage = stage
             relay.listener = { frame in stage.ingest(frame) }
             stage.start()
@@ -82,9 +92,34 @@ struct ReviewView: View {
         }
     }
 
-    private var title: some View {
+    @ViewBuilder private var buttons: some View {
+        if stage.phase == .timelapse {
+            button(Self.skipID, "Skip", "forward.fill", .teal) { stage.skipTimelapse() }
+        } else {
+            if stage.canReplay {
+                button(Self.replayID, "Replay", "arrow.counterclockwise", .purple) { stage.replay() }
+            }
+            switch mode {
+            case .fresh:
+                button(Self.keepID, "Keep drawing", "paintbrush.pointed.fill", .orange) { leave(keepDrawing) }
+                button(Self.saveID, "Save to gallery", "building.columns.fill", .pink) { leave(save) }
+            case .viewing:
+                button(Self.backID, "Back", "chevron.left", .blue) { leave(back) }
+            }
+        }
+    }
+
+    /// A button a tap presses, or a hand holds still on; it only takes hand hovers while it is on the page.
+    private func button(_ id: String, _ title: String, _ symbol: String, _ tint: Color,
+                        action: @escaping () -> Void) -> some View {
+        DwellButton(title: title, symbol: symbol, tint: tint, progress: progress(id), action: action)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.space)) } action: { frames[id] = $0 }
+            .onDisappear { frames[id] = nil }
+    }
+
+    private var titleBadge: some View {
         VStack(spacing: 4 * scale) {
-            Text(draft.choice?.title ?? "Freeform")
+            Text(title)
                 .font(.system(size: 26 * scale, weight: .black, design: .rounded))
             Text(date.formatted(.dateTime.weekday(.wide).month(.wide).day()))
                 .font(.system(size: 14 * scale, weight: .semibold, design: .rounded))
@@ -97,7 +132,9 @@ struct ReviewView: View {
     }
 
     private var hint: some View {
-        Text("Fist to grab · two fists to stretch · open hand to splash · hold an open hand on a button")
+        Text(stage.phase == .timelapse
+             ? "Watch your painting come to life · hold an open hand on Skip to jump ahead"
+             : "Fist to grab · two fists to stretch · open hand to splash · hold an open hand on a button")
             .font(.system(size: 13 * scale, weight: .semibold, design: .rounded))
             .foregroundStyle(Color(red: 0.25, green: 0.2, blue: 0.35).opacity(0.7))
             .multilineTextAlignment(.center)

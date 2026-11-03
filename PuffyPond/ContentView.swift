@@ -89,8 +89,9 @@ struct ContentView: View {
             InstructionView(router: router, tracker: tracker, cameraStatus: playground.cameraStatus, choice: choice)
                 .transition(.opacity)
         case let .review(draft):
-            ReviewView(draft: draft, audio: playground.audio, relay: pageHands,
-                       keepDrawing: { router.go(.canvas(draft.choice)) }, save: { save(draft) })
+            ReviewView(photos: draft.photos, recording: draft.recording, title: draft.choice?.title ?? "Freeform",
+                       date: Date(), mode: .fresh, audio: playground.audio, relay: pageHands,
+                       keepDrawing: { router.go(.canvas(draft.choice)) }, save: { save(draft) }, back: {})
                 .id(draft.id)
                 .transition(.opacity)
         case .gallery2D:

@@ -1,4 +1,6 @@
 import CoreGraphics
+import Metal
+import SceneKit
 import Testing
 import simd
 @testable import PuffyPond
@@ -82,5 +84,57 @@ struct RevealMaskTests {
 
         replayer.reset()
         #expect(replayer.mask.coverage(atWorld: SIMD2(-2, 1)) == 0)
+    }
+
+    /// Renders the replayer's node alone against green and reads two pixels: the shader that hides unrevealed paint
+    /// is the one thing the other tests cannot see.
+    @Test func replayerDrawsPaintOnlyWhereRevealed() throws {
+        let red = try #require(CGContext(data: nil, width: 4, height: 4, bitsPerComponent: 8, bytesPerRow: 0,
+                                         space: CGColorSpaceCreateDeviceRGB(),
+                                         bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        red.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
+        red.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
+        let events: [RecordedEvent] = [
+            .dab(dab(from: SIMD2(-2, 0.1), to: SIMD2(-2, 0.1), radius: 0.3, t: 0)),
+            .dab(dab(from: SIMD2(-2, 0.1), to: SIMD2(-2, 0.1), radius: 0.3, t: 1)),
+        ]
+        let replayer = MaskReplayer(finalPaint: try #require(red.makeImage()),
+                                    recording: StrokeRecording(events: events),
+                                    timeline: ReplayTimeline(eventTimes: [0, 1]))
+        replayer.advance(to: 0.5)
+
+        let scene = SCNScene()
+        scene.background.contents = PlatformColor(red: 0, green: 1, blue: 0, alpha: 1)
+        scene.rootNode.addChildNode(replayer.node)
+        let light = SCNNode()
+        light.light = SCNLight()
+        light.light?.type = .ambient
+        light.light?.intensity = 1000
+        scene.rootNode.addChildNode(light)
+        let lens = SCNNode()
+        lens.camera = SCNCamera()
+        lens.camera?.usesOrthographicProjection = true
+        lens.camera?.orthographicScale = 2
+        lens.simdPosition = SIMD3(0, 0, 5)
+        scene.rootNode.addChildNode(lens)
+
+        let renderer = SCNRenderer(device: MTLCreateSystemDefaultDevice(), options: nil)
+        renderer.scene = scene
+        renderer.pointOfView = lens
+        let shot = try #require(renderer.snapshot(atTime: 0, with: CGSize(width: 640, height: 400),
+                                                  antialiasingMode: .none).cgImageValue)
+
+        func rgb(x: Int, y: Int) -> (r: Int, g: Int) {
+            var bytes = [UInt8](repeating: 0, count: 4)
+            let context = CGContext(data: &bytes, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                    space: CGColorSpaceCreateDeviceRGB(),
+                                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            context.draw(shot, in: CGRect(x: -x, y: -(shot.height - 1 - y), width: shot.width, height: shot.height))
+            return (Int(bytes[0]), Int(bytes[1]))
+        }
+        let revealed = rgb(x: 120, y: 200)    // where the dab is
+        let hidden = rgb(x: 520, y: 200)      // the far side
+        #expect(revealed.r > 150 && revealed.g < 100, "paint shows where revealed: \(revealed)")
+        #expect(hidden.g > 150 && hidden.r < 100, "background shows elsewhere: \(hidden)")
     }
 }

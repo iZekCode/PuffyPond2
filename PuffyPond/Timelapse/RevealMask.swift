@@ -1,7 +1,8 @@
 import CoreGraphics
 import simd
 
-/// A grey picture of the canvas that fills in white where paint has been laid: the reveal for the timelapse.
+/// A picture of the canvas that fills in white where paint has been laid (premultiplied, so its colour and alpha
+/// both run from 0 to 1): the reveal for the timelapse.
 /// It is a class because it owns a bitmap that must not be shared by copies.
 final class RevealMask {
     static let width = 640
@@ -14,11 +15,11 @@ final class RevealMask {
 
     init() {
         context = CGContext(data: nil, width: Self.width, height: Self.height, bitsPerComponent: 8, bytesPerRow: 0,
-                            space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue)!
+                            space: CGColorSpaceCreateDeviceRGB(),
+                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         context.setLineCap(.round)
         context.setLineJoin(.round)
-        context.setStrokeColor(gray: 1, alpha: 1)
-        clear()
+        context.setStrokeColor(red: 1, green: 1, blue: 1, alpha: 1)
     }
 
     /// A round-capped line from `dab.from` to `dab.to`, as wide as the brush.
@@ -33,8 +34,7 @@ final class RevealMask {
     }
 
     func clear() {
-        context.setFillColor(gray: 0, alpha: 1)
-        context.fill(CGRect(x: 0, y: 0, width: Self.width, height: Self.height))
+        context.clear(CGRect(x: 0, y: 0, width: Self.width, height: Self.height))
     }
 
     /// 0 (hidden) to 1 (fully revealed) at a point of the canvas, in world units.
@@ -43,7 +43,7 @@ final class RevealMask {
         let column = Int(point.x)
         let row = Self.height - 1 - Int(point.y)
         guard column >= 0, column < Self.width, row >= 0, row < Self.height, let data = context.data else { return 0 }
-        return Float(data.load(fromByteOffset: row * context.bytesPerRow + column, as: UInt8.self)) / 255
+        return Float(data.load(fromByteOffset: row * context.bytesPerRow + column * 4 + 3, as: UInt8.self)) / 255
     }
 
     var image: CGImage { context.makeImage()! }
