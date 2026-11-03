@@ -81,7 +81,7 @@ final class Octopus: Critter {
         let ooze = smoothStep(Self.oozeDelay, Self.oozeDelay + 0.35, holdTime)
         let swell = min(max(holdTime - Self.oozeDelay, 0), Self.oozeGrowth)
         var style = BrushStyle.octopus
-        if ooze > 0 { style.amount = 0.05 + 0.2 * ooze }
+        if ooze > 0 { style.amount = 0.05 + 0.1 * ooze }
         var result = [BrushDab(from: a, to: b, radius: radius * sizeScale * (1 + 0.3 * swell), speed: speed, style: style)]
         for c in tentacles.contacts {
             guard ooze > 0 else {

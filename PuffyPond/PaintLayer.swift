@@ -30,7 +30,7 @@ struct BrushStyle {
 
     static let brush = BrushStyle()
     /// The octopus: a thin watercolor wash that grows its own texture.
-    static let octopus = BrushStyle(push: 0.4, bristles: 0, watery: 0.6, nca: 1)
+    static let octopus = BrushStyle(push: 0.4, bristles: 0, watery: 0.9, nca: 1)
     static let blend = BrushStyle(amount: 0, push: 0.9, bristles: 0, blend: 1)
 }
 
@@ -61,10 +61,10 @@ final class PaintLayer {
     private static let leveling: Float = 2            // how quickly wet paint relaxes
     private static let damping: Float = 5             // 1/s: how fast smears stop moving
     private static let gravity: Float = 260           // texels/s² pull on thick wet paint
-    private static let normalStrength: Float = 42
-    private static let cavity: Float = 6
+    private static let normalStrength: Float = 20
+    private static let cavity: Float = 3
     private static let reliefHeight: Float = 0.12     // bristle texture depth
-    private static let bodyHeight: Float = 0.35       // how much the paint's thickness itself shows
+    private static let bodyHeight: Float = 0.15       // how much the paint's thickness itself shows
     private static let weaveDepth: Float = 0.012      // canvas weave showing through thin paint
     private static let grainHeight: Float = 0.02      // per-texel canvas tooth under the paint
     private static let maxStamps = 256
@@ -82,7 +82,7 @@ final class PaintLayer {
     private static let ncaDT: Float = 1               // --dt
     private static let ncaFireRate: Float = 0.5       // --fire-rate
     private static let ncaHeight: Float = 0.2         // how much the grown texture lifts and lowers the paint
-    private static let ncaColor: Float = 0.9          // how far the pigment gives way to the texture's own colours
+    private static let ncaColor: Float = 0.6          // how far the pigment gives way to the texture's own colours
     private static let ncaLifePerSecond: Float = 0.3  // a stroke keeps growing for about 1 / this many seconds
     // The texture takes hold in patches along a stroke, not everywhere: a soft noise field decides where.
     private static let ncaPatchSize: Float = 0.4      // patch width, in world units
