@@ -413,6 +413,7 @@ final class GalleryHall {
         camera.vignettingPower = 0.8
         cameraNode.camera = camera
         scene.rootNode.addChildNode(cameraNode)
+        Effects.addFireflies(to: cameraNode, in: SIMD3(5, 3, 1.5), at: SIMD3(0, 0, -3))
         scene.rootNode.addChildNode(row)
 
         // Track light from the ceiling, walking with the camera: a soft pool on the painting in front,

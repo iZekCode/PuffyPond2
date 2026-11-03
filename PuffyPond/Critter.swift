@@ -210,7 +210,7 @@ class Critter {
         lips.simdEulerAngles = SIMD3(0, mouthYaw, 0)
         host.addChildNode(lips)
         mouthNode = lips
-        let particles = Effects.inkBubbles()
+        let particles = Effects.petals()
         let nozzle = SCNNode()
         nozzle.simdPosition = SIMD3(0, 0, 0.03)
         nozzle.addParticleSystem(particles)

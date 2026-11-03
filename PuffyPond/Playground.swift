@@ -252,6 +252,7 @@ final class Playground {
         scene.rootNode.addChildNode(canvasNode)
 
         scene.rootNode.addChildNode(paintLayer.node)
+        Effects.addFireflies(to: cameraNode, in: SIMD3(5, 3, 0.6), at: SIMD3(0, 0, -2.4))
         // Two columns just outside the canvas, so dipping never smears the painting:
         // paint pots down the right (rub a critter in one to pick up its color),
         // critter bubbles down the left (rub one to become that brush animal, or to pick up that paint tool).
