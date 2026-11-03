@@ -28,7 +28,7 @@ enum PaintTool: Int, CaseIterable, Equatable {
     var critterKind: CritterKind? {
         switch self {
         case .thickOil: return .snail
-        case .liquidOil: return .jellyfish
+        case .liquidOil: return .ladybug
         case .brush: return .spider
         case .eraser: return nil
         case .blender: return .sponge

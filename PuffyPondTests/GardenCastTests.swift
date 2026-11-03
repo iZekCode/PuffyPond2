@@ -41,4 +41,24 @@ struct GardenCastTests {
         #expect(Octopus(color: Paint.colors[0], at: .zero).usesSizeSlider)
         #expect(!Snail(color: Paint.colors[0], at: .zero).usesSizeSlider)
     }
+
+    @Test func liquidOilIsTheLadybug() {
+        #expect(PaintTool.liquidOil.critterKind == .ladybug)
+        #expect(CritterKind.ladybug.make(color: Paint.colors[5], at: .zero) is Ladybug)
+    }
+
+    @Test func ladybugWingsFlapWithTheBeat() {
+        let bug = Ladybug(color: Paint.colors[5], at: .zero)
+        var seen: [Float] = []
+        for _ in 0..<3 {
+            for pulse in [Float(1), 0] {
+                for _ in 0..<10 {
+                    bug.update(dt: 1.0 / 60, target: .zero, visible: true, painting: false, beatPulse: pulse)
+                    seen.append(bug.wingOpen)
+                }
+            }
+        }
+        #expect((seen.max() ?? 0) - (seen.min() ?? 0) > 0.3)
+        #expect(seen.allSatisfy { $0 >= 0 && $0 <= 1.2 })
+    }
 }
