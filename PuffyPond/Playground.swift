@@ -8,7 +8,7 @@ import simd
 nonisolated enum CameraStatus: Equatable { case starting, running, denied, unavailable }
 
 nonisolated enum Hint: Equatable {
-    case starting, raiseHands, swimming, pickingColor, drawing, erasing, readyToHang, tracing, touchMode
+    case starting, raiseHands, roaming, pickingColor, drawing, erasing, readyToHang, tracing, touchMode
 }
 
 /// "You picked a color" moment for the HUD.
@@ -45,7 +45,7 @@ final class Playground {
     var focusMode = false
     var pointerErases = false {
         didSet {
-            guard controlScheme == .fist, pointerErases != oldValue, let buddy = buddies.first else { return }
+            guard pointerErases != oldValue, let buddy = buddies.first else { return }
             // The garden eraser is a critter: the mouse or finger eraser button turns its buddy into the mushroom.
             let next: PaintTool = pointerErases ? .eraser : (toolBeforePointerErase ?? .brush)
             if pointerErases { toolBeforePointerErase = buddy.tool }
@@ -57,14 +57,13 @@ final class Playground {
         }
     }
     @ObservationIgnored private var toolBeforePointerErase: PaintTool?
-    var buddyColors: [Int] = [0, 1]
-    var buddyKinds: [CritterKind] = [.octopus, .seahorse]
+    /// Red and orange: the ladybug's own colours.
+    var buddyColors: [Int] = [0, 3]
+    var buddyKinds: [CritterKind] = [.ladybug, .ladybug]
     var buddyTools: [PaintTool] = [.brush, .brush]
-    /// How big the octopus is, and so how wide its brush paints (its mouth and every tentacle scale with it).
-    var octopusSize: Float = 1
+    /// How big the ladybug is, and so how wide its brush paints (every leg scales with it).
+    var brushSize: Float = 1
     var colorFlash: ColorFlash?
-    /// Fist paints with four tools (default), or the original pinch + six brush animals.
-    let controlScheme: ControlScheme
 
     // MARK: World
     @ObservationIgnored let effects = Effects(scene: SCNScene())
@@ -82,7 +81,6 @@ final class Playground {
     @ObservationIgnored private var blipDistance: [Int: Float] = [:]
     @ObservationIgnored private(set) var pots: [PaintPot] = []
     @ObservationIgnored private(set) var critterPots: [CritterPot] = []
-    @ObservationIgnored private var templatePots: [TemplatePot] = []
     /// The dotted animal to trace, if one is on the canvas.
     @ObservationIgnored private(set) var template: TemplateOutline?
     /// What you actually see: wet, textured paint on the canvas.
@@ -111,17 +109,13 @@ final class Playground {
     /// The pot and bubble columns sit just outside the canvas's left and right edges.
     static let shelfX: Float = canvasSize.x * 0.5 + 0.38
     static let shelfSpacing: Float = 0.62
-    /// Template bubbles stand on the easel tray along the bottom of the canvas.
-    static let templateRowY: Float = 0.1 - canvasSize.y * 0.5 + 0.23
     static let strokeRadius: Float = 0.085
     static let paintHoverZ: Float = 0.24        // how high the brush animal hovers while painting
-    static let octopusSizeRange: ClosedRange<Float> = 0.6...2.4
+    static let brushSizeRange: ClosedRange<Float> = 0.6...2.4
 
     // Timing
-    @ObservationIgnored private var lastTime: Double = 0
     @ObservationIgnored private var clock: Float = 0
-    @ObservationIgnored private var lastSqueak: Double = 0
-    @ObservationIgnored private var lastBeatIndex = -1
+    @ObservationIgnored private var lastPoof: Double = 0
     @ObservationIgnored private var energy: Float = 0
     @ObservationIgnored private var handsSeenTime: Float = 0
 
@@ -129,13 +123,7 @@ final class Playground {
     @ObservationIgnored private var pointer: SIMD2<Float>?
     @ObservationIgnored private var pointerPrevious: SIMD2<Float>?
 
-    init(controlScheme: ControlScheme = .fist) {
-        self.controlScheme = controlScheme
-        input.scheme = controlScheme
-        if controlScheme == .fist {
-            buddyKinds = [.ladybug, .ladybug]
-            buddyColors = [0, 3]   // red and orange: the ladybug's own colours
-        }
+    init() {
         buildWorld()
         frameDriver.onFrame = { [weak self] dt in self?.tick(dt: Float(dt)) }
     }
@@ -250,43 +238,25 @@ final class Playground {
         func columnY(_ k: Int, of count: Int) -> Float {
             0.1 + (Float(count - 1) / 2 - Float(k)) * Self.shelfSpacing
         }
-        let potColors = controlScheme == .fist ? Paint.potOrder : Array(Paint.colors.indices)
+        let potColors = Paint.potOrder
         for (k, colorIndex) in potColors.enumerated() {
             let pot = PaintPot(colorIndex: colorIndex, at: SIMD3(Self.shelfX, columnY(k, of: potColors.count), 0.3))
             scene.rootNode.addChildNode(pot.root)
             pots.append(pot)
         }
-        switch controlScheme {
-        case .legacy:
-            for (k, kind) in CritterKind.legacyBrushes.enumerated() {
-                let y = columnY(k, of: CritterKind.legacyBrushes.count)
-                critterPots.append(CritterPot(kind: kind, at: SIMD3(-Self.shelfX, y, 0.3)))
-            }
-        case .fist:
-            for (k, tool) in PaintTool.allCases.enumerated() {
-                let y = columnY(k, of: PaintTool.allCases.count)
-                critterPots.append(CritterPot(tool: tool, at: SIMD3(-Self.shelfX, y, 0.3)))
-            }
+        for (k, tool) in PaintTool.allCases.enumerated() {
+            let y = columnY(k, of: PaintTool.allCases.count)
+            critterPots.append(CritterPot(tool: tool, at: SIMD3(-Self.shelfX, y, 0.3)))
         }
         for pot in critterPots {
             scene.rootNode.addChildNode(pot.root)
             scene.rootNode.addChildNode(pot.residentRoot)
         }
-        // A row of template bubbles on the tray: rub one to get a dotted animal to trace. The fist
-        // controls pick the template before the canvas opens instead.
-        for (k, kind) in (controlScheme == .legacy ? TemplateKind.legacyTray : []).enumerated() {
-            let x = (Float(k) - Float(TemplateKind.legacyTray.count - 1) / 2) * 0.9
-            let pot = TemplatePot(kind: kind, at: SIMD3(x, Self.templateRowY, 0.3))
-            scene.rootNode.addChildNode(pot.root)
-            templatePots.append(pot)
-        }
 
         for slot in 0..<2 {
             let start = SIMD3<Float>(slot == 0 ? -1.2 : 1.2, -0.9, 0.5)
-            let buddy = Buddy(slot: slot, colorIndex: buddyColors[slot], kind: buddyKinds[slot], start: start,
-                              erasesWithStarfish: controlScheme == .legacy)
+            let buddy = Buddy(slot: slot, colorIndex: buddyColors[slot], kind: buddyKinds[slot], start: start)
             scene.rootNode.addChildNode(buddy.critter.root)
-            scene.rootNode.addChildNode(buddy.starfish.root)
             buddies.append(buddy)
         }
         layout(size: CGSize(width: 1600, height: 1000))
@@ -373,16 +343,12 @@ final class Playground {
         let beat = audio.beat
         let beatFraction = Float(beat - beat.rounded(.down))
         let beatPulse = exp(-beatFraction * 6)
-        let beatIndex = Int(beat.rounded(.down))
-        let onBeat = beatIndex != lastBeatIndex
-        lastBeatIndex = beatIndex
 
         var hands = input.advance(dt: dt, now: now)
         if let p = pointer {
             let previous = pointerPrevious ?? p
             hands.removeAll { $0.slot == 0 }
-            let pose: HandPose = controlScheme == .fist || pointerErases ? .fist : .pinch
-            hands.append(HandState(slot: 0, pose: pose, position: p,
+            hands.append(HandState(slot: 0, pose: .fist, position: p,
                                    velocity: (p - previous) / dt, tracking: true, isPointer: true))
             pointerPrevious = p
         }
@@ -395,31 +361,26 @@ final class Playground {
             let hand = hands.first { $0.slot == buddy.slot && $0.tracking }
             // The touch/mouse eraser button makes the pointer scrub, whatever tool the buddy holds.
             let tool: PaintTool = hand?.isPointer == true && pointerErases ? .eraser : buddy.tool
-            let mode = controlScheme.mode(for: hand?.pose, tool: tool)
-            if buddy.setMode(mode) {
-                audio.play(.swap, pan: buddy.slot == 0 ? -0.5 : 0.5)
-            }
+            let mode = BuddyMode.mode(for: hand?.pose, tool: tool)
+            buddy.setMode(mode)
             if mode != .paint { finishStroke(slot: buddy.slot) }
 
-            // Painting, the animal comes down close to the canvas so its tentacles can lie on it.
+            // Painting, the animal comes down close to the canvas so its legs can lie on it.
             // A bigger brush animal hovers higher, so its body stays clear of the canvas.
-            let bigBrush = buddy.critter.usesSizeSlider ? max(octopusSize, 1) : 1
+            let bigBrush = buddy.critter.usesSizeSlider ? max(brushSize, 1) : 1
             let buddyZ: Float = mode == .paint ? Self.canvasZ + (Self.paintHoverZ - Self.canvasZ) * bigBrush : 0.42
-            if buddy.critter.usesSizeSlider { buddy.critter.sizeScale = octopusSize }
+            if buddy.critter.usesSizeSlider { buddy.critter.sizeScale = brushSize }
             let target: SIMD3<Float>
             if let hand {
                 target = worldPoint(hand.position, z: buddyZ)
             } else {
-                // Idle: swim lazy loops so the buddies always feel alive.
+                // Idle: drift in lazy loops so the buddies always feel alive.
                 let h = visibleHalfSize(atZ: buddyZ)
                 let t = clock * 0.35 + Float(buddy.slot) * 3.1
                 target = SIMD3(sin(t) * h.x * 0.6, cameraY - h.y * 0.62 + sin(t * 2.3) * 0.15, buddyZ)
             }
-            buddy.critter.update(dt: dt, target: target, visible: !buddy.showsStarfish,
-                                 painting: (mode == .paint || mode == .erase) && !buddy.showsStarfish,
-                              beatPulse: beatPulse)
-            buddy.starfish.update(dt: dt, target: SIMD3(target.x, target.y, 0.3), visible: buddy.showsStarfish,
-                                  beatPulse: beatPulse)
+            buddy.critter.update(dt: dt, target: target, visible: true,
+                                 painting: mode == .paint || mode == .erase, beatPulse: beatPulse)
 
             movement += min(buddy.toolSpeed, 4) * (hand == nil ? 0 : 1)
             switch mode {
@@ -429,7 +390,7 @@ final class Playground {
             case .erase:
                 erasingNow = true
                 erase(with: buddy, now: now)
-            case .idle, .swim:
+            case .idle, .roam:
                 break
             }
             rubPots(buddy, dt: dt, now: now)
@@ -457,12 +418,6 @@ final class Playground {
             if case .tool(let tool) = pot.target { paints = tool.usesColor } else { paints = true }
             pot.update(dt: dt, beatPulse: beatPulse, rubProgress: min(progress, 1), selectedCount: wearers.count,
                        color: paints ? wearers.first?.color : nil)
-        }
-        for pot in templatePots {
-            let rubbers = buddies.filter { $0.rubbingPot == .template(pot.kind) }
-            let progress = rubbers.map(\.rubAmount).max() ?? 0
-            if progress > 0 { rubbing = true }
-            pot.update(dt: dt, beatPulse: beatPulse, rubProgress: min(progress, 1), selected: template?.kind == pot.kind)
         }
         template?.update()
 
@@ -503,21 +458,16 @@ final class Playground {
         var p = SIMD2(p3.x, p3.y)
         // Only a little slack sideways: reaching for a pot or bubble beside the canvas shouldn't paint.
         let onCanvas = abs(p.x - center.x) <= half.x + 0.05 && abs(p.y - center.y) <= half.y + 0.12
-        // The template bubbles overlap the bottom of the canvas: rubbing one shouldn't smear paint.
-        let onTemplatePot = templatePots.contains { pot in
-            let c = pot.root.simdPosition
-            return simd_distance(p, SIMD2(c.x, c.y + 0.04)) < PaintPot.radius + 0.14
-        }
-        guard onCanvas, !onTemplatePot, !isOverShelf(p) else {
+        guard onCanvas, !isOverShelf(p) else {
             finishStroke(slot: slot)
             return
         }
         p = simd_clamp(p, center - half, center + half)
 
-        // Lay real paint every frame, the way this tool (legacy: this brush animal) paints.
+        // Lay real paint every frame, the way this tool paints.
         let from = lastStamp[slot] ?? p
-        // The octopus paints with its tentacles too, so its brush always comes from the animal itself.
-        let dabs = controlScheme == .fist && buddy.tool != .brush
+        // The ladybug paints with its legs too, so its brush always comes from the animal itself.
+        let dabs = buddy.tool != .brush
             ? buddy.tool.dabs(from: from, to: p, radius: Self.strokeRadius, speed: buddy.critter.speed)
             : buddy.critter.dabs(from: from, to: p, radius: Self.strokeRadius, speed: buddy.critter.speed)
         lay(dabs, color: buddy.color, ncaModel: buddy.colorIndex, seed: Float(slot) * 13.7 + Float(strokes.count) * 2.3,
@@ -528,7 +478,7 @@ final class Playground {
             audio.play(.ooze, a: hold, pan: panFor(p.x))
         }
         // The blender only moves paint that's already there: it doesn't start a stroke of its own.
-        if controlScheme == .fist && buddy.tool == .blender {
+        if buddy.tool == .blender {
             if now - lastSlurp > 0.25 {
                 lastSlurp = now
                 audio.play(.slurp, a: min(buddy.critter.speed / 3, 1), pan: panFor(p.x))
@@ -578,11 +528,6 @@ final class Playground {
         if activeStroke[slot] != nil, slot < buddies.count {
             let buddy = buddies[slot]
             buddy.critter.react(.happy, for: 0.7)   // proud of that line
-            // Some brushes paint when you let go (the pufferfish bursts).
-            if controlScheme == .legacy {
-                lay(buddy.critter.released(), color: buddy.color, ncaModel: buddy.colorIndex,
-                    seed: Float(slot) * 7.7 + Float(strokes.count), brush: buddy.critter.kind)
-            }
         }
         activeStroke[slot] = nil
         lastBead[slot] = nil
@@ -599,12 +544,8 @@ final class Playground {
         if abs(p.x) <= Self.canvasSize.x / 2, abs(p.y - 0.1) <= Self.canvasSize.y / 2 {
             timelapse.recordErase(at: p, radius: r, dt: frameDT)
         }
-        // The legacy starfish scrubs the dotted guide away too; the garden mushroom only wipes paint.
-        var erasedAny = buddy.showsStarfish ? (template?.erase(at: p, radius: r) ?? false) : false
-        if let outline = template, outline.isEmpty {
-            outline.node.removeFromParentNode()
-            template = nil
-        }
+        // The mushroom only wipes paint: the dotted guide stays.
+        var erasedAny = false
         var newStrokes: [Stroke] = []
         for stroke in strokes {
             guard stroke.points.contains(where: { simd_distance($0.p, p) < r }) else {
@@ -639,9 +580,9 @@ final class Playground {
         strokes = newStrokes
         if erasedAny {
             buddy.scrubbed()
-            if now - lastSqueak > 0.09 {
-                lastSqueak = now
-                audio.play(buddy.showsStarfish ? .squeak : .poof, pan: panFor(p.x))
+            if now - lastPoof > 0.09 {
+                lastPoof = now
+                audio.play(.poof, pan: panFor(p.x))
                 Toybox.burst(in: scene, at: SIMD3(p.x, p.y, 0.2), color: SIMD3(1, 1, 1), count: 10, speed: 1.2,
                              size: 0.04, gravity: -1)
             }
@@ -773,10 +714,9 @@ final class Playground {
             buddy.rubAmount = 0
             buddy.critter.colorPreview = nil
         }
-        // The garden eraser is a critter like any other, so it can dip into pots and bubbles while it erases
+        // The eraser is a critter like any other, so it can dip into pots and bubbles while it erases
         // (a mouse or finger is always "fist", so the mushroom would otherwise be stuck as the mushroom).
-        let canRub = buddy.mode == .swim || buddy.mode == .paint || (buddy.mode == .erase && !buddy.erasesWithStarfish)
-        guard canRub else { return stop() }
+        guard buddy.mode != .idle else { return stop() }
         let p = buddy.toolPosition
         func near(_ c: SIMD3<Float>) -> Bool {
             simd_distance(SIMD2(p.x, p.y), SIMD2(c.x, c.y + 0.04)) < PaintPot.radius + 0.14
@@ -789,9 +729,6 @@ final class Playground {
         } else if let pot = critterPots.first(where: { near($0.root.simdPosition) }), !wears(buddy, pot.target) {
             target = pot.target
             potPosition = pot.root.simdPosition
-        } else if let pot = templatePots.first(where: { near($0.root.simdPosition) }), pot.kind != template?.kind {
-            target = .template(pot.kind)
-            potPosition = pot.root.simdPosition
         } else {
             return stop()
         }
@@ -800,7 +737,7 @@ final class Playground {
             buddy.rubAmount = 0
             bouncePot(target, 0.6)
         }
-        // Slow animals (snail, jelly) can't rub fast, so just sitting in the pot counts for a lot too.
+        // Slow animals (the snail) can't rub fast, so just sitting in the pot counts for a lot too.
         buddy.rubAmount += dt * 0.9 + min(buddy.critter.speed, 3) * dt * 0.9
         let progress = min(buddy.rubAmount, 1)
         if case .color(let index) = target { buddy.critter.colorPreview = (Paint.colors[index], progress * 0.85) }
@@ -817,7 +754,7 @@ final class Playground {
         case .color(let index):
             buddy.pick(index)
             // A colour belongs to one brush animal: dip into the other one's colour and become that animal.
-            if controlScheme == .fist, buddy.tool.usesColor, let owner = Paint.owner(of: index), owner != buddy.critter.kind,
+            if buddy.tool.usesColor, let owner = Paint.owner(of: index), owner != buddy.critter.kind,
                let tool = PaintTool.allCases.first(where: { $0.critterKind == owner }) {
                 finishStroke(slot: buddy.slot)
                 if let old = buddy.equip(tool) {
@@ -829,16 +766,9 @@ final class Playground {
             audio.play(Int.random(in: 0..<12) == 0 ? .chicken : .pick, a: Float(index), pan: pan)
             flashCounter += 1
             colorFlash = ColorFlash(slot: buddy.slot, colorIndex: index, id: flashCounter)
-        case .critter(let kind):
-            finishStroke(slot: buddy.slot)
-            let old = buddy.become(kind)
-            old.root.removeFromParentNode()
-            scene.rootNode.addChildNode(buddy.critter.root)
-            effects.colorSplash(at: potPosition + SIMD3(0, 0.15, 0.1), color: buddy.color)
-            audio.play(.swap, pan: pan)
         case .tool(let tool):
             finishStroke(slot: buddy.slot)
-            if pointerErases, buddy.slot == 0, controlScheme == .fist, tool != .eraser {
+            if pointerErases, buddy.slot == 0, tool != .eraser {
                 // The eraser button would keep the pointer scrubbing: switch it off and take the new tool instead.
                 toolBeforePointerErase = tool
                 pointerErases = false
@@ -848,17 +778,7 @@ final class Playground {
             }
             effects.colorSplash(at: potPosition + SIMD3(0, 0.15, 0.1), color: tool.usesColor ? buddy.color : SIMD3(1, 1, 1))
             audio.play(.bonk, pan: pan)
-        case .template(let kind):
-            showTemplate(kind)
-            effects.colorSplash(at: potPosition + SIMD3(0, 0.15, 0.1), color: kind.signatureColor)
-            audio.play(.sparkle, pan: pan)
         }
-    }
-
-    /// Lays a new dotted outline on the canvas (replacing any other one). Paint already there stays.
-    private func showTemplate(_ kind: TemplateKind) {
-        showOutline(TemplateOutline(kind: kind, canvasCenter: SIMD2(0, 0.1), canvasSize: Self.canvasSize,
-                                    z: Self.canvasZ + 0.0008))
     }
 
     private func showOutline(_ outline: TemplateOutline) {
@@ -867,20 +787,16 @@ final class Playground {
         template = outline
     }
 
-    /// The buddy already is this brush animal or holds this tool.
+    /// The buddy already holds this tool.
     private func wears(_ buddy: Buddy, _ target: PotTarget) -> Bool {
-        switch target {
-        case .critter(let kind): return buddy.critter.kind == kind
-        case .tool(let tool): return buddy.tool == tool
-        case .color, .template: return false
-        }
+        if case .tool(let tool) = target { return buddy.tool == tool }
+        return false
     }
 
     private func bouncePot(_ target: PotTarget, _ strength: Float) {
         switch target {
         case .color(let index): pots.first { $0.colorIndex == index }?.bounce(strength)
-        case .critter, .tool: critterPots.first { $0.target == target }?.bounce(strength)
-        case .template(let kind): templatePots.first { $0.kind == kind }?.bounce(strength)
+        case .tool: critterPots.first { $0.target == target }?.bounce(strength)
         }
     }
 
@@ -897,7 +813,7 @@ final class Playground {
         } else if template != nil {
             next = .tracing
         } else if hands.contains(where: { $0.tracking && !$0.isPointer }) {
-            next = .swimming
+            next = .roaming
         } else if cameraStatus == .denied || cameraStatus == .unavailable {
             next = .touchMode
         } else if cameraStatus == .starting {

@@ -130,8 +130,8 @@ struct SessionRecorderTests {
 
     @Test func gripCycleCountsFistOpenPairs() {
         var recorder = SessionRecorder(mirrored: true)
-        // open → fist → open → fist → pinch (counts as open) → fist: two full cycles, one still closed.
-        for pose in [HandPose.open, .fist, .fist, .open, .fist, .pinch, .fist] {
+        // open → fist → open → fist → open → fist: two full cycles, one still closed.
+        for pose in [HandPose.open, .fist, .fist, .open, .fist, .open, .fist] {
             recorder.record(hands: [hand(slot: 0, pose: pose)], dt: frameTime)
         }
         #expect(recorder.finish()?.gripCycles[.left] == 2)

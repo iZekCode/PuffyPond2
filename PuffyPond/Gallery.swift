@@ -596,12 +596,6 @@ final class GalleryHall {
                 ctx.setFillColor(CGColor(red: CGFloat(c.x), green: CGFloat(c.y), blue: CGFloat(c.z), alpha: CGFloat(c.w)))
                 ctx.fill(r)
             }
-            func polygon(_ points: [CGPoint], _ c: SIMD4<Float>) {
-                ctx.setFillColor(CGColor(red: CGFloat(c.x), green: CGFloat(c.y), blue: CGFloat(c.z), alpha: CGFloat(c.w)))
-                ctx.addLines(between: points)
-                ctx.closePath()
-                ctx.fillPath()
-            }
             let W = CGFloat(w), H = CGFloat(h)
             let horizon: CGFloat = 330          // where the deck meets the open air (y up)
             var seed: UInt32 = 5

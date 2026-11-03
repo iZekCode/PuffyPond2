@@ -21,7 +21,7 @@ struct GardenCastTests {
     }
 
     @Test func gardenCastIsTheToolColumn() {
-        #expect(CritterKind.gardenCast == PaintTool.allCases.compactMap(\.critterKind))
+        #expect(CritterKind.gardenCast == PaintTool.allCases.map(\.critterKind))
         #expect(CritterKind.gardenCast.count == 4)
     }
 
@@ -45,8 +45,12 @@ struct GardenCastTests {
         }
     }
 
-    @Test func legacyBrushesAreUntouched() {
-        #expect(CritterKind.legacyBrushes == [.octopus, .snail, .pufferfish, .seahorse, .jellyfish, .frog])
+    /// Saved timelapse recordings store the raw value of the brush's kind.
+    @Test func kindRawValuesMatchSavedRecordings() {
+        #expect(CritterKind.snail.rawValue == 1)
+        #expect(CritterKind.ladybug.rawValue == 7)
+        #expect(CritterKind.butterfly.rawValue == 8)
+        #expect(CritterKind.mushroom.rawValue == 9)
     }
 
     // MARK: Ladybug (brush)
@@ -75,9 +79,8 @@ struct GardenCastTests {
         #expect(bug.bodyNode.simdPosition.x.isFinite)
     }
 
-    @Test func limbBrushesUseTheSizeSlider() {
+    @Test func limbBrushUsesTheSizeSlider() {
         #expect(Ladybug(color: Paint.colors[0], at: .zero).usesSizeSlider)
-        #expect(Octopus(color: Paint.colors[0], at: .zero).usesSizeSlider)
         #expect(!Snail(color: Paint.colors[0], at: .zero).usesSizeSlider)
     }
 
@@ -137,39 +140,21 @@ struct GardenCastTests {
         #expect(p.x.isFinite && p.y.isFinite && p.z.isFinite)
     }
 
-    @Test func mushroomErasesAtLeastAsWideAsTheStarfish() {
-        #expect(Mushroom.eraseRadius >= Starfish.eraseRadius)
-    }
-
     // MARK: Eraser plumbing
 
-    @Test func legacyEraserStillSwapsToTheStarfish() {
-        let buddy = Buddy(slot: 0, colorIndex: 0, kind: .octopus, start: .zero)
-        #expect(buddy.setMode(.erase))
-        #expect(buddy.showsStarfish)
-        #expect(buddy.eraseRadius == Starfish.eraseRadius)
-    }
-
-    @Test func gardenEraserIsTheMushroom() {
-        let buddy = Buddy(slot: 0, colorIndex: 0, kind: .ladybug, start: .zero, erasesWithStarfish: false)
+    @Test func eraserIsTheMushroom() {
+        let buddy = Buddy(slot: 0, colorIndex: 0, kind: .ladybug, start: .zero)
         let old = buddy.equip(.eraser)
         #expect(old is Ladybug)
         #expect(buddy.critter is Mushroom)
-        #expect(!buddy.showsStarfish)
-        #expect(!buddy.setMode(.erase))
         #expect(buddy.eraseRadius == Mushroom.eraseRadius)
     }
 
-    @Test func eraserBubbleHoldsNoStarfishInTheGardenScheme() {
-        #expect(CritterPot(tool: .eraser, at: .zero).starfish == nil)
-    }
-
     @Test func pointerEraserEquipsTheMushroom() {
-        let playground = Playground(controlScheme: .fist)
+        let playground = Playground()
         playground.pointerErases = true
         let buddy = playground.buddies[0]
         #expect(buddy.critter is Mushroom)
-        #expect(!buddy.showsStarfish)
         playground.pointerErases = false
         #expect(playground.buddies[0].critter is Ladybug)
     }
@@ -181,7 +166,7 @@ struct GardenCastTests {
 
     @Test func wholeCanvasStaysInViewWithRoomBesideIt() {
         for size in Self.windows {
-            let playground = Playground(controlScheme: .fist)
+            let playground = Playground()
             playground.layout(size: size)
             let canvas = Playground.canvasSize * 0.5
             let visible = playground.visibleHalfSize(atZ: Playground.canvasZ)
@@ -199,7 +184,7 @@ struct GardenCastTests {
 
     @Test func potsAndBubblesFloatInsideTheView() {
         for size in Self.windows {
-            let playground = Playground(controlScheme: .fist)
+            let playground = Playground()
             playground.layout(size: size)
             let visible = playground.visibleHalfSize(atZ: 0.3)
             #expect(!playground.pots.isEmpty && !playground.critterPots.isEmpty)
@@ -215,7 +200,7 @@ struct GardenCastTests {
     }
 
     @Test func nothingPaintsUnderAPotOrBubble() {
-        let playground = Playground(controlScheme: .fist)
+        let playground = Playground()
         playground.layout(size: Self.windows[0])
         let pot = playground.pots[0].root.simdPosition
         #expect(playground.isOverShelf(SIMD2(pot.x, pot.y)))
@@ -267,12 +252,6 @@ struct GardenCastTests {
             drive(critter, vx: 2, frames: 90)
             #expect(critter.leanNode.simdOrientation.act(SIMD3(0, 1, 0)).z > 0.3, "\(kind.name)")
         }
-    }
-
-    @Test func otherAnimalsKeepTheirOwnLook() {
-        let octopus = Octopus(color: Paint.colors[0], at: .zero)
-        drive(octopus, vx: 2, frames: 90)
-        #expect(!octopus.facesMotion && octopus.side == 0)
     }
 
     @Test func ladybugHasTheShapeOfARealOne() {

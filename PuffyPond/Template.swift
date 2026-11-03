@@ -124,9 +124,6 @@ enum TemplateKind: String, CaseIterable {
         }
     }
 
-    /// The three bubbles of the legacy tray on the easel.
-    static let legacyTray: [TemplateKind] = [.pebble, .bumpy, .bean]
-
     /// Bubble icon color.
     var signatureColor: SIMD3<Float> { art.color }
 
@@ -254,7 +251,7 @@ enum TemplateKind: String, CaseIterable {
     }
 }
 
-/// The dotted outline lying on the canvas, just under the paint. The starfish scrubs it away dash by dash.
+/// The dotted outline lying on the canvas, just under the paint.
 final class TemplateOutline {
     /// The template it came from (nil for a daily-quest outline).
     let kind: TemplateKind?
@@ -300,20 +297,8 @@ final class TemplateOutline {
         render()
     }
 
-    var isEmpty: Bool { marks.isEmpty }
-
     /// How many dashes and eye dots are left to trace.
     var markCount: Int { marks.count }
-
-    /// Starfish scrub: wipes the dashes it touches. Returns true if anything was wiped.
-    @discardableResult
-    func erase(at p: SIMD2<Float>, radius: Float) -> Bool {
-        guard !fading else { return false }
-        let before = marks.count
-        marks.removeAll { mark in mark.contains { simd_distance($0, p) < radius + Self.lineWidth * 0.5 } }
-        if marks.count != before { dirty = true }
-        return marks.count != before
-    }
 
     func update() {
         if dirty { render() }
@@ -381,89 +366,4 @@ final class TemplateOutline {
         if drawing && piece.count > 1 { out.append(piece) }
         return out
     }
-}
-
-// MARK: - Template bubbles (rub one to get its outline on the canvas)
-
-/// A glass bubble on the easel tray with a little picture of the animal to trace.
-final class TemplatePot {
-    let root = SCNNode()
-    let kind: TemplateKind
-    private let bubble: SCNNode
-    private let icon: SCNNode
-    private let progressRing: SCNNode
-    private let halo: SCNNode
-    private var squash = Spring3(SIMD3(1, 1, 1))
-    private var ringScale = Spring1(0)
-    private var clock: Float = 0
-
-    init(kind: TemplateKind, at position: SIMD3<Float>) {
-        self.kind = kind
-        root.simdPosition = position
-        clock = Float(TemplateKind.legacyTray.firstIndex(of: kind) ?? 0) * 1.7
-
-        let glass = SCNMaterial()
-        glass.lightingModel = .blinn
-        glass.diffuse.contents = PlatformColor(red: 1.0, green: 0.95, blue: 0.85, alpha: 0.14)
-        glass.specular.contents = PlatformColor.white
-        glass.shininess = 0.9
-        glass.transparencyMode = .aOne
-        glass.writesToDepthBuffer = false
-        bubble = Toybox.node(SCNSphere(radius: CGFloat(PaintPot.radius)), glass)
-        root.addChildNode(bubble)
-        let stand = Toybox.balloon(kind.signatureColor, wobble: 0, roughness: 0.25)
-        root.addChildNode(Toybox.node(SCNTorus(ringRadius: 0.14, pipeRadius: 0.035), stand, at: SIMD3(0, -0.19, 0)))
-
-        // The animal's outline, drawn solid in its color, floating inside the bubble.
-        let picture = SCNMaterial()
-        picture.lightingModel = .constant
-        picture.diffuse.contents = Toybox.platformImage(Self.iconImage(kind))
-        picture.transparencyMode = .aOne
-        picture.writesToDepthBuffer = false
-        let plane = SCNPlane(width: 0.3, height: 0.3)
-        plane.materials = [picture]
-        icon = SCNNode(geometry: plane)
-        icon.castsShadow = false
-        root.addChildNode(icon)
-
-        let ringMaterial = SCNMaterial()
-        ringMaterial.lightingModel = .constant
-        ringMaterial.diffuse.contents = PlatformColor.white
-        progressRing = SCNNode(geometry: SCNTorus(ringRadius: 0.27, pipeRadius: 0.022))
-        progressRing.geometry?.materials = [ringMaterial]
-        progressRing.simdEulerAngles = SIMD3(Float.pi / 2, 0, 0)
-        progressRing.simdScale = SIMD3(repeating: 0.001)
-        root.addChildNode(progressRing)
-
-        halo = SCNNode(geometry: SCNTorus(ringRadius: 0.22, pipeRadius: 0.014))
-        halo.geometry?.materials = [ringMaterial]
-        halo.simdPosition = SIMD3(0, -0.17, 0)
-        root.addChildNode(halo)
-    }
-
-    func bounce(_ strength: Float = 1) {
-        squash.velocity += SIMD3(3, -5, 3) * strength
-    }
-
-    /// - Parameters:
-    ///   - rubProgress: 0…1 while a buddy is rubbing this bubble.
-    ///   - selected: this animal's outline is on the canvas right now.
-    func update(dt: Float, beatPulse: Float, rubProgress: Float, selected: Bool) {
-        clock += dt
-        let jiggle = rubProgress > 0 ? sin(clock * 30) * 0.05 * rubProgress : 0
-        squash.step(to: SIMD3(1 + beatPulse * 0.04 + jiggle, 1 - beatPulse * 0.05 - jiggle, 1 + jiggle),
-                    stiffness: 260, damping: 9, dt: dt)
-        bubble.simdScale = squash.value
-        icon.simdScale = squash.value
-        icon.simdPosition = SIMD3(0, sin(clock * 1.3) * 0.015, 0.02)
-        icon.simdEulerAngles = SIMD3(0, 0, sin(clock * 0.9) * 0.08)
-        ringScale.step(to: rubProgress > 0 ? 0.35 + rubProgress * 0.65 : 0, stiffness: 300, damping: 18, dt: dt)
-        progressRing.simdScale = SIMD3(repeating: max(ringScale.value, 0.001))
-        progressRing.simdEulerAngles = SIMD3(Float.pi / 2, clock * 3, 0)
-        halo.isHidden = !selected
-        halo.simdScale = SIMD3(repeating: 1 + sin(clock * 4) * 0.04)
-        halo.simdEulerAngles = SIMD3(0.25, clock, 0)
-    }
-
-    static func iconImage(_ kind: TemplateKind) -> CGImage? { kind.art.iconImage() }
 }

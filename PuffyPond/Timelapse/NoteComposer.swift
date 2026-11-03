@@ -9,7 +9,7 @@ enum NoteTimbre: Int, CaseIterable {
         switch brush {
         case .butterfly: self = .bell
         case .ladybug: self = .pluck
-        case .snail, .sponge: self = .marimba
+        case .snail: self = .marimba
         default: self = .xylophone
         }
     }

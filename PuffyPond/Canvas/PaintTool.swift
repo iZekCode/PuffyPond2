@@ -23,8 +23,8 @@ enum PaintTool: Int, CaseIterable, Equatable {
         }
     }
 
-    /// The brush animal that carries this tool (the legacy scheme's eraser is the starfish, which isn't a brush animal).
-    var critterKind: CritterKind? {
+    /// The critter that carries this tool.
+    var critterKind: CritterKind {
         switch self {
         case .wingBrush: return .butterfly
         case .brush: return .ladybug
@@ -38,14 +38,12 @@ enum PaintTool: Int, CaseIterable, Equatable {
 
     /// Paint for this frame's segment a → b of the character's path across the canvas.
     func dabs(from a: SIMD2<Float>, to b: SIMD2<Float>, radius: Float, speed: Float) -> [BrushDab] {
-        let d = b - a
-        let moving = smoothStep(0.002, 0.02, simd_length(d))
         switch self {
         case .wingBrush:
             // The butterfly's brush: one round, textured stroke, a touch broader than a single limb.
-            return [BrushDab(from: a, to: b, radius: radius * 1.15, speed: speed, style: .octopus)]
+            return [BrushDab(from: a, to: b, radius: radius * 1.15, speed: speed, style: .wash)]
         case .brush:
-            return [BrushDab(from: a, to: b, radius: radius, speed: speed, style: .octopus)]
+            return [BrushDab(from: a, to: b, radius: radius, speed: speed, style: .wash)]
         case .eraser:
             return []
         case .blender:

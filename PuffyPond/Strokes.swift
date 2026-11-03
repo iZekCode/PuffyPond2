@@ -34,7 +34,7 @@ struct StrokePoint {
     var born: Double
 }
 
-/// The path of one brush stroke: what the fish drew, in which color, with which brush animal.
+/// The path of one brush stroke: what the critter drew, in which color, with which brush animal.
 /// (What you *see* is the PaintLayer; this tracks what's been drawn so far, for erasing.)
 final class Stroke {
     let node = SCNNode()
@@ -52,7 +52,6 @@ final class Stroke {
     }
 
     var isEmpty: Bool { points.isEmpty }
-    var lastPoint: SIMD2<Float>? { points.last?.p }
 
     func add(_ p: SIMD2<Float>, now: Double) {
         points.append(StrokePoint(p: p, born: now))

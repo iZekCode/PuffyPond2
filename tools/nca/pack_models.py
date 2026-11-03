@@ -1,4 +1,4 @@
-"""Pack trained NCA models into the one file the app loads (PuffyPond/NCA/octopus.bin).
+"""Pack trained NCA models into the one file the app loads (PuffyPond/NCA/nca.bin).
 
 Layout (float32, little-endian): the weights of every model in order (each 5856 floats, as nca.bin), then every
 model's mean colour as 4 floats (r, g, b, 0). The order must match Paint.colors in Toybox.swift.
@@ -6,7 +6,7 @@ model's mean colour as 4 floats (r, g, b, 0). The order must match Paint.colors 
 Usage (red blue yellow orange green purple, the order of Paint.colors; the butterfly's blue and green and the
 ladybug's red and orange are trained on their own targets in tools/nca/targets/<animal>/, yellow and purple reuse
 the octopus models):
-  python pack_models.py PuffyPond/NCA/octopus.bin runs/ladybug/red runs/butterfly/blue runs/octopus/yellow \
+  python pack_models.py PuffyPond/NCA/nca.bin runs/ladybug/red runs/butterfly/blue runs/octopus/yellow \
       runs/ladybug/orange runs/butterfly/green runs/octopus/purple
 """
 import json

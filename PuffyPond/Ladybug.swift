@@ -3,17 +3,19 @@ import simd
 
 /// Brush: a ladybug, drawn the way a real one looks from above: a round domed shell with a dark seam and black
 /// spots, a black shield behind a small black head with white cheek patches, and six short legs (three a side).
-/// While painting the legs lie flat on the canvas and are the brush, exactly like the octopus's tentacles (see
-/// `LimbBrush`). The shell lifts at the back with the beat. It faces the camera at rest and turns sideways,
+/// While painting the legs lie flat on the canvas and are the brush (see `LimbBrush`). The shell lifts at the back with the beat. It faces the camera at rest and turns sideways,
 /// head first, when it travels (`Critter.facesMotion`). The shell takes the paint colour (red, orange or yellow).
 final class Ladybug: Critter {
-    private let legs: TentacleBundle
+    private let legs: LimbBundle
     private let limbs: LimbBrush
     private var wings: [SCNNode] = []
     private var antennae: [SCNNode] = []
     private var wingSpring = Spring1(0)
     /// 0 = shell closed … 1 = fully lifted (a touch more while it flutters).
     private(set) var wingOpen: Float = 0
+
+    /// Height of a leg's centre when it lies on the canvas (just above the canvas face).
+    static let limbZ: Float = Playground.canvasZ + 0.02
 
     /// The shell: one round dome (a little wider than long), split down the middle by a thin dark seam.
     private static let shellRadii = SIMD3<Float>(0.165, 0.125, 0.17)
@@ -34,7 +36,7 @@ final class Ladybug: Critter {
         let cream = Toybox.balloon(SIMD3(1.0, 0.95, 0.82), wobble: 0, roughness: 0.35)
 
         // Very short, stubby, fairly stiff legs.
-        var shape = TentacleBundle.Shape()
+        var shape = LimbBundle.Shape()
         shape.segments = 7
         shape.segmentLength = 0.025
         shape.rootRadius = 0.013
@@ -45,8 +47,8 @@ final class Ladybug: Critter {
         shape.stiffness = 0.2
         shape.gravity = 1.0
         shape.ripple = 0.05
-        legs = TentacleBundle(shape: shape, roots: Self.legRoots, start: start)
-        limbs = LimbBrush(bundle: legs, limbZ: Octopus.limbZ)
+        legs = LimbBundle(shape: shape, roots: Self.legRoots, start: start)
+        limbs = LimbBrush(bundle: legs, limbZ: Self.limbZ)
         super.init(kind: .ladybug, color: color, at: start, accentLift: 0.3)
         // Lying flat, each leg points where it leaves the body: (side, front/back) → (canvas x, canvas y).
         legs.setSpokes(Self.legRoots.map { SIMD2($0.outward.x, $0.outward.z) })
@@ -150,7 +152,7 @@ final class Ladybug: Critter {
     /// The round body paints too, along the path it travels, so a quick drag still leaves paint when the short legs
     /// have no time to reach the canvas; the legs add their strokes on top.
     override func dabs(from a: SIMD2<Float>, to b: SIMD2<Float>, radius: Float, speed: Float) -> [BrushDab] {
-        let body = BrushDab(from: a, to: b, radius: radius * Self.bodyBrush * sizeScale, speed: speed, style: .octopus)
+        let body = BrushDab(from: a, to: b, radius: radius * Self.bodyBrush * sizeScale, speed: speed, style: .wash)
         return [body] + limbs.dabs(towards: b)
     }
 

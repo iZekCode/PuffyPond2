@@ -4,9 +4,8 @@ import simd
 
 /// Big, forgiving poses only — no fiddly finger gestures.
 enum HandPose: Equatable {
-    case open   // the character swims along with you (and can dip into paint pots)
-    case pinch  // thumb + index together: paints in the legacy controls, reads as open otherwise
-    case fist   // paints with the current tool (legacy: the starfish erases)
+    case open   // the character moves along with you (and can dip into paint pots)
+    case fist   // paints with the current tool
 }
 
 /// One hand as the game sees it, in view UV (0…1, y down).
@@ -23,16 +22,10 @@ struct HandState {
 struct PalmReading {
     var palm: SIMD2<Float>
     var extendedFingers: Int
-    /// Thumb-tip to index-tip distance, in hand sizes.
-    var pinchRatio: Float = 10
-    /// Index tip to wrist, in hand sizes (a curled index in a fist sits close to the palm).
-    var indexReach: Float = 0
 
-    init(palm: SIMD2<Float>, extendedFingers: Int, pinchRatio: Float = 10, indexReach: Float = 0) {
+    init(palm: SIMD2<Float>, extendedFingers: Int) {
         self.palm = palm
         self.extendedFingers = extendedFingers
-        self.pinchRatio = pinchRatio
-        self.indexReach = indexReach
     }
 
     init?(_ hand: HandObservation, aspect: Float) {
@@ -53,13 +46,6 @@ struct PalmReading {
             }
         }
         extendedFingers = count
-
-        let middleKnuckle = hand[.middleMCP] ?? knuckles[0]
-        let size = max(distance(wrist, middleKnuckle), 0.02)
-        if let thumb = hand[.thumbTip], let index = hand[.indexTip] {
-            pinchRatio = distance(thumb, index) / size
-            indexReach = distance(index, wrist) / size
-        }
     }
 }
 
@@ -70,37 +56,16 @@ struct PoseFilter {
 
     init(pose: HandPose) { self.pose = pose }
 
-    mutating func feed(_ reading: PalmReading, scheme: ControlScheme) {
+    mutating func feed(_ reading: PalmReading) {
+        // The fist paints, so it holds on: a loose fist (one finger creeping out) or one noisy
+        // frame keeps painting.
         let raw: HandPose
-        let needed: Int
-        switch scheme {
-        case .legacy:
-            // Pinch wins first (with hysteresis so it doesn't flicker while drawing).
-            // In a fist the thumb also rests on the index, but the index tip is tucked near the palm.
-            let pinchThreshold: Float = pose == .pinch ? 0.55 : 0.33
-            let pinching = reading.pinchRatio < pinchThreshold && reading.indexReach > 0.95
-            if pinching {
-                raw = .pinch
-            } else if pose == .fist {
-                raw = reading.extendedFingers >= 2 ? .open : .fist
-            } else {
-                raw = reading.extendedFingers == 0 ? .fist : .open
-            }
-            switch raw {
-            case .pinch: needed = 1
-            case .open: needed = 2
-            case .fist: needed = 3
-            }
-        case .fist:
-            // The fist paints, so it holds on: a loose fist (one finger creeping out) or one noisy
-            // frame keeps painting. No pinch at all, it just reads as an open hand.
-            if pose == .fist {
-                raw = reading.extendedFingers >= 2 ? .open : .fist
-            } else {
-                raw = reading.extendedFingers == 0 ? .fist : .open
-            }
-            needed = raw == .fist ? 2 : 3
+        if pose == .fist {
+            raw = reading.extendedFingers >= 2 ? .open : .fist
+        } else {
+            raw = reading.extendedFingers == 0 ? .fist : .open
         }
+        let needed = raw == .fist ? 2 : 3
         if raw != pose {
             candidateFrames += 1
             if candidateFrames >= needed {
@@ -135,7 +100,6 @@ final class HandInput {
     static let reachMax = SIMD2<Float>(0.92, 0.86)
 
     private(set) var tracked: [Tracked] = []
-    var scheme: ControlScheme = .fist
     private var nextID = 1
 
     private func viewUV(fromImage p: SIMD2<Float>) -> SIMD2<Float> {
@@ -174,7 +138,7 @@ final class HandInput {
 
     private func update(_ hand: inout Tracked, with reading: PalmReading, now: Double) {
         let dt = Float(min(max(now - hand.lastSample, 1.0 / 120.0), 0.1))
-        hand.poseFilter.feed(reading, scheme: scheme)
+        hand.poseFilter.feed(reading)
         let filtered = hand.filter.filter(reading.palm, dt: dt)
         let span = Self.reachMax - Self.reachMin
         hand.palmImage = reading.palm
@@ -211,10 +175,5 @@ final class HandInput {
                                     tracking: tracking))
         }
         return states
-    }
-
-    /// Raw joints (image space) for the camera preview.
-    static func previewPoints(_ frame: HandFrame) -> [[SIMD2<Float>]] {
-        frame.hands.map { $0.joints.compactMap { $0 } }
     }
 }

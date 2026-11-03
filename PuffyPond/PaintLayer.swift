@@ -29,8 +29,8 @@ struct BrushStyle: Equatable {
     var ncaSeed: Float = 1      // chance each texel under the brush starts growing
 
     static let brush = BrushStyle()
-    /// The octopus: a thin watercolor wash that grows its own texture.
-    static let octopus = BrushStyle(push: 0.4, bristles: 0, watery: 0.9, nca: 1)
+    /// The ladybug and butterfly: a thin watercolor wash that grows its own texture.
+    static let wash = BrushStyle(push: 0.4, bristles: 0, watery: 0.9, nca: 1)
     static let blend = BrushStyle(amount: 0, push: 0.9, bristles: 0, blend: 1)
 }
 
@@ -74,9 +74,9 @@ final class PaintLayer {
     // Neural cellular automaton brushes ("Self-Organising Textures": 12 channels, hidden 96). These must match the
     // values the model was trained with (tools/nca/train_nca.py, runs/<name>/nca.json): the weights only grow the
     // right texture under the same rule. The shader's sizes (12 channels, hidden 96) are fixed at compile time.
-    // PuffyPond/NCA/octopus.bin: one model per paint colour (in Paint.colors order), each 5856 float32, then each
+    // PuffyPond/NCA/nca.bin: one model per paint colour (in Paint.colors order), each 5856 float32, then each
     // model's mean colour as 4 float32 (rgb + padding). tools/nca/pack_models.py builds it.
-    private static let ncaWeightFile = "octopus"
+    private static let ncaWeightFile = "nca"
     private static let ncaModelCount = 6
     private static let ncaWeightCount = 5856
     private static let ncaStride: Float = 1           // --stride
@@ -248,7 +248,7 @@ final class PaintLayer {
         settleTime = max(settleTime, 5 + style.watery * 3)
     }
 
-    /// Starfish scrubbing: paint gets smeared thin and wiped away.
+    /// Erasing: paint gets smeared thin and wiped away.
     func erase(at center: SIMD2<Float>, radius: Float, dt: Float) {
         guard stamps.count < Self.maxStamps else { return }
         stamps.append(PaintStamp(segment: SIMD4(center.x, center.y, center.x, center.y),

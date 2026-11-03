@@ -1,27 +1,18 @@
 import SceneKit
 import simd
 
-/// The brush animals. Each one paints in its own way.
+/// The garden cast: the characters that carry the paint tools. The raw values are written into saved timelapse
+/// recordings, so they stay put when a character is removed.
 enum CritterKind: Int, CaseIterable, Equatable {
-    case octopus, snail, pufferfish, seahorse, jellyfish, frog, sponge
-    /// The garden cast (fist controls).
-    case ladybug, butterfly, mushroom
+    case snail = 1
+    case ladybug = 7, butterfly = 8, mushroom = 9
 
-    /// The garden cast of the fist controls, in tool-column order (butterfly brush, ladybug brush, eraser, blender).
+    /// The cast in tool-column order (butterfly brush, ladybug brush, eraser, blender).
     static let gardenCast: [CritterKind] = [.butterfly, .ladybug, .mushroom, .snail]
-
-    /// The six brush animals of the legacy controls (the sponge only carries the fist controls' blender).
-    static let legacyBrushes: [CritterKind] = [.octopus, .snail, .pufferfish, .seahorse, .jellyfish, .frog]
 
     var name: String {
         switch self {
-        case .octopus: return "Octopus"
         case .snail: return "Snail"
-        case .pufferfish: return "Puffer"
-        case .seahorse: return "Seahorse"
-        case .jellyfish: return "Jelly"
-        case .frog: return "Frog"
-        case .sponge: return "Sponge"
         case .ladybug: return "Ladybug"
         case .butterfly: return "Butterfly"
         case .mushroom: return "Mushroom"
@@ -31,13 +22,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
     /// What kind of brush it is.
     var brush: String {
         switch self {
-        case .octopus: return "bundle brush"
-        case .snail: return "palette knife"
-        case .pufferfish: return "splatter"
-        case .seahorse: return "calligraphy nib"
-        case .jellyfish: return "watercolor"
-        case .frog: return "dot prints"
-        case .sponge: return "blender"
+        case .snail: return "blender"
         case .ladybug: return "bundle brush"
         case .butterfly: return "bundle brush"
         case .mushroom: return "eraser"
@@ -46,13 +31,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
 
     var symbol: String {
         switch self {
-        case .octopus: return "scribble.variable"
-        case .snail: return "rectangle.portrait.fill"
-        case .pufferfish: return "sparkle"
-        case .seahorse: return "pencil.tip"
-        case .jellyfish: return "drop.halffull"
-        case .frog: return "circle.grid.cross.fill"
-        case .sponge: return "tornado"
+        case .snail: return "tornado"
         case .ladybug: return "scribble.variable"
         case .butterfly: return "drop.halffull"
         case .mushroom: return "cloud.fill"
@@ -62,13 +41,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
     /// Its own color while it waits in a critter bubble.
     var signatureColor: SIMD3<Float> {
         switch self {
-        case .octopus: return Paint.colors[0]
         case .snail: return Paint.colors[2]
-        case .pufferfish: return Paint.colors[3]
-        case .seahorse: return Paint.colors[1]
-        case .jellyfish: return Paint.colors[5]
-        case .frog: return Paint.colors[4]
-        case .sponge: return SIMD3(1.0, 0.86, 0.38)
         case .ladybug: return Paint.colors[0]
         case .butterfly: return Paint.colors[1]
         case .mushroom: return SIMD3(0.98, 0.53, 0.72)
@@ -77,13 +50,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
 
     func make(color: SIMD3<Float>, at start: SIMD3<Float>) -> Critter {
         switch self {
-        case .octopus: return Octopus(color: color, at: start)
         case .snail: return Snail(color: color, at: start)
-        case .pufferfish: return Pufferfish(color: color, at: start)
-        case .seahorse: return Seahorse(color: color, at: start)
-        case .jellyfish: return Jellyfish(color: color, at: start)
-        case .frog: return Frog(color: color, at: start)
-        case .sponge: return Sponge(color: color, at: start)
         case .ladybug: return Ladybug(color: color, at: start)
         case .butterfly: return Butterfly(color: color, at: start)
         case .mushroom: return Mushroom(color: color, at: start)
@@ -98,13 +65,13 @@ struct BrushDab {
     var radius: Float
     var speed: Float
     var style: BrushStyle = .brush
-    /// How far the brush moved this frame, when that isn't `to - from` (a tentacle lying on the canvas).
+    /// How far the brush moved this frame, when that isn't `to - from` (a leg lying on the canvas).
     var drag: SIMD2<Float>? = nil
 }
 
 /// A hand's brush animal: shared body rig (follow spring, lean, squash, presence), face and moods.
 /// Subclasses build their bodies, add their own secondary motion in `animate`, and decide how they
-/// paint in `dabs` (while pinching) and `released` (when the pinch lets go).
+/// paint in `dabs` (while the fist is closed).
 class Critter {
     let kind: CritterKind
     let root = SCNNode()
@@ -127,7 +94,7 @@ class Critter {
     private(set) var clock: Float = 0
     /// Where the eyes drift on their own, on top of following the motion (gallery visitors look up).
     var gazeBias = SIMD2<Float>.zero
-    /// Turn sideways toward the swim direction (profile animals) instead of facing the camera.
+    /// Turn sideways toward the travel direction (profile animals) instead of facing the camera.
     var turnsToMotion = false
     private var yaw: Float = -0.35
     /// -1 (heading left) … 0 (facing the camera) … 1 (heading right): how far it has turned toward its travel.
@@ -230,7 +197,7 @@ class Critter {
         if mood == .surprised { flare(0.8) }
     }
 
-    /// Secondary-motion kick (tentacles splay, spikes boing…).
+    /// Secondary-motion kick (legs splay, wings flutter…).
     func flare(_ amount: Float) {}
 
     // MARK: Per frame
@@ -352,13 +319,13 @@ class Critter {
     var leanAmount: Float { 1 }
     /// How long a held-still brush has been pressing, as 0…1 (nil when it isn't held still): drives a sound.
     var holdProgress: Float? { nil }
-    /// Whether the brush-size slider scales this critter (the limb brushes: octopus, ladybug).
+    /// Whether the brush-size slider scales this critter (the limb brush: the ladybug).
     var usesSizeSlider: Bool { false }
     /// How much paint this critter wipes away around itself while its tool is the eraser (world units).
-    var eraseRadius: Float { Starfish.eraseRadius }
+    var eraseRadius: Float { 0.26 }
     var bob: Float { sin(clock * 2.2) * 0.02 }
 
-    /// How the critter travels toward the hand (a spring by default; the frog hops).
+    /// How the critter travels toward the hand (a spring by default).
     func move(dt: Float, target: SIMD3<Float>, painting: Bool) {
         position.step(to: target, stiffness: followStiffness, damping: followDamping, dt: dt)
     }
@@ -373,7 +340,4 @@ class Critter {
     func dabs(from a: SIMD2<Float>, to b: SIMD2<Float>, radius: Float, speed: Float) -> [BrushDab] {
         [BrushDab(from: a, to: b, radius: radius, speed: speed)]
     }
-
-    /// Paint laid when the pinch lets go.
-    func released() -> [BrushDab] { [] }
 }

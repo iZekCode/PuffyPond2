@@ -51,7 +51,7 @@ struct HUDView: View {
                 .padding(16 * scale)
 
                 if playground.showGuide {
-                    GuideCard(scheme: playground.controlScheme) { withAnimation(.easeOut(duration: 0.3)) { playground.showGuide = false } }
+                    GuideCard { withAnimation(.easeOut(duration: 0.3)) { playground.showGuide = false } }
                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
                 if playground.cameraStatus == .denied || playground.cameraStatus == .unavailable {
@@ -84,25 +84,15 @@ struct HUDView: View {
     // MARK: Hint
 
     private var hintContent: (symbol: String, text: String) {
-        if playground.controlScheme == .fist {
-            switch playground.hint {
-            case .raiseHands: return ("hand.raised.fill", "Raise both hands — a paint buddy follows each one")
-            case .swimming: return ("hand.raised.fill", "Make a fist to paint · rub a pot for a color, a bubble for a new tool")
-            case .drawing: return ("paintbrush.pointed.fill", "Swoosh! Keep your fist closed and sweep your arm")
-            case .erasing: return ("cloud.fill", "Mushroom puff! Keep your fist closed to puff the paint away")
-            case .tracing: return ("scribble.variable", "Make a fist and follow the dotted line · the mushroom puffs it away")
-            default: break
-            }
-        }
         switch playground.hint {
         case .starting: return ("camera.fill", "Waking up the camera…")
-        case .raiseHands: return ("hand.raised.fill", "Raise both hands — a brush animal follows each one")
-        case .swimming: return ("hand.pinch.fill", "Pinch to draw · rub a pot for a color, a bubble for a new animal")
+        case .raiseHands: return ("hand.raised.fill", "Raise both hands — a paint buddy follows each one")
+        case .roaming: return ("hand.raised.fill", "Make a fist to paint · rub a pot for a color, a bubble for a new tool")
         case .pickingColor: return ("drop.fill", "Rub rub rub! Swipe through the pot to soak up the color")
-        case .drawing: return ("paintbrush.pointed.fill", "Swoosh! Keep pinching and sweep your arm")
-        case .erasing: return ("star.fill", "Starfish scrub! Wipe the paint away")
+        case .drawing: return ("paintbrush.pointed.fill", "Swoosh! Keep your fist closed and sweep your arm")
+        case .erasing: return ("cloud.fill", "Mushroom puff! Keep your fist closed to puff the paint away")
         case .readyToHang: return ("photo.artframe", "All done? Tap Save image")
-        case .tracing: return ("scribble.variable", "Pinch and follow the dotted line · fist to wipe it away")
+        case .tracing: return ("scribble.variable", "Make a fist and follow the dotted line · the mushroom puffs it away")
         case .touchMode: return ("hand.draw.fill", "Drag to draw · tap Save image when you're done")
         }
     }
@@ -137,17 +127,12 @@ struct HUDView: View {
 
     private func colorChip(slot: Int) -> some View {
         let index = slot < playground.buddyColors.count ? playground.buddyColors[slot] : slot
-        let kind = slot < playground.buddyKinds.count ? playground.buddyKinds[slot] : .octopus
         let colorName = Paint.names[index % Paint.names.count]
-        var symbol = kind.symbol
-        var label = "\(colorName) \(kind.name)"
+        let tool = slot < playground.buddyTools.count ? playground.buddyTools[slot] : .brush
+        let symbol = tool.symbol
+        let label = tool.usesColor ? "\(colorName) \(tool.name)" : tool.name
         var tint = Paint.swiftUI(Paint.colors[index % Paint.colors.count])
-        if playground.controlScheme == .fist {
-            let tool = slot < playground.buddyTools.count ? playground.buddyTools[slot] : .brush
-            symbol = tool.symbol
-            label = tool.usesColor ? "\(colorName) \(tool.name)" : tool.name
-            if !tool.usesColor { tint = Color(red: 0.55, green: 0.5, blue: 0.7) }
-        }
+        if !tool.usesColor { tint = Color(red: 0.55, green: 0.5, blue: 0.7) }
         return HStack(spacing: 8 * scale) {
             Image(systemName: symbol)
                 .font(.system(size: 15 * scale, weight: .bold))
@@ -161,7 +146,7 @@ struct HUDView: View {
         .overlay(Capsule().stroke(.white, lineWidth: 2))
         .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
         .symbolEffect(.bounce, value: index)
-        .symbolEffect(.bounce, value: kind)
+        .symbolEffect(.bounce, value: tool)
         .phaseAnimator([1.0, 1.18, 1.0], trigger: index) { view, scale in
             view.scaleEffect(scale)
         } animation: { _ in .spring(response: 0.22, dampingFraction: 0.5) }
@@ -192,7 +177,7 @@ struct HUDView: View {
                 if playground.hasDrawing { confirmingHome = true } else { goHome() }
             }
             #if os(iOS)
-            RoundButton(symbol: playground.pointerErases ? (playground.controlScheme == .fist ? "cloud.fill" : "star.fill") : "paintbrush.pointed.fill",
+            RoundButton(symbol: playground.pointerErases ? "cloud.fill" : "paintbrush.pointed.fill",
                         tint: playground.pointerErases ? .orange : .blue) {
                 playground.pointerErases.toggle()
             }
@@ -215,11 +200,11 @@ struct HUDView: View {
         .padding(.trailing, 56 * scale)   // room for the eye button
     }
 
-    /// How big the brush animal is (ladybug or octopus): bigger paints a wider stroke.
+    /// How big the ladybug is: bigger paints a wider stroke.
     private var brushSizeSlider: some View {
         HStack(spacing: 8 * scale) {
             Image(systemName: "circle.fill").font(.system(size: 8 * scale)).foregroundStyle(.secondary)
-            Slider(value: $playground.octopusSize, in: Playground.octopusSizeRange)
+            Slider(value: $playground.brushSize, in: Playground.brushSizeRange)
                 .frame(width: 130 * scale)
             Image(systemName: "circle.fill").font(.system(size: 20 * scale)).foregroundStyle(.secondary)
         }
@@ -295,7 +280,6 @@ struct RoundButton: View {
 }
 
 private struct GuideCard: View {
-    let scheme: ControlScheme
     let dismiss: () -> Void
     @Environment(\.uiScale) private var scale
 
@@ -307,9 +291,7 @@ private struct GuideCard: View {
         var id: String { title }
     }
 
-    private var rows: [Row] { scheme == .fist ? fistRows : legacyRows }
-
-    private let fistRows: [Row] = [
+    private let rows: [Row] = [
         Row(symbol: "hand.raised.fill", color: .orange, title: "Open hand = move",
             detail: "Each hand has a paint buddy that follows you around. An open hand never paints."),
         Row(symbol: "paintbrush.pointed.fill", color: .blue, title: "Fist = paint",
@@ -320,21 +302,6 @@ private struct GuideCard: View {
             detail: "Butterfly brush (blue, green, purple), ladybug brush (red, orange, yellow), mushroom eraser, snail blender."),
         Row(symbol: "cloud.fill", color: .pink, title: "Mushroom = eraser",
             detail: "Pick the mushroom bubble and make a fist to puff paint away. The dotted guide stays."),
-        Row(symbol: "photo.artframe", color: .purple, title: "All done? Save it",
-            detail: "Tap Save image to look it over, then hang it in the gallery for the critters to admire."),
-    ]
-
-    private let legacyRows: [Row] = [
-        Row(symbol: "hand.raised.fill", color: .orange, title: "Open hand = swim",
-            detail: "Each hand has a brush animal that follows you around."),
-        Row(symbol: "hand.pinch.fill", color: .blue, title: "Pinch = draw",
-            detail: "Hold a pinch and sweep your arm. Every animal paints its own way."),
-        Row(symbol: "drop.fill", color: .mint, title: "Rub a paint pot = new color",
-            detail: "Swipe your critter back and forth through a pot at the bottom until it soaks up the color."),
-        Row(symbol: "sparkles", color: .indigo, title: "Rub a bubble = new brush animal",
-            detail: "Octopus bundle brush, snail palette knife, puffer splatter, seahorse calligraphy, jelly watercolor, frog prints."),
-        Row(symbol: "star.fill", color: .pink, title: "Fist = Starfish",
-            detail: "Make a fist and your critter turns into a starfish that scrubs paint away."),
         Row(symbol: "photo.artframe", color: .purple, title: "All done? Save it",
             detail: "Tap Save image to look it over, then hang it in the gallery for the critters to admire."),
     ]

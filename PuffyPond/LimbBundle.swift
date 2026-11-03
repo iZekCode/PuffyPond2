@@ -1,15 +1,8 @@
 import SceneKit
 import simd
 
-/// A tentacle tip dragging across the canvas this frame.
-struct TipStroke {
-    var from: SIMD2<Float>
-    var to: SIMD2<Float>
-    var speed: Float
-}
-
 /// A stretch of a limb lying on the canvas this frame: it paints like a brush.
-struct TentacleContact {
+struct LimbContact {
     var a: SIMD2<Float>         // the two ends of the stretch (canvas plane)
     var b: SIMD2<Float>
     var drag: SIMD2<Float>      // how far it moved this frame
@@ -19,14 +12,13 @@ struct TentacleContact {
 
 /// Soft, jiggly limbs: Verlet chains hanging from a body. Each remembers a curled rest shape
 /// but lags, swings and wobbles whenever the body moves. Drawn as tapered tubes rebuilt every frame.
-final class TentacleBundle {
+final class LimbBundle {
     struct Limb {
         var points: [SIMD3<Float>]
         var previous: [SIMD3<Float>]
         let rootLocal: SIMD3<Float>    // where it leaves the body (body space)
         let outward: SIMD3<Float>      // which way it curls (body space)
         let phase: Float
-        var lastTip: SIMD2<Float>?
         var lastXY: [SIMD2<Float>] = []   // every point's canvas position last frame (for contact drag)
         var spoke = SIMD2<Float>(0, -1)   // which way it points when lying flat on the canvas (unit, canvas plane)
     }
@@ -47,8 +39,7 @@ final class TentacleBundle {
 
     let node = SCNNode()                // world-space mesh
     private(set) var limbs: [Limb] = []
-    private(set) var tipStrokes: [TipStroke] = []
-    private(set) var contacts: [TentacleContact] = []
+    private(set) var contacts: [LimbContact] = []
     private let shape: Shape
     /// The critter's accent material (set once the critter exists).
     var material = SCNMaterial()
@@ -195,19 +186,6 @@ final class TentacleBundle {
         }
     }
 
-    /// Records where each tip moved this frame (only kept while `painting`).
-    func collectTips(dt: Float, painting: Bool) {
-        tipStrokes.removeAll(keepingCapacity: true)
-        for k in limbs.indices {
-            let tip3 = limbs[k].points[shape.segments - 1]
-            let tip = SIMD2(tip3.x, tip3.y)
-            if painting, let last = limbs[k].lastTip {
-                tipStrokes.append(TipStroke(from: last, to: tip, speed: simd_distance(last, tip) / max(dt, 1e-4)))
-            }
-            limbs[k].lastTip = tip
-        }
-    }
-
     /// The stretches of every limb that lie on the canvas this frame (only kept while `painting`).
     /// Each covers two links, so a full limb (root to tip) makes five.
     func collectContacts(dt: Float, painting: Bool, scale: Float, contactZ: Float) {
@@ -223,7 +201,7 @@ final class TentacleBundle {
                 let t = Float(i + 1) / Float(n - 1)
                 let radius = max((shape.rootRadius * (1 - t) + shape.tipRadius) * scale * 1.6, 0.016)
                 let drag = xy[i + 1] - limbs[k].lastXY[i + 1]
-                contacts.append(TentacleContact(a: xy[i], b: xy[i + 2], drag: drag, radius: radius,
+                contacts.append(LimbContact(a: xy[i], b: xy[i + 2], drag: drag, radius: radius,
                                                 speed: simd_length(drag) / max(dt, 1e-4)))
             }
         }

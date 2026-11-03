@@ -45,7 +45,7 @@ The whole canvas is always on screen, with a column of paint pots beside its rig
 
 | Move | What happens |
 |---|---|
-| Open hand | Your hand's paint character swims along with you. No paint. While it travels it turns sideways, head first, seen from above (left or right with your hand), and faces you again when it stops. |
+| Open hand | Your hand's paint character moves along with you. No paint. While it travels it turns sideways, head first, seen from above (left or right with your hand), and faces you again when it stops. |
 | **Fist** | Paint with the character's tool. Keep the fist closed and sweep your arm; open the hand to stop. A loosening fist keeps painting for a moment, so strokes don't break. |
 | Rub a **paint pot** | Pots stand in a column on the right. Swipe your character back and forth through one until the ring fills: new color. A color belongs to one brush animal: dip the butterfly in red, orange or yellow and it turns into the ladybug (and the other way round). |
 | Rub a **tool bubble** | Bubbles in a column on the left hold the four paint characters. Rub one to switch to its tool. |
@@ -60,10 +60,6 @@ The whole canvas is always on screen, with a column of paint pots beside its rig
 The paint is simulated: flat wet strokes with bristle grooves and ragged edges, it levels out, thick blobs sag a little, and it dries over time. The faster a stroke is drawn, the smoother its texture gets: a slow stroke keeps the full texture, then it turns into a coarse gradation, a fine one, and at a fast sweep a single smooth colour. Colours never blend by themselves: new paint covers whatever is under it, and only the snail (blender) mixes colours.
 
 The buttons along the bottom: brush size, Home, eraser for touch (iPad only), music, camera preview, help card, clear canvas, Save image, and the **eye**. The eye hides the HUD (buttons, hints, camera preview) so only the canvas, the pots, the bubbles and the brush characters show; the eye itself stays, faded, in the bottom right corner to bring the HUD back. There are no cast shadows under the pots, bubbles or brush animals.
-
-### Legacy controls
-
-The original controls and their sea animals are still in the code: pinch to paint with six brush animals (octopus, snail, pufferfish, seahorse, jellyfish, frog), fist turns into the starfish, and template bubbles on the easel tray (they now swim in the garden world). Start the playground with `Playground(controlScheme: .legacy)` in `ContentView` to use them.
 
 ## Without a camera
 
@@ -99,12 +95,11 @@ Everything stays on the device in `Application Support/Gallery/`: one PNG per pa
 | `Input/PaddleDetector.swift` | Open hand sweeping down → walk on or back in the 3D gallery |
 | `Input/HandFrameRelay.swift` | Passes camera hand frames to the review page and the 3D gallery |
 | `HandTracker.swift` | Camera + Vision hand pose (2 hands) and body pose (only while a page needs it), on device |
-| `HandInput.swift`, `OneEuroFilter.swift` | Palm tracking, open/pinch/fist with hysteresis, smoothing + prediction |
-| `Canvas/ControlScheme.swift`, `Canvas/PaintTool.swift` | Fist vs legacy controls; the four tools and the dabs each one lays |
+| `HandInput.swift`, `OneEuroFilter.swift` | Palm tracking, open/fist with hysteresis, smoothing + prediction |
+| `Canvas/PaintTool.swift` | The four tools and the dabs each one lays |
 | `Playground.swift` | The easel: world, buddies, painting, erasing, pots and bubbles, stats recording |
-| `Critter.swift`, `Characters.swift`, `Tentacles.swift` | Character base (springs, faces, moods), starfish rig (legacy eraser), pots, bubbles, buddies, springy limbs, the shared limb brush |
-| `Ladybug.swift`, `Butterfly.swift`, `Mushroom.swift`, `Snail.swift` | The four garden paint characters; `LimbBrush.swift` is the leg brush the ladybug shares with the octopus |
-| `Octopus.swift`, `Jellyfish.swift`, `Sponge.swift`, `Pufferfish.swift`, `Seahorse.swift`, `Frog.swift` | The legacy sea brush animals |
+| `Critter.swift`, `Characters.swift`, `LimbBundle.swift` | Character base (springs, faces, moods), pots, bubbles, buddies, springy limbs, the shared limb brush |
+| `Ladybug.swift`, `Butterfly.swift`, `Mushroom.swift`, `Snail.swift` | The four garden paint characters; `LimbBrush.swift` is the leg brush the ladybug uses |
 | `Strokes.swift` | Stroke paths (what's been drawn, for erasing) and geometry helpers |
 | `PaintLayer.swift`, `PaintShaders.metal` | Wet paint simulated on the GPU (Metal compute): dabs, advection, leveling, mixing, drips, drying, normal map |
 | `Studio.swift`, `Toybox.swift`, `Effects.swift` | Treehouse backdrop, linen and easel textures; glossy materials; petals and fireflies |

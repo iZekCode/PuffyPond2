@@ -1,10 +1,10 @@
 import SceneKit
 import simd
 
-/// The brush behaviour of a critter whose limbs lie flat on the canvas and paint (the octopus, the ladybug):
+/// The brush behaviour of a critter whose limbs lie flat on the canvas and paint (the ladybug):
 /// wiping gathers the limbs into one trailing bundle, holding still makes every limb ooze paint outward.
 final class LimbBrush {
-    let bundle: TentacleBundle
+    let bundle: LimbBundle
     /// Height of a limb's centre when it lies on the canvas (just above the canvas face).
     let limbZ: Float
     private var lastHead: SIMD3<Float>?
@@ -28,7 +28,7 @@ final class LimbBrush {
         holdTime > Self.oozeDelay ? min((holdTime - Self.oozeDelay) / Self.oozeGrowth, 1) : nil
     }
 
-    init(bundle: TentacleBundle, limbZ: Float) {
+    init(bundle: LimbBundle, limbZ: Float) {
         self.bundle = bundle
         self.limbZ = limbZ
     }
@@ -54,7 +54,6 @@ final class LimbBrush {
         bundle.simulate(dt: dt, body: body, scale: scale, clock: clock,
                         beatPulse: beatPulse, snap: teleported, press: pressing ? 1 : 0, minZ: limbZ,
                         trail: trail, trailDirection: streamDirection, spread: spread)
-        bundle.collectTips(dt: dt, painting: pressing)
         bundle.collectContacts(dt: dt, painting: pressing, scale: scale, contactZ: limbZ + 0.03)
         bundle.rebuild(scale: scale, clock: clock, hidden: hidden)
     }
@@ -65,12 +64,12 @@ final class LimbBrush {
     func dabs(towards head: SIMD2<Float>) -> [BrushDab] {
         let ooze = smoothStep(Self.oozeDelay, Self.oozeDelay + 0.35, holdTime)
         let swell = min(max(holdTime - Self.oozeDelay, 0), Self.oozeGrowth)
-        var style = BrushStyle.octopus
+        var style = BrushStyle.wash
         if ooze > 0 { style.amount = 0.05 + 0.1 * ooze }
         var result: [BrushDab] = []
         for c in bundle.contacts {
             guard ooze > 0 else {
-                result.append(BrushDab(from: c.a, to: c.b, radius: c.radius, speed: c.speed, style: .octopus, drag: c.drag))
+                result.append(BrushDab(from: c.a, to: c.b, radius: c.radius, speed: c.speed, style: .wash, drag: c.drag))
                 continue
             }
             let away = (c.a + c.b) * 0.5 - head

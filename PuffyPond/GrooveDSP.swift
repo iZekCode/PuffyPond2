@@ -3,17 +3,15 @@ import os
 
 /// Sound effects the game can ask for.
 nonisolated enum Sfx: UInt8, Sendable, CaseIterable {
-    case blip      // a fish blows a bead (a = height 0…1, b = pan)
-    case squeak    // starfish scrubbing (b = pan)
+    case blip      // a critter lays a bead of paint (a = height 0…1, b = pan)
     case pop       // something pops (b = pan)
     case boing     // a creature gets bumped (a = size 0…1, b = pan)
     case rise      // drawing starts to transform
     case fanfare   // creature is born
-    case swap      // fish ↔ starfish
+    case swap      // tried to save an empty canvas (b = pan)
     case fizzle    // transform with nothing to inflate
-    case gurgle    // a fish rubbing in a paint pot (a = progress 0…1, b = pan)
-    case pick      // a fish soaks up a new color (a = color index, b = pan)
-    case sparkle   // twinkly glitter after a pop
+    case gurgle    // a critter rubbing in a paint pot (a = progress 0…1, b = pan)
+    case pick      // a critter soaks up a new color (a = color index, b = pan)
     case splash    // a palm slaps the wet painting (a = strength 0…1, b = pan)
     case sproing   // a fist catches the paint like a rubber band (b = pan)
     case wobble    // the paint lets go and jiggles home like jelly (b = pan)
@@ -393,10 +391,6 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
             let f = Self.hz(Self.blipScale[i])
             start(.sine, f, peak: 0.17, decay: 0.16, at: 0, pan: pan, attack: 0.002, glideFrom: f * 0.7, glideTime: 0.025)
             start(.fm, f * 2, peak: 0.04, decay: 0.12, at: 0, pan: pan, fm: (2, 1.2, 0.04))
-        case .squeak:
-            start(.sine, 900, peak: 0.1, decay: 0.12, at: 0, pan: pan, glideFrom: 1500, glideTime: 0.05,
-                  vibrato: (0.07, 26))
-            start(.noise, 0, peak: 0.07, decay: 0.08, at: 0, pan: pan, filter: .bandPass(3200, q: 2, sr: sampleRate))
         case .pop:
             start(.noise, 0, peak: 0.5, decay: 0.07, at: 0, pan: pan, filter: .bandPass(1000, q: 0.7, sr: sampleRate))
             start(.sine, 180, peak: 0.4, decay: 0.12, at: 0, pan: pan, glideFrom: 700, glideTime: 0.02)
@@ -428,12 +422,6 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
             start(.sine, 900, peak: 0.12, decay: 0.15, at: 0, pan: pan, glideFrom: 250, glideTime: 0.06)
             start(.fm, Self.hz(base), peak: 0.15, decay: 0.7, at: Int(0.07 * sampleRate), pan: pan, fm: (3.5, 2.2, 0.15))
             start(.fm, Self.hz(base + 7), peak: 0.12, decay: 0.8, at: Int(0.15 * sampleRate), pan: pan, fm: (3.5, 2.2, 0.15))
-        case .sparkle:
-            for k in 0..<6 {
-                let n = Self.blipScale[Int.random(in: 4..<Self.blipScale.count)]
-                start(.fm, Self.hz(n), peak: 0.05, decay: 0.35, at: Int(Float(k) * 0.04 * sampleRate),
-                      pan: Float.random(in: -0.7...0.7), fm: (3.5, 1.5, 0.08))
-            }
         case .splash:
             let s = 0.5 + 0.5 * min(max(e.a, 0), 1)
             start(.noise, 0, peak: 0.22 * s, decay: 0.18, at: 0, pan: pan, filter: .bandPass(1400, q: 0.9, sr: sampleRate))

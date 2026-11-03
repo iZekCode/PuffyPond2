@@ -104,40 +104,6 @@ enum Studio {
         return m
     }
 
-    // MARK: Wood
-
-    /// Oak-like wood with long, slightly wavy grain running along the beam.
-    static func woodMaterial(grainAlongV: Bool) -> SCNMaterial {
-        let size = 256
-        func grain(_ x: Int, _ y: Int) -> Float {
-            let warp = noise(Float(x) / 22, Float(y) / 60, period: 256, seed: 21) * 9
-            let rings = sin((Float(x) + warp) * 0.42) * 0.5 + 0.5
-            let fine = noise(Float(x) * 0.9, Float(y) / 18, period: 256, seed: 23)
-            return rings * 0.7 + fine * 0.3
-        }
-        let albedo = bitmap(width: size, height: size) { x, y in
-            let g = grainAlongV ? grain(x, y) : grain(y, x)
-            let light = SIMD3<Float>(0.62, 0.46, 0.31), dark = SIMD3<Float>(0.38, 0.25, 0.15)
-            return SIMD4(dark + (light - dark) * g * g, 1)
-        }
-        let m = SCNMaterial()
-        m.lightingModel = .physicallyBased
-        m.diffuse.contents = Toybox.platformImage(albedo)
-        m.normal.contents = Toybox.platformImage(normalMap(size: size, strength: 0.8) { x, y in
-            grainAlongV ? grain(x, y) : grain(y, x)
-        })
-        m.roughness.contents = NSNumber(value: 0.55)
-        m.metalness.contents = NSNumber(value: 0.0)
-        m.clearCoat.contents = NSNumber(value: 0.25)        // a thin coat of varnish
-        m.clearCoatRoughness.contents = NSNumber(value: 0.35)
-        for p in [m.diffuse, m.normal] {
-            p.wrapS = .repeat
-            p.wrapT = .repeat
-            p.contentsTransform = grainAlongV ? SCNMatrix4MakeScale(1, 4, 1) : SCNMatrix4MakeScale(4, 1, 1)
-        }
-        return m
-    }
-
     // MARK: The room
 
     private static func softBlob(_ ctx: CGContext, at c: CGPoint, radius: CGFloat, color: SIMD4<Float>,

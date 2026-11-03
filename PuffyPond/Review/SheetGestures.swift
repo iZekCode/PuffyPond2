@@ -49,12 +49,6 @@ private struct SheetGrab {
         anchor += (hand - anchor) * (1 - exp(-dt * Self.followRate))
     }
 
-    /// Restarts from the sheet's current shape.
-    mutating func rebaseline(solver: SheetSolver) {
-        previous = anchor
-        targets = (0..<solver.count).map(solver.position)
-    }
-
     mutating func apply(to solver: SheetSolver) {
         let step = anchor - previous
         previous = anchor
@@ -99,9 +93,6 @@ final class SheetGestures {
     private(set) var state: State = .idle
     private var grabs: [SheetGrab] = []
     private var rippleCooldown: [Int: Float] = [:]
-
-    /// Positions of the grabbed points (they lag the fists a little), for drawing.
-    var anchors: [SIMD2<Float>] { grabs.map(\.anchor) }
 
     /// Clears last frame's inputs and adds this frame's. Call once per frame, before `solver.step`.
     func update(hands: [SheetHand], dt: Float, solver: SheetSolver) -> [Event] {

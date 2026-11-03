@@ -7,7 +7,7 @@ import simd
 @MainActor
 struct FocusModeTests {
     private func makePlayground() -> Playground {
-        let playground = Playground(controlScheme: .fist)
+        let playground = Playground()
         playground.layout(size: CGSize(width: 1600, height: 1000))
         return playground
     }

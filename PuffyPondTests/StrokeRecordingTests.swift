@@ -23,7 +23,7 @@ struct StrokeRecordingTests {
     }
 
     @Test func roundTripKeepsEveryField() {
-        var wet = BrushStyle.octopus
+        var wet = BrushStyle.wash
         wet.amount = 0.2
         wet.knife = 0.5
         let recording = StrokeRecording(events: [

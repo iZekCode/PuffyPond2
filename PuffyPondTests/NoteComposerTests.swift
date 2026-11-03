@@ -77,7 +77,7 @@ struct NoteComposerTests {
 
     @Test func timbreFollowsTheBrush() {
         let brushes: [(CritterKind, NoteTimbre)] = [(.butterfly, .bell), (.ladybug, .pluck), (.snail, .marimba),
-                                                    (.sponge, .marimba), (.octopus, .xylophone), (.frog, .xylophone)]
+                                                    (.mushroom, .xylophone)]
         for (brush, timbre) in brushes {
             let notes = compose([dab(t: 0, brush: brush), dab(t: 0.05, brush: brush)])
             #expect(notes.first?.voice == .note(timbre), "\(brush)")

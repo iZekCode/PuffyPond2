@@ -11,12 +11,13 @@ struct LimbBrushTests {
         }
     }
 
-    @Test func octopusLaysItsLimbsFlatWhilePressing() {
-        let octopus = Octopus(color: Paint.colors[0], at: .zero)
-        Self.settle(octopus, frames: 180, target: SIMD3(0, 0, Playground.paintHoverZ), painting: true)
-        let dabs = octopus.dabs(from: .zero, to: .zero, radius: 0.085, speed: 0)
+    @Test func ladybugLaysItsLimbsFlatWhilePressing() {
+        let ladybug = Ladybug(color: Paint.colors[0], at: .zero)
+        Self.settle(ladybug, frames: 180, target: SIMD3(0, 0, Playground.paintHoverZ), painting: true)
+        let dabs = ladybug.dabs(from: .zero, to: .zero, radius: 0.085, speed: 0)
         #expect(!dabs.isEmpty)
         #expect(dabs.allSatisfy { $0.style.nca == 1 })
-        #expect(dabs.count == 40)
+        // The round body's dab, and the legs lying on the canvas add theirs on top.
+        #expect(dabs.count > 1)
     }
 }

@@ -6,7 +6,7 @@ import simd
 @MainActor
 struct GardenPaletteTests {
     private func makePlayground() -> Playground {
-        let playground = Playground(controlScheme: .fist)
+        let playground = Playground()
         playground.layout(size: CGSize(width: 1600, height: 1000))
         return playground
     }
@@ -28,7 +28,7 @@ struct GardenPaletteTests {
         #expect(names(.butterfly) == ["Blue", "Green", "Purple"])
         #expect(names(.ladybug) == ["Red", "Orange", "Yellow"])
         #expect(Paint.palette(for: .mushroom) == nil)
-        #expect(Paint.palette(for: .octopus) == nil)
+        #expect(Paint.palette(for: .snail) == nil)
     }
 
     @Test func everyColourHasOneOwnerAndOnePot() {
@@ -51,7 +51,7 @@ struct GardenPaletteTests {
     }
 
     @Test func switchingAnimalKeepsAColourItCanUse() {
-        let buddy = Buddy(slot: 0, colorIndex: 0, kind: .ladybug, start: .zero, erasesWithStarfish: false)   // red
+        let buddy = Buddy(slot: 0, colorIndex: 0, kind: .ladybug, start: .zero)   // red
         _ = buddy.equip(.wingBrush)
         #expect(buddy.critter is Butterfly)
         #expect(buddy.colorIndex == Paint.palette(for: .butterfly)![0])   // red isn't a butterfly colour: first blue
@@ -68,7 +68,7 @@ struct GardenPaletteTests {
         let playground = makePlayground()
         let buddy = playground.buddies[0]
         #expect(buddy.critter is Ladybug)
-        buddy.setMode(.swim)
+        buddy.setMode(.roam)
         let blue = playground.pots.first { $0.colorIndex == 1 }!
         rub(playground, buddy, at: blue.root.simdPosition)
         #expect(buddy.colorIndex == 1)
@@ -97,17 +97,6 @@ struct GardenPaletteTests {
         #expect(buddy.critter is Butterfly)
     }
 
-    @Test func legacyStarfishStillCannotPickThingsWhileErasing() {
-        let playground = Playground(controlScheme: .legacy)
-        playground.layout(size: CGSize(width: 1600, height: 1000))
-        let buddy = playground.buddies[0]
-        buddy.setMode(.erase)
-        let pot = playground.pots.first { $0.colorIndex != buddy.colorIndex }!
-        let before = buddy.colorIndex
-        rub(playground, buddy, at: pot.root.simdPosition)
-        #expect(buddy.colorIndex == before)
-    }
-
     // MARK: Bug: the mushroom wiped the dotted guide
 
     @Test func mushroomLeavesTheTemplateAlone() {
@@ -132,24 +121,5 @@ struct GardenPaletteTests {
         }
         #expect(playground.template === outline)
         #expect(outline.markCount == marks)
-    }
-
-    @Test func legacyStarfishStillScrubsTheTemplate() {
-        let playground = Playground(controlScheme: .legacy)
-        playground.layout(size: CGSize(width: 1600, height: 1000))
-        playground.begin(TemplateChoice(templateID: TemplateKind.pebble.rawValue, isDailyQuest: false))
-        let marks = playground.template!.markCount
-        let buddy = playground.buddies[0]
-        #expect(buddy.setMode(.erase))
-        let half = Playground.canvasSize * 0.5
-        var now = 1000.0
-        for ix in -10...10 {
-            for iy in -6...6 {
-                buddy.starfish.position = Spring3(SIMD3(Float(ix) / 10 * half.x, 0.1 + Float(iy) / 6 * half.y, 0.3))
-                playground.erase(with: buddy, now: now)
-                now += 0.1
-            }
-        }
-        #expect((playground.template?.markCount ?? 0) < marks)
     }
 }

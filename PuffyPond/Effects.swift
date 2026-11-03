@@ -232,16 +232,6 @@ final class Effects {
         return p
     }
 
-    /// Hangs a drift of fireflies in front of `node` (a camera), filling the view.
-    static func addFireflies(to node: SCNNode, in size: SIMD3<Float>, at offset: SIMD3<Float>) {
-        let p = fireflies()
-        p.emitterShape = SCNBox(width: CGFloat(size.x), height: CGFloat(size.y), length: CGFloat(size.z), chamferRadius: 0)
-        let emitter = SCNNode()
-        emitter.simdPosition = offset
-        emitter.addParticleSystem(p)
-        node.addChildNode(emitter)
-    }
-
     // MARK: Images
 
     private static func makeStar() -> CGImage? {
