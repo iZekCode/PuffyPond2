@@ -220,6 +220,13 @@ final class GalleryHall {
     private(set) var cursors: [Cursor] = []
     /// Called on a paddle stroke.
     @ObservationIgnored var onPaddle: ((PaddleDetector.Stroke) -> Void)?
+    /// Buttons an open camera hand can hold still on to press, in view UV.
+    @ObservationIgnored var targets: [HoverTarget] = []
+    /// Called when a hover-and-hold completes.
+    @ObservationIgnored var onPress: ((String) -> Void)?
+    /// Hover-and-hold progress (0…1) of the button an open hand rests on, for its ring.
+    private(set) var dwell: (id: String, progress: Double)?
+    @ObservationIgnored private var hover = HoverDwell()
 
     @ObservationIgnored let scene = SCNScene()
     @ObservationIgnored let cameraNode = SCNNode()
@@ -530,6 +537,14 @@ final class GalleryHall {
 
         let states = hands.advance(dt: dt, now: CACurrentMediaTime())
         if let stroke = paddle.feed(states, now: CACurrentMediaTime()) { onPaddle?(stroke) }
+        let open = states.filter { $0.tracking && $0.pose != .fist }
+        let hit = targets.first { target in
+            open.contains { target.frame.contains(CGPoint(x: CGFloat($0.position.x), y: CGFloat($0.position.y))) }
+        }
+        let pressed = hover.update(hoveredID: hit?.id, dt: Double(dt))
+        let ring = hover.progress.map { (id: $0.id, progress: $0.value) }
+        if ring?.id != dwell?.id || ring?.progress != dwell?.progress { dwell = ring }
+        if let pressed { onPress?(pressed) }
         let next = states.filter(\.tracking).map { Cursor(slot: $0.slot, position: $0.position, fist: $0.pose == .fist) }
         if next != cursors { cursors = next }
 

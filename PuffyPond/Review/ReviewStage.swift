@@ -21,12 +21,6 @@ final class ReviewStage {
         var id: Int { slot }
     }
 
-    /// An on-screen button an open hand can hover over and hold to press, in view UV.
-    struct HoverTarget: Equatable {
-        var id: String
-        var frame: CGRect
-    }
-
     /// The page is either replaying how the painting was made, or letting the hands play with the sheet.
     enum Phase: Equatable {
         case timelapse
@@ -77,8 +71,7 @@ final class ReviewStage {
     @ObservationIgnored private var pointerVelocity = SIMD2<Float>.zero
     @ObservationIgnored private var pointerTime: Double = 0
     @ObservationIgnored private var meshIsFlat = false
-    @ObservationIgnored private var dwellTime: Double = 0
-    @ObservationIgnored private var dwellLatched: String?
+    @ObservationIgnored private var hover = HoverDwell()
     @ObservationIgnored private lazy var texcoordSource = Self.makeTexcoords()
     @ObservationIgnored private lazy var element = Self.makeElement()
 
@@ -93,8 +86,6 @@ final class ReviewStage {
     static let canvasDepth: Float = -0.3
     static let maxRipples = 16
     static let rippleLifetime: Float = 2
-    /// Seconds an open hand rests on a button to press it.
-    static let dwellDuration = 1.0
 
     init() {
         build()
@@ -283,24 +274,11 @@ final class ReviewStage {
         let hit = targets.first { target in
             open.contains { target.frame.contains(CGPoint(x: CGFloat($0.position.x), y: CGFloat($0.position.y))) }
         }
-        guard let hit else {
-            dwellTime = 0
-            dwellLatched = nil
-            if dwell != nil { dwell = nil }
-            return false
-        }
-        if dwellLatched == hit.id { return true }
-        if dwell?.id != hit.id { dwellTime = 0 }
-        dwellTime += dt
-        if dwellTime >= Self.dwellDuration {
-            dwellLatched = hit.id
-            dwellTime = 0
-            dwell = nil
-            onPress?(hit.id)
-        } else {
-            dwell = (hit.id, dwellTime / Self.dwellDuration)
-        }
-        return true
+        let pressed = hover.update(hoveredID: hit?.id, dt: dt)
+        let ring = hover.progress.map { (id: $0.id, progress: $0.value) }
+        if ring?.id != dwell?.id || ring?.progress != dwell?.progress { dwell = ring }
+        if let pressed { onPress?(pressed) }
+        return hit != nil
     }
 
     // MARK: - Mesh

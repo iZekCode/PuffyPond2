@@ -162,7 +162,7 @@ struct ReviewView: View {
     private func updateTargets(size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
         stage.targets = frames.map { id, frame in
-            ReviewStage.HoverTarget(id: id, frame: CGRect(x: frame.minX / size.width, y: frame.minY / size.height,
+            HoverTarget(id: id, frame: CGRect(x: frame.minX / size.width, y: frame.minY / size.height,
                                                           width: frame.width / size.width,
                                                           height: frame.height / size.height))
         }
