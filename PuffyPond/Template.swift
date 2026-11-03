@@ -302,6 +302,9 @@ final class TemplateOutline {
 
     var isEmpty: Bool { marks.isEmpty }
 
+    /// How many dashes and eye dots are left to trace.
+    var markCount: Int { marks.count }
+
     /// Starfish scrub: wipes the dashes it touches. Returns true if anything was wiped.
     @discardableResult
     func erase(at p: SIMD2<Float>, radius: Float) -> Bool {

@@ -1,12 +1,13 @@
 import simd
 
-/// The four paint characters of the fist controls. Each one is its own animal and paints its own way.
+/// The four paint characters of the fist controls. Each one is its own animal and paints its own way. The
+/// butterfly and the ladybug are both brushes; they differ in their colours (`Paint.palette(for:)`).
 enum PaintTool: Int, CaseIterable, Equatable {
-    case liquidOil, brush, eraser, blender
+    case wingBrush, brush, eraser, blender
 
     var name: String {
         switch self {
-        case .liquidOil: return "Liquid oil"
+        case .wingBrush: return "Wing brush"
         case .brush: return "Brush"
         case .eraser: return "Eraser"
         case .blender: return "Blender"
@@ -15,7 +16,7 @@ enum PaintTool: Int, CaseIterable, Equatable {
 
     var symbol: String {
         switch self {
-        case .liquidOil: return "drop.fill"
+        case .wingBrush: return "paintbrush.fill"
         case .brush: return "paintbrush.pointed.fill"
         case .eraser: return "star.fill"
         case .blender: return "tornado"
@@ -25,7 +26,7 @@ enum PaintTool: Int, CaseIterable, Equatable {
     /// The brush animal that carries this tool (the legacy scheme's eraser is the starfish, which isn't a brush animal).
     var critterKind: CritterKind? {
         switch self {
-        case .liquidOil: return .butterfly
+        case .wingBrush: return .butterfly
         case .brush: return .ladybug
         case .eraser: return .mushroom
         case .blender: return .snail
@@ -40,10 +41,9 @@ enum PaintTool: Int, CaseIterable, Equatable {
         let d = b - a
         let moving = smoothStep(0.002, 0.02, simd_length(d))
         switch self {
-        case .liquidOil:
-            // Thinned oil: a translucent glaze that spreads out and runs downhill.
-            let style = BrushStyle(amount: 0.08 + 0.12 * moving, push: 0.35, bristles: 0.15, watery: 0.4, runs: 1)
-            return [BrushDab(from: a, to: b, radius: radius * 1.25, speed: speed, style: style)]
+        case .wingBrush:
+            // The butterfly's brush: one round, textured stroke, a touch broader than a single limb.
+            return [BrushDab(from: a, to: b, radius: radius * 1.15, speed: speed, style: .octopus)]
         case .brush:
             return [BrushDab(from: a, to: b, radius: radius, speed: speed, style: .octopus)]
         case .eraser:

@@ -466,6 +466,8 @@ final class Buddy {
         tool = newTool
         var old: Critter?
         if let kind = newTool.critterKind, kind != critter.kind {
+            // A brush animal only has its own colours: bring along the current one if it fits, else its first.
+            if let palette = Paint.palette(for: kind), !palette.contains(colorIndex) { colorIndex = palette[0] }
             old = become(kind)
             if showsStarfish { critter.position = Spring3(starfish.position.value) }
         }

@@ -15,19 +15,37 @@ typealias PlatformImage = UIImage
 // MARK: - Colors
 
 enum Paint {
-    /// The six paint colours, each the main colour of an NCA texture (tools/nca/targets/<name>-texture.*).
-    /// The order matches the NCA model file (PuffyPond/NCA/octopus.bin) and the old palette's roles
-    /// (templates and animals refer to colours by index: 0 warm, 1 cool, 2 light, 3 pink, 4 green, 5 purple).
+    /// The six paint colours, each the main colour of an NCA texture (tools/nca/targets/).
+    /// The order matches the NCA model file (PuffyPond/NCA/octopus.bin) and keeps the old palette's roles
+    /// (templates and animals refer to colours by index: 0 warm, 1 cool, 2 light, 3 orange, 4 green, 5 purple).
     static let colors: [SIMD3<Float>] = [
-        SIMD3(0.92, 0.21, 0.04), // red
-        SIMD3(0.16, 0.58, 0.92), // blue
-        SIMD3(1.00, 0.90, 0.10), // yellow
-        SIMD3(0.98, 0.53, 0.72), // pink
-        SIMD3(0.17, 0.63, 0.28), // green
-        SIMD3(0.52, 0.40, 0.77), // purple
+        SIMD3(0.93, 0.24, 0.22), // red      (ladybug)
+        SIMD3(0.16, 0.58, 0.92), // blue     (butterfly)
+        SIMD3(1.00, 0.90, 0.10), // yellow   (ladybug)
+        SIMD3(0.98, 0.58, 0.10), // orange   (ladybug)
+        SIMD3(0.12, 0.70, 0.40), // green    (butterfly)
+        SIMD3(0.52, 0.40, 0.77), // purple   (butterfly)
     ]
 
-    static let names = ["Red", "Blue", "Yellow", "Pink", "Green", "Purple"]
+    static let names = ["Red", "Blue", "Yellow", "Orange", "Green", "Purple"]
+
+    /// The colours (indices into `colors`) each brush animal paints with, in the order its pots are shown.
+    /// Only the garden brushes are limited to a palette; every other animal paints with any colour.
+    static func palette(for kind: CritterKind) -> [Int]? {
+        switch kind {
+        case .butterfly: return [1, 4, 5]   // blue, green, purple
+        case .ladybug: return [0, 3, 2]     // red, orange, yellow
+        default: return nil
+        }
+    }
+
+    /// The animal that owns a colour (the brush that has it in its palette), if any.
+    static func owner(of index: Int) -> CritterKind? {
+        [CritterKind.butterfly, .ladybug].first { palette(for: $0)?.contains(index) == true }
+    }
+
+    /// The order the paint pots stand in: the butterfly's colours, then the ladybug's.
+    static let potOrder: [Int] = [1, 4, 5, 0, 3, 2]
 
     static func swiftUI(_ c: SIMD3<Float>) -> Color {
         Color(red: Double(c.x), green: Double(c.y), blue: Double(c.z))

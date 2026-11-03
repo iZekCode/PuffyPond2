@@ -1,8 +1,8 @@
 import SceneKit
 import simd
 
-/// Liquid oil: a dreamy butterfly with big wings that flap lazily and flap fast while it paints. The glaze
-/// itself comes from the liquid-oil tool (`PaintTool.dabs`), which spreads and runs downhill.
+/// Wing brush: a dreamy butterfly with big wings that flap lazily and flap fast while it paints. It paints blue,
+/// green and purple (`Paint.palette(for:)`) with the textured brush stroke of `PaintTool.wingBrush`.
 final class Butterfly: Critter {
     private var hinges: [SCNNode] = []
     private var antennae: [SCNNode] = []
@@ -59,6 +59,9 @@ final class Butterfly: Critter {
     }
 
     override var bob: Float { sin(clock * 2.4) * 0.05 }
+    // Its wings face the camera, so it banks (head toward travel) and tips back to be seen from above.
+    override var facesMotion: Bool { true }
+    override var heading: Heading { Heading(idle: 0, right: -1.15, left: 1.15, axis: SIMD3(0, 0, 1), restPitch: 0.1, pitch: 0.5) }
 
     override func animate(dt: Float, painting: Bool, beatPulse: Float, scale: Float, hidden: Bool) {
         rateSpring.step(to: painting ? 15 : 5, stiffness: 60, damping: 10, dt: dt)

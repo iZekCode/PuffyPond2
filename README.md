@@ -45,16 +45,16 @@ The canvas fills the whole screen, edge to edge. The paint pots float over its r
 
 | Move | What happens |
 |---|---|
-| Open hand | Your hand's paint character swims along with you. No paint. |
+| Open hand | Your hand's paint character swims along with you. No paint. While it travels it turns sideways, head first, seen from above (left or right with your hand), and faces you again when it stops. |
 | **Fist** | Paint with the character's tool. Keep the fist closed and sweep your arm; open the hand to stop. A loosening fist keeps painting for a moment, so strokes don't break. |
-| Rub a **paint pot** | Pots stand in a column on the right. Swipe your character back and forth through one until the ring fills: new color. |
+| Rub a **paint pot** | Pots stand in a column on the right. Swipe your character back and forth through one until the ring fills: new color. A color belongs to one brush animal: dip the butterfly in red, orange or yellow and it turns into the ladybug (and the other way round). |
 | Rub a **tool bubble** | Bubbles in a column on the left hold the four paint characters. Rub one to switch to its tool. |
 
 | Tool | Character | How it paints |
 |---|---|---|
-| Liquid oil | Butterfly | Thinned oil: a translucent glaze that spreads and runs downhill while wet. |
-| Brush | Ladybug | Six legs lie on the canvas and wipe a thin watercolor wash with a grown-in texture. |
-| Eraser | Mushroom | Scrubs paint away in puffs of spores and wipes the template's dotted guide. |
+| Wing brush | Butterfly | A round, textured brush stroke in the butterfly's colours: blue, green and purple. |
+| Brush | Ladybug | Six legs lie on the canvas and wipe a thin watercolor wash with a grown-in texture, in the ladybug's colours: red, orange and yellow. |
+| Eraser | Mushroom | Scrubs paint away in puffs of spores. The template's dotted guide stays. |
 | Blender | Snail | Lays no paint; smudges and mixes the wet paint underneath. |
 
 The paint is simulated: flat wet strokes with bristle grooves and ragged edges, it levels out, blends with wet neighbours, thick blobs sag a little, and it dries over time.

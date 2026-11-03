@@ -84,7 +84,7 @@ final class Playground {
     @ObservationIgnored private(set) var critterPots: [CritterPot] = []
     @ObservationIgnored private var templatePots: [TemplatePot] = []
     /// The dotted animal to trace, if one is on the canvas.
-    @ObservationIgnored private var template: TemplateOutline?
+    @ObservationIgnored private(set) var template: TemplateOutline?
     /// What you actually see: wet, textured paint on the canvas.
     @ObservationIgnored private let paintLayer = PaintLayer(center: SIMD2(0, 0.1), size: Playground.canvasSize,
                                                             z: Playground.canvasZ + 0.0015)
@@ -131,7 +131,10 @@ final class Playground {
     init(controlScheme: ControlScheme = .fist) {
         self.controlScheme = controlScheme
         input.scheme = controlScheme
-        if controlScheme == .fist { buddyKinds = [.ladybug, .ladybug] }
+        if controlScheme == .fist {
+            buddyKinds = [.ladybug, .ladybug]
+            buddyColors = [0, 3]   // red and orange: the ladybug's own colours
+        }
         buildWorld()
         frameDriver.onFrame = { [weak self] dt in self?.tick(dt: Float(dt)) }
     }
@@ -246,8 +249,9 @@ final class Playground {
         func columnY(_ k: Int, of count: Int) -> Float {
             0.1 + (Float(count - 1) / 2 - Float(k)) * Self.shelfSpacing
         }
-        for k in 0..<Paint.colors.count {
-            let pot = PaintPot(colorIndex: k, at: SIMD3(Self.shelfX, columnY(k, of: Paint.colors.count), 0.3))
+        let potColors = controlScheme == .fist ? Paint.potOrder : Array(Paint.colors.indices)
+        for (k, colorIndex) in potColors.enumerated() {
+            let pot = PaintPot(colorIndex: colorIndex, at: SIMD3(Self.shelfX, columnY(k, of: potColors.count), 0.3))
             scene.rootNode.addChildNode(pot.root)
             pots.append(pot)
         }
@@ -278,7 +282,7 @@ final class Playground {
 
         for slot in 0..<2 {
             let start = SIMD3<Float>(slot == 0 ? -1.2 : 1.2, -0.9, 0.5)
-            let buddy = Buddy(slot: slot, colorIndex: slot == 0 ? 0 : 1, kind: buddyKinds[slot], start: start,
+            let buddy = Buddy(slot: slot, colorIndex: buddyColors[slot], kind: buddyKinds[slot], start: start,
                               erasesWithStarfish: controlScheme == .legacy)
             scene.rootNode.addChildNode(buddy.critter.root)
             scene.rootNode.addChildNode(buddy.starfish.root)
@@ -555,11 +559,7 @@ final class Playground {
             activeStroke[slot] = stroke
             lastBead[slot] = p
             buddy.critter.gulp()
-            if controlScheme == .fist && buddy.tool == .liquidOil {
-                audio.play(.splorp, pan: panFor(p.x))
-            } else {
-                audio.play(.blip, a: (p.y - center.y) / Self.canvasSize.y + 0.5, pan: panFor(p.x))
-            }
+            audio.play(.blip, a: (p.y - center.y) / Self.canvasSize.y + 0.5, pan: panFor(p.x))
         }
     }
 
@@ -587,13 +587,14 @@ final class Playground {
         lastStamp[slot] = nil
     }
 
-    private func erase(with buddy: Buddy, now: Double) {
+    func erase(with buddy: Buddy, now: Double) {
         let s = buddy.toolPosition
         let p = SIMD2(s.x, s.y)
         if isOverShelf(p) { return }
         let r = buddy.eraseRadius
         paintLayer.erase(at: p, radius: r, dt: frameDT)
-        var erasedAny = template?.erase(at: p, radius: r) ?? false
+        // The legacy starfish scrubs the dotted guide away too; the garden mushroom only wipes paint.
+        var erasedAny = buddy.showsStarfish ? (template?.erase(at: p, radius: r) ?? false) : false
         if let outline = template, outline.isEmpty {
             outline.node.removeFromParentNode()
             template = nil
@@ -756,13 +757,16 @@ final class Playground {
 
     /// Dip a critter into a pot and rub/swipe: it soaks up the color (faster the more you rub).
     /// Rub it in a critter bubble instead and it turns into that brush animal.
-    private func rubPots(_ buddy: Buddy, dt: Float, now: Double) {
+    func rubPots(_ buddy: Buddy, dt: Float, now: Double) {
         func stop() {
             buddy.rubbingPot = nil
             buddy.rubAmount = 0
             buddy.critter.colorPreview = nil
         }
-        guard buddy.mode == .swim || buddy.mode == .paint else { return stop() }
+        // The garden eraser is a critter like any other, so it can dip into pots and bubbles while it erases
+        // (a mouse or finger is always "fist", so the mushroom would otherwise be stuck as the mushroom).
+        let canRub = buddy.mode == .swim || buddy.mode == .paint || (buddy.mode == .erase && !buddy.erasesWithStarfish)
+        guard canRub else { return stop() }
         let p = buddy.toolPosition
         func near(_ c: SIMD3<Float>) -> Bool {
             simd_distance(SIMD2(p.x, p.y), SIMD2(c.x, c.y + 0.04)) < PaintPot.radius + 0.14
@@ -802,6 +806,15 @@ final class Playground {
         switch target {
         case .color(let index):
             buddy.pick(index)
+            // A colour belongs to one brush animal: dip into the other one's colour and become that animal.
+            if controlScheme == .fist, buddy.tool.usesColor, let owner = Paint.owner(of: index), owner != buddy.critter.kind,
+               let tool = PaintTool.allCases.first(where: { $0.critterKind == owner }) {
+                finishStroke(slot: buddy.slot)
+                if let old = buddy.equip(tool) {
+                    old.root.removeFromParentNode()
+                    scene.rootNode.addChildNode(buddy.critter.root)
+                }
+            }
             effects.colorSplash(at: potPosition + SIMD3(0, 0.15, 0.1), color: Paint.colors[index])
             audio.play(Int.random(in: 0..<12) == 0 ? .chicken : .pick, a: Float(index), pan: pan)
             flashCounter += 1
@@ -815,7 +828,11 @@ final class Playground {
             audio.play(.swap, pan: pan)
         case .tool(let tool):
             finishStroke(slot: buddy.slot)
-            if let old = buddy.equip(tool) {
+            if pointerErases, buddy.slot == 0, controlScheme == .fist, tool != .eraser {
+                // The eraser button would keep the pointer scrubbing: switch it off and take the new tool instead.
+                toolBeforePointerErase = tool
+                pointerErases = false
+            } else if let old = buddy.equip(tool) {
                 old.root.removeFromParentNode()
                 scene.rootNode.addChildNode(buddy.critter.root)
             }

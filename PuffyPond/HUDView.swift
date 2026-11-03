@@ -317,9 +317,9 @@ private struct GuideCard: View {
         Row(symbol: "drop.fill", color: .mint, title: "Rub a paint pot = new color",
             detail: "Swipe your buddy back and forth through a pot on the right until it soaks up the color."),
         Row(symbol: "sparkles", color: .indigo, title: "Rub a bubble = new tool",
-            detail: "Butterfly liquid oil, ladybug brush, mushroom eraser, snail blender."),
+            detail: "Butterfly brush (blue, green, purple), ladybug brush (red, orange, yellow), mushroom eraser, snail blender."),
         Row(symbol: "cloud.fill", color: .pink, title: "Mushroom = eraser",
-            detail: "Pick the mushroom bubble and make a fist to puff paint and the dotted guide away."),
+            detail: "Pick the mushroom bubble and make a fist to puff paint away. The dotted guide stays."),
         Row(symbol: "photo.artframe", color: .purple, title: "All done? Save it",
             detail: "Tap Save image to look it over, then hang it in the gallery for the critters to admire."),
     ]

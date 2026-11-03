@@ -10,11 +10,11 @@ struct GardenCastTests {
     // MARK: Tool column
 
     @Test func toolColumnHasFourTools() {
-        #expect(PaintTool.allCases == [.liquidOil, .brush, .eraser, .blender])
+        #expect(PaintTool.allCases == [.wingBrush, .brush, .eraser, .blender])
     }
 
     @Test func toolsMapToTheCast() {
-        #expect(PaintTool.liquidOil.critterKind == .butterfly)
+        #expect(PaintTool.wingBrush.critterKind == .butterfly)
         #expect(PaintTool.brush.critterKind == .ladybug)
         #expect(PaintTool.eraser.critterKind == .mushroom)
         #expect(PaintTool.blender.critterKind == .snail)
@@ -96,7 +96,7 @@ struct GardenCastTests {
         #expect(seen.allSatisfy { $0 >= 0 && $0 <= 1.2 })
     }
 
-    // MARK: Butterfly (liquid oil)
+    // MARK: Butterfly (brush)
 
     @Test func butterflyIsBuiltByKind() {
         let critter = CritterKind.butterfly.make(color: Paint.colors[1], at: .zero)
@@ -217,6 +217,70 @@ struct GardenCastTests {
         let bubble = playground.critterPots[0].root.simdPosition
         #expect(playground.isOverShelf(SIMD2(bubble.x, bubble.y)))
         #expect(!playground.isOverShelf(SIMD2(0, 0.1)))
+    }
+
+    // MARK: Facing the way it travels
+
+    /// Drives a critter's target steadily to one side for a second, then lets it stop.
+    private func drive(_ critter: Critter, vx: Float, frames: Int) {
+        var x = critter.position.value.x
+        for _ in 0..<frames {
+            x += vx / 60
+            critter.update(dt: 1.0 / 60, target: SIMD3(x, 0, 0.4), visible: true, painting: false, beatPulse: 0)
+        }
+    }
+
+    /// Where the head (the model's front) points on screen right now.
+    private func facing(_ critter: Critter, front: SIMD3<Float>) -> SIMD3<Float> {
+        critter.leanNode.simdOrientation.act(front)
+    }
+
+    @Test func gardenCastTurnsSidewaysWhileTravelingAndBackWhenStill() {
+        // Ladybug, mushroom and snail turn their heads to the side; the butterfly (wings to the camera) banks.
+        let fronts: [CritterKind: SIMD3<Float>] = [.ladybug: SIMD3(0, 0, 1), .mushroom: SIMD3(0, 0, 1),
+                                                    .butterfly: SIMD3(0, 1, 0), .snail: SIMD3(1, 0, 0)]
+        for (kind, front) in fronts {
+            let critter = kind.make(color: kind.signatureColor, at: .zero)
+            drive(critter, vx: 0, frames: 90)
+            let rest = facing(critter, front: front)
+            #expect(abs(rest.x) < 0.2, "\(kind.name) waits facing the camera")
+
+            drive(critter, vx: 2, frames: 90)
+            #expect(facing(critter, front: front).x > 0.8, "\(kind.name) heads right")
+            drive(critter, vx: -2, frames: 150)
+            #expect(facing(critter, front: front).x < -0.8, "\(kind.name) heads left")
+
+            drive(critter, vx: 0, frames: 120)
+            #expect(abs(facing(critter, front: front).x) < 0.2, "\(kind.name) faces the camera again")
+        }
+    }
+
+    @Test func turnedCharactersAreTippedTowardTheCamera() {
+        // Seen from above and the side, not edge-on: the top of the body tips toward the viewer.
+        for kind in [CritterKind.ladybug, .mushroom, .snail] {
+            let critter = kind.make(color: kind.signatureColor, at: .zero)
+            drive(critter, vx: 2, frames: 90)
+            #expect(critter.leanNode.simdOrientation.act(SIMD3(0, 1, 0)).z > 0.3, "\(kind.name)")
+        }
+    }
+
+    @Test func otherAnimalsKeepTheirOwnLook() {
+        let octopus = Octopus(color: Paint.colors[0], at: .zero)
+        drive(octopus, vx: 2, frames: 90)
+        #expect(!octopus.facesMotion && octopus.side == 0)
+    }
+
+    @Test func ladybugHasTheShapeOfARealOne() {
+        // Two covers over a shell, a shield and head in front, six legs (three a side).
+        let bug = Ladybug(color: Paint.colors[0], at: .zero)
+        var spheres = 0
+        bug.squashNode.enumerateHierarchy { node, _ in if node.geometry is SCNSphere { spheres += 1 } }
+        #expect(spheres > 12)
+        var antennae = 0
+        bug.squashNode.enumerateHierarchy { node, _ in if node.geometry is SCNCapsule { antennae += 1 } }
+        #expect(antennae >= 2)
+        LimbBrushTests.settle(bug, frames: 180, target: hover, painting: true)
+        #expect(bug.dabs(from: .zero, to: .zero, radius: 0.085, speed: 0).count > 0)
     }
 
     // MARK: Ladybug held still

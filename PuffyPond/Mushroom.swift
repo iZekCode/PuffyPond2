@@ -61,6 +61,7 @@ final class Mushroom: Critter {
     }
 
     override var eraseRadius: Float { Self.eraseRadius }
+    override var facesMotion: Bool { true }
     override var bob: Float { sin(clock * 3) * 0.03 }
 
     override func scrubbed() {

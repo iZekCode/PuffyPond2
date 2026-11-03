@@ -55,13 +55,15 @@ final class Snail: Critter {
             facing.simdPosition = SIMD3(0, 0.15, 0.01)
             stalks[i].pivot.addChildNode(facing)
         }
-        turnsToMotion = true
     }
 
     // Slow and heavy: it oozes after your hand.
     override var followStiffness: Float { 38 }
     override var followDamping: Float { 12 }
     override var leanAmount: Float { 0.4 }
+    // Built in profile (facing +x): turn it to face the camera at rest, and back to the side when it moves.
+    override var facesMotion: Bool { true }
+    override var heading: Heading { Heading(idle: -Float.pi / 2, right: -0.35, left: -Float.pi + 0.35) }
     override var bob: Float { sin(clock * 1.3) * 0.01 }
 
     override func flare(_ amount: Float) {

@@ -7,7 +7,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
     /// The garden cast (fist controls).
     case ladybug, butterfly, mushroom
 
-    /// The garden cast of the fist controls, in tool-column order (liquid oil, brush, eraser, blender).
+    /// The garden cast of the fist controls, in tool-column order (butterfly brush, ladybug brush, eraser, blender).
     static let gardenCast: [CritterKind] = [.butterfly, .ladybug, .mushroom, .snail]
 
     /// The six brush animals of the legacy controls (the sponge only carries the fist controls' blender).
@@ -39,7 +39,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .frog: return "dot prints"
         case .sponge: return "blender"
         case .ladybug: return "bundle brush"
-        case .butterfly: return "glaze"
+        case .butterfly: return "bundle brush"
         case .mushroom: return "eraser"
         }
     }
@@ -71,7 +71,7 @@ enum CritterKind: Int, CaseIterable, Equatable {
         case .sponge: return SIMD3(1.0, 0.86, 0.38)
         case .ladybug: return Paint.colors[0]
         case .butterfly: return Paint.colors[1]
-        case .mushroom: return Paint.colors[3]
+        case .mushroom: return SIMD3(0.98, 0.53, 0.72)
         }
     }
 
@@ -130,6 +130,9 @@ class Critter {
     /// Turn sideways toward the swim direction (profile animals) instead of facing the camera.
     var turnsToMotion = false
     private var yaw: Float = -0.35
+    /// -1 (heading left) … 0 (facing the camera) … 1 (heading right): how far it has turned toward its travel.
+    private(set) var side: Float = 0
+    private var travelDirection: Float = 1
     private var blinkStart: Float = -10
     private var nextBlink: Float = 2
 
@@ -242,6 +245,7 @@ class Critter {
                              max(-0.35, min(0.35, v.x * 0.1)),
                              max(-0.5, min(0.5, -v.x * 0.13))) * leanAmount
         lean += (leanGoal - lean) * min(1, dt * 8)
+        if facesMotion { turnToTravel(velocity: v, dt: dt) }
         if turnsToMotion, abs(v.x) > 0.25 {
             let goal: Float = v.x > 0 ? -0.35 : -Float.pi + 0.35
             yaw += (goal - yaw) * min(1, dt * 7)
@@ -289,11 +293,56 @@ class Critter {
         let scale = currentScale * (painting ? 1.08 : 1)
         bodyNode.simdPosition = position.value + SIMD3(0, bob, 0)
         bodyNode.simdScale = SIMD3(repeating: scale)
-        leanNode.simdEulerAngles = lean + SIMD3(0, turnsToMotion ? yaw : 0, 0)
+        if facesMotion {
+            leanNode.simdOrientation = headingOrientation * Self.orientation(euler: lean)
+        } else {
+            leanNode.simdEulerAngles = lean + SIMD3(0, turnsToMotion ? yaw : 0, 0)
+        }
         squashNode.simdScale = squash.value
         let hidden = presence.value < 0.01 && !visible
         root.isHidden = hidden
         animate(dt: dt, painting: painting, beatPulse: beatPulse, scale: scale, hidden: hidden)
+    }
+
+    // MARK: Heading (3/4 view from above while moving)
+
+    /// How a critter that `facesMotion` stands at rest and when it travels: the angle (radians) of its turn about
+    /// `axis` when idle, heading right and heading left. The default is to face the camera and turn the head about
+    /// 60° toward the direction of travel.
+    struct Heading {
+        var idle: Float = 0
+        var right: Float = 1.1
+        var left: Float = -1.1
+        /// Turn about the vertical axis (a standing animal), or roll about the viewing axis (a flat one, like the
+        /// butterfly, whose wings face the camera).
+        var axis: SIMD3<Float> = SIMD3(0, 1, 0)
+        /// How far the top tips toward the camera at rest and at full turn, so it is seen a little from above
+        /// when it waits and from above and the side when it travels.
+        var restPitch: Float = 0.3
+        var pitch: Float = 0.55
+    }
+
+    /// Turns to the side, seen from above, while it travels, and faces the camera again when it stops.
+    var facesMotion: Bool { false }
+    var heading: Heading { Heading() }
+
+    /// The turn for the current `side` (the pitch comes first, about the screen's x axis, then the turn).
+    private var headingOrientation: simd_quatf {
+        let h = heading
+        let angle = side >= 0 ? h.idle + (h.right - h.idle) * side : h.idle + (h.left - h.idle) * -side
+        let tip = h.restPitch + (h.pitch - h.restPitch) * abs(side)
+        return simd_quatf(angle: tip, axis: SIMD3(1, 0, 0)) * simd_quatf(angle: angle, axis: h.axis)
+    }
+
+    private func turnToTravel(velocity v: SIMD3<Float>, dt: Float) {
+        if abs(v.x) > 0.2 { travelDirection = v.x > 0 ? 1 : -1 }
+        let moving = smoothStep(0.15, 0.6, simd_length(SIMD2(v.x, v.y)))
+        side += (travelDirection * moving - side) * min(1, dt * 6)
+    }
+
+    private static func orientation(euler e: SIMD3<Float>) -> simd_quatf {
+        simd_quatf(angle: e.z, axis: SIMD3(0, 0, 1)) * simd_quatf(angle: e.y, axis: SIMD3(0, 1, 0))
+            * simd_quatf(angle: e.x, axis: SIMD3(1, 0, 0))
     }
 
     // MARK: Overridable behavior
