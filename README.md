@@ -53,11 +53,11 @@ The whole canvas is always on screen, with a column of paint pots beside its rig
 | Tool | Character | How it paints |
 |---|---|---|
 | Wing brush | Butterfly | A round, textured brush stroke in the butterfly's colours: blue, green and purple. |
-| Brush | Ladybug | Six legs lie on the canvas and wipe a thin watercolor wash with a grown-in texture, in the ladybug's colours: red, orange and yellow. |
+| Brush | Ladybug | Its round body and its six legs all paint a thin watercolor wash with a grown-in texture, in the ladybug's colours: red, orange and yellow. A quick drag still leaves paint from the body. |
 | Eraser | Mushroom | Scrubs paint away in puffs of spores. The template's dotted guide stays. |
 | Blender | Snail | Lays no paint; smudges and mixes the wet paint underneath. |
 
-The paint is simulated: flat wet strokes with bristle grooves and ragged edges, it levels out, thick blobs sag a little, and it dries over time. Colours never blend by themselves: new paint covers whatever is under it, and only the snail (blender) mixes colours.
+The paint is simulated: flat wet strokes with bristle grooves and ragged edges, it levels out, thick blobs sag a little, and it dries over time. The faster a stroke is drawn, the smoother its texture gets: a slow stroke keeps the full texture, then it turns into a coarse gradation, a fine one, and at a fast sweep a single smooth colour. Colours never blend by themselves: new paint covers whatever is under it, and only the snail (blender) mixes colours.
 
 The buttons along the bottom: brush size, Home, eraser for touch (iPad only), music, camera preview, help card, clear canvas, Save image, and the **eye**. The eye hides the HUD (buttons, hints, camera preview) so only the canvas, the pots, the bubbles and the brush characters show; the eye itself stays, faded, in the bottom right corner to bring the HUD back. There are no cast shadows under the pots, bubbles or brush animals.
 

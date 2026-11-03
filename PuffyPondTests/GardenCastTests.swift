@@ -288,6 +288,29 @@ struct GardenCastTests {
         #expect(bug.dabs(from: .zero, to: .zero, radius: 0.085, speed: 0).count > 0)
     }
 
+    @Test func ladybugBodyPaintsEvenWhenDraggedTooFastForTheLegs() {
+        let bug = Ladybug(color: Paint.colors[0], at: .zero)
+        var x: Float = 0
+        for _ in 0..<60 {
+            x += 6.0 / 60   // 6 units a second
+            bug.update(dt: 1.0 / 60, target: SIMD3(x, 0, Playground.paintHoverZ), visible: true, painting: true, beatPulse: 0)
+        }
+        let dabs = bug.dabs(from: SIMD2(x - 0.1, 0), to: SIMD2(x, 0), radius: 0.085, speed: 6)
+        #expect(!dabs.isEmpty)
+        let body = dabs[0]
+        #expect(body.from == SIMD2(x - 0.1, 0) && body.to == SIMD2(x, 0))
+        #expect(body.radius >= 0.085 * Ladybug.bodyBrush * 0.99 && body.style.nca == 1)
+    }
+
+    @Test func ladybugBodyBrushFollowsTheSizeSlider() {
+        let small = Ladybug(color: Paint.colors[0], at: .zero)
+        let big = Ladybug(color: Paint.colors[0], at: .zero)
+        big.sizeScale = 2
+        let a = small.dabs(from: .zero, to: SIMD2(0.1, 0), radius: 0.085, speed: 1)[0].radius
+        let b = big.dabs(from: .zero, to: SIMD2(0.1, 0), radius: 0.085, speed: 1)[0].radius
+        #expect(abs(b - 2 * a) < 1e-5)
+    }
+
     // MARK: Ladybug held still
 
     @Test func ladybugHoldIsNilWhileMovingAndGrowsWhenHeldStill() {

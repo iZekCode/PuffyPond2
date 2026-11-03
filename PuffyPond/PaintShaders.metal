@@ -391,13 +391,14 @@ kernel void ncaStep(texture2d<float, access::sample> ncaAIn [[texture(0)]],
                 float2 offset = float2(st.nca.z * 3.7, st.nca.z * 1.9);
                 float bias = (hash3(int2(int(floor(st.nca.z * 31.0)), 5), 9u) * 2.0 - 1.0) * P.ncaPatch.w;
                 float field = noise(world / P.ncaPatch.x + offset) * 0.5 + 0.5 + bias;
-                float slow = 1.0 - smoothstep(P.ncaSpeed.x, P.ncaSpeed.y, length(st.motion.xy) * P.frame.z);
-                float coverage = smoothstep(P.ncaPatch.y, P.ncaPatch.z, field) * slow;
+                // How fast the brush went decides how smooth the texture stays (0 = full texture … 1 = blended into one colour).
+                float speedSmooth = smoothstep(P.ncaSpeed.x, P.ncaSpeed.y, length(st.motion.xy) * P.frame.z);
+                float coverage = smoothstep(P.ncaPatch.y, P.ncaPatch.z, field);
                 if (coverage > 0.02) {
                     state[0] = float4(0);
                     state[1] = float4(0);
                     state[2] = float4(0);
-                    life = float4(1.0, coverage, st.nca.w, 0.0);
+                    life = float4(1.0, coverage, st.nca.w, speedSmooth);
                 }
             }
         } else if (st.color.w > 0.5 ? dist < radius * 0.8 : (st.brush.y > 0.0 && st.extra.w < 0.5 && dist < radius * 0.8)) {
@@ -442,7 +443,7 @@ static float surfaceHeight(texture2d<float, access::read> paint, texture2d<float
     float4 life = ncaLife.read(uint2(c));
     float meanBrightness = dot(ncaMeans[int(life.z + 0.5)].rgb, float3(1.0 / 3.0));
     float ncaBright = dot(nca.read(uint2(c)).rgb + 0.5, float3(1.0 / 3.0)) - meanBrightness;
-    float grown = ncaGrown(life, covered);
+    float grown = ncaGrown(life, covered) * (1.0 - smoothstep(0.3, 0.9, life.w));
     return a * shade.w + relief * shade.z * covered + 0.006 * noise(float2(c) * 0.9) * covered
          + weave(float2(c), canvas.x) * canvas.y * thin + grain + ncaBright * grown * ncaHeight;
 }
@@ -485,7 +486,23 @@ kernel void paintShade(texture2d<float, access::read> paint [[texture(0)]],
     // Where an NCA texture has grown, its own colours replace the flat pigment (each paint colour has a model trained
     // on a texture of that colour).
     float grown = ncaGrown(ncaLife.read(gid), coverage);
+    // A slow stroke shows the full texture, a quicker one a coarser and then a finer gradation of it, and a fast one is
+    // blended into one smooth colour (the texture's own average): the stroke's speed was stored when it was laid.
+    const float smoothness = ncaLife.read(gid).w;
     float3 ncaColor = saturate(ncaA.read(gid).rgb + 0.5);
+    if (smoothness > 0.02) {
+        const float r = smoothness * 14.0;
+        float3 sum = float3(0);
+        for (int j = -1; j <= 1; j++) {
+            for (int i = -1; i <= 1; i++) {
+                int2 q = clamp(int2(gid) + int2(round(float2(i, j) * r)), int2(0), size - 1);
+                sum += ncaA.read(uint2(q)).rgb;
+            }
+        }
+        ncaColor = saturate(sum / 9.0 + 0.5);
+        const float3 average = ncaMeans[int(ncaLife.read(gid).z + 0.5)].rgb;
+        ncaColor = mix(ncaColor, average, 0.9 * smoothstep(0.45, 0.95, smoothness));
+    }
     // The grown texture would be duller than the fresh pigment it replaces (it has its own shadows and the studio light
     // flattens it): lift it back so a stroke keeps its colour as the texture grows in.
     ncaColor = saturate(mix(float3(dot(ncaColor, float3(0.299, 0.587, 0.114))), ncaColor, kNCASaturation) * kNCAGain);

@@ -147,7 +147,13 @@ final class Ladybug: Critter {
                       pressing: painting && !hidden, hidden: hidden)
     }
 
+    /// The round body paints too, along the path it travels, so a quick drag still leaves paint when the short legs
+    /// have no time to reach the canvas; the legs add their strokes on top.
     override func dabs(from a: SIMD2<Float>, to b: SIMD2<Float>, radius: Float, speed: Float) -> [BrushDab] {
-        limbs.dabs(towards: b)
+        let body = BrushDab(from: a, to: b, radius: radius * Self.bodyBrush * sizeScale, speed: speed, style: .octopus)
+        return [body] + limbs.dabs(towards: b)
     }
+
+    /// The body's brush is this many times the stroke radius (at size 1): about as wide as the shell.
+    static let bodyBrush: Float = 1.7
 }

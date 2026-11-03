@@ -61,10 +61,10 @@ final class PaintLayer {
     private static let leveling: Float = 2            // how quickly wet paint relaxes
     private static let damping: Float = 5             // 1/s: how fast smears stop moving
     private static let gravity: Float = 260           // texels/s² pull on thick wet paint
-    private static let normalStrength: Float = 10
-    private static let cavity: Float = 1.2
+    private static let normalStrength: Float = 20
+    private static let cavity: Float = 3
     /// How much of the paint colour shows regardless of the light (the studio lights alone would dull it).
-    static let emission: CGFloat = 1.0
+    static let emission: CGFloat = 0.6
     private static let reliefHeight: Float = 0.12     // bristle texture depth
     private static let bodyHeight: Float = 0.15       // how much the paint's thickness itself shows
     private static let weaveDepth: Float = 0.012      // canvas weave showing through thin paint
@@ -84,15 +84,17 @@ final class PaintLayer {
     private static let ncaDT: Float = 1               // --dt
     private static let ncaFireRate: Float = 0.5       // --fire-rate
     private static let ncaHeight: Float = 0.2         // how much the grown texture lifts and lowers the paint
-    private static let ncaColor: Float = 0.9          // how far the pigment gives way to the texture's own colours
+    private static let ncaColor: Float = 1.0          // how far the pigment gives way to the texture's own colours (all of it)
     private static let ncaLifePerSecond: Float = 0.3  // a stroke keeps growing for about 1 / this many seconds
-    // The texture takes hold in patches along a stroke, not everywhere: a soft noise field decides where.
+    // The texture covers a stroke almost everywhere, so its own gradation shows (like Splash Canvas); a soft noise field
+    // only thins it out here and there.
     private static let ncaPatchSize: Float = 0.4      // patch width, in world units
-    private static let ncaPatchEdge = SIMD2<Float>(0.42, 0.58)  // noise range that fades from plain paint to full texture
-    private static let ncaPatchBias: Float = 0.1      // per-stroke shift of that range: some strokes carry more texture
-    // Speed (world units/s): a slow brush leaves the full texture, a fast one little, and its colour smears instead.
+    private static let ncaPatchEdge = SIMD2<Float>(0.02, 0.2)   // noise range that fades from plain paint to full texture
+    private static let ncaPatchBias: Float = 0.05     // per-stroke shift of that range: some strokes carry more texture
+    // Speed (world units/s): up to the slow speed a stroke keeps the full texture; from there it smooths out (a coarse
+    // gradation, then a fine one) until at the fast speed it is blended into one colour.
     private static let ncaSlowSpeed: Float = 0.4
-    private static let ncaFastSpeed: Float = 2.5
+    private static let ncaFastSpeed: Float = 2
 
     private let width: Int
     private let height: Int
