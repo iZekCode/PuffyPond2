@@ -65,7 +65,7 @@ struct HomeButton: View {
     }
 }
 
-/// Soft pond-colored backdrop shared by the full-screen pages.
+/// Soft leaf-green and sunlight backdrop shared by the full-screen pages.
 struct PageBackground: View {
     static let titleGradient = LinearGradient(colors: [Color(red: 1, green: 0.45, blue: 0.3),
                                                        Color(red: 0.95, green: 0.35, blue: 0.65),
@@ -73,8 +73,8 @@ struct PageBackground: View {
                                               startPoint: .leading, endPoint: .trailing)
 
     var body: some View {
-        LinearGradient(colors: [Color(red: 0.86, green: 0.95, blue: 1),
-                                Color(red: 1, green: 0.93, blue: 0.95)],
+        LinearGradient(colors: [Color(red: 0.88, green: 0.97, blue: 0.84),
+                                Color(red: 1, green: 0.96, blue: 0.86)],
                        startPoint: .top, endPoint: .bottom)
             .ignoresSafeArea()
     }

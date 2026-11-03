@@ -325,7 +325,7 @@ final class GalleryHall {
     private static let wallMaterial: SCNMaterial = {
         let wall = SCNMaterial()
         wall.lightingModel = .physicallyBased
-        wall.diffuse.contents = PlatformColor(red: 0.5, green: 0.5, blue: 0.51, alpha: 1)
+        wall.diffuse.contents = PlatformColor(red: 0.62, green: 0.46, blue: 0.3, alpha: 1)
         wall.roughness.contents = NSNumber(value: 0.95)
         wall.metalness.contents = NSNumber(value: 0.0)
         return wall
@@ -490,8 +490,8 @@ final class GalleryHall {
         }
     }
 
-    /// The rest of the museum, out of focus behind the partition: blue-grey walls hung with paintings,
-    /// statues on plinths, a warm stone floor and ceiling light.
+    /// The treehouse deck, out of focus behind the partition: a sunlit leafy canopy, big branches, warm
+    /// planks, a rail and string lights.
     static func backdrop() -> PlatformImage? {
         let w = 1600, h = 1000
         guard let sharp = Toybox.image(width: w, height: h, draw: { ctx in
@@ -506,45 +506,64 @@ final class GalleryHall {
                 ctx.fillPath()
             }
             let W = CGFloat(w), H = CGFloat(h)
-            let horizon: CGFloat = 330          // where the far wall meets the floor (y up)
-            fill(CGRect(x: 0, y: 0, width: W, height: H), SIMD4(0.55, 0.58, 0.63, 1))          // walls
-            // Side walls receding toward the middle, a little darker than the far wall.
-            polygon([CGPoint(x: 0, y: 0), CGPoint(x: 420, y: horizon), CGPoint(x: 420, y: 880),
-                     CGPoint(x: 0, y: H)], SIMD4(0.5, 0.53, 0.58, 1))
-            polygon([CGPoint(x: W, y: 0), CGPoint(x: W - 420, y: horizon), CGPoint(x: W - 420, y: 880),
-                     CGPoint(x: W, y: H)], SIMD4(0.48, 0.51, 0.56, 1))
-            // Ceiling with a long skylight.
-            polygon([CGPoint(x: 0, y: H), CGPoint(x: 420, y: 880), CGPoint(x: W - 420, y: 880),
-                     CGPoint(x: W, y: H)], SIMD4(0.72, 0.7, 0.66, 1))
-            fill(CGRect(x: 300, y: 920, width: W - 600, height: 40), SIMD4(0.95, 0.94, 0.9, 1))
-            // Stone floor and the dark skirting line along the walls.
-            polygon([CGPoint(x: 0, y: 0), CGPoint(x: 420, y: horizon), CGPoint(x: W - 420, y: horizon),
-                     CGPoint(x: W, y: 0)], SIMD4(0.66, 0.61, 0.55, 1))
-            fill(CGRect(x: 420, y: horizon, width: W - 840, height: 12), SIMD4(0.25, 0.25, 0.27, 1))
-            polygon([CGPoint(x: 0, y: 40), CGPoint(x: 420, y: horizon + 10), CGPoint(x: 420, y: horizon),
-                     CGPoint(x: 0, y: 0)], SIMD4(0.25, 0.25, 0.27, 1))
-            polygon([CGPoint(x: W, y: 40), CGPoint(x: W - 420, y: horizon + 10), CGPoint(x: W - 420, y: horizon),
-                     CGPoint(x: W, y: 0)], SIMD4(0.25, 0.25, 0.27, 1))
-            // Paintings on the side walls: gilt or dark frames, warm canvases.
-            let hung: [(CGRect, SIMD4<Float>, SIMD4<Float>)] = [
-                (CGRect(x: 10, y: 470, width: 70, height: 130), SIMD4(0.5, 0.35, 0.2, 1), SIMD4(0.45, 0.32, 0.22, 1)),
-                (CGRect(x: 160, y: 500, width: 70, height: 110), SIMD4(0.62, 0.5, 0.32, 1), SIMD4(0.8, 0.74, 0.62, 1)),
-                (CGRect(x: 300, y: 530, width: 40, height: 70), SIMD4(0.55, 0.42, 0.25, 1), SIMD4(0.6, 0.45, 0.3, 1)),
-                (CGRect(x: W - 120, y: 450, width: 100, height: 160), SIMD4(0.12, 0.12, 0.13, 1), SIMD4(0.3, 0.22, 0.16, 1)),
-                (CGRect(x: W - 270, y: 500, width: 60, height: 100), SIMD4(0.55, 0.42, 0.25, 1), SIMD4(0.7, 0.6, 0.45, 1)),
-            ]
-            for (r, frame, art) in hung {
-                fill(r, frame)
-                fill(r.insetBy(dx: r.width * 0.12, dy: r.width * 0.12), art)
+            let horizon: CGFloat = 330          // where the deck meets the open air (y up)
+            var seed: UInt32 = 5
+            func random() -> CGFloat {
+                seed = seed &* 1_664_525 &+ 1_013_904_223
+                return CGFloat(seed >> 8) / CGFloat(1 << 24)
             }
-            // Statues on plinths.
-            let statues: [(CGFloat, CGFloat, CGFloat)] = [(180, 200, 70), (W - 140, 160, 90), (W - 300, 260, 50)]
-            for (x, base, s) in statues {
-                fill(CGRect(x: x - s * 0.6, y: base, width: s * 1.2, height: s * 2.4), SIMD4(0.42, 0.44, 0.47, 1))
-                let top = base + s * 2.4
-                ctx.setFillColor(CGColor(red: 0.86, green: 0.83, blue: 0.77, alpha: 1))
-                ctx.fillEllipse(in: CGRect(x: x - s * 0.45, y: top, width: s * 0.9, height: s * 1.5))
-                ctx.fillEllipse(in: CGRect(x: x - s * 0.22, y: top + s * 1.35, width: s * 0.44, height: s * 0.5))
+            // Sunlit canopy: pale lime at the top sinking into leafy green.
+            let space = CGColorSpaceCreateDeviceRGB()
+            let sky = [CGColor(red: 0.88, green: 0.95, blue: 0.62, alpha: 1),
+                       CGColor(red: 0.6, green: 0.8, blue: 0.4, alpha: 1),
+                       CGColor(red: 0.32, green: 0.55, blue: 0.28, alpha: 1)] as CFArray
+            if let g = CGGradient(colorsSpace: space, colors: sky, locations: [0, 0.5, 1]) {
+                ctx.drawLinearGradient(g, start: CGPoint(x: 0, y: H), end: CGPoint(x: 0, y: horizon), options: [])
+            }
+            // Three layers of leaf clumps, far and bright to near and dark.
+            for (count, rMin, rMax, shade) in [(60, 60.0, 130.0, 0.95), (70, 50.0, 110.0, 0.8), (60, 40.0, 90.0, 0.62)] as [(Int, CGFloat, CGFloat, Float)] {
+                for _ in 0..<count {
+                    let r = rMin + random() * (rMax - rMin)
+                    ctx.setFillColor(CGColor(red: CGFloat(0.26 * shade + 0.1 * Float(random())),
+                                             green: CGFloat((0.5 + 0.25 * Float(random())) * shade),
+                                             blue: CGFloat(0.2 * shade), alpha: 0.9))
+                    ctx.fillEllipse(in: CGRect(x: random() * W - r, y: horizon + random() * (H - horizon) - r,
+                                               width: r * 2, height: r * 1.5))
+                }
+            }
+            // Bright gaps in the leaves where the sun comes through.
+            for _ in 0..<14 {
+                ctx.setFillColor(CGColor(red: 1, green: 0.98, blue: 0.75, alpha: 0.55))
+                let r = 30 + random() * 60
+                ctx.fillEllipse(in: CGRect(x: random() * W, y: horizon + 120 + random() * 450, width: r, height: r * 0.8))
+            }
+            // Big branches reaching in from both sides.
+            func branch(_ points: [CGPoint]) {
+                ctx.setFillColor(CGColor(red: 0.42, green: 0.3, blue: 0.2, alpha: 1))
+                ctx.addLines(between: points)
+                ctx.closePath()
+                ctx.fillPath()
+            }
+            branch([CGPoint(x: 0, y: 700), CGPoint(x: 360, y: 560), CGPoint(x: 380, y: 610), CGPoint(x: 0, y: 820)])
+            branch([CGPoint(x: W, y: 640), CGPoint(x: W - 340, y: 520), CGPoint(x: W - 360, y: 580), CGPoint(x: W, y: 780)])
+            // The deck: warm planks, a rail along the back and string lights above.
+            ctx.setFillColor(CGColor(red: 0.72, green: 0.54, blue: 0.35, alpha: 1))
+            ctx.fill(CGRect(x: 0, y: 0, width: W, height: horizon))
+            for k in 0..<12 {
+                ctx.setFillColor(CGColor(red: 0.35, green: 0.24, blue: 0.15, alpha: 0.35))
+                ctx.fill(CGRect(x: 0, y: CGFloat(k) * 28, width: W, height: 4))
+            }
+            ctx.setFillColor(CGColor(red: 0.5, green: 0.36, blue: 0.24, alpha: 1))
+            ctx.fill(CGRect(x: 0, y: horizon, width: W, height: 14))
+            ctx.fill(CGRect(x: 0, y: horizon + 150, width: W, height: 16))
+            for k in 0..<24 {
+                ctx.fill(CGRect(x: CGFloat(k) * 70 + 20, y: horizon, width: 14, height: 160))
+            }
+            for k in 0..<16 {
+                let x = 50 + CGFloat(k) * 100
+                let y = 900 - sin(CGFloat(k) / 15 * .pi) * 80
+                ctx.setFillColor(CGColor(red: 1, green: 0.92, blue: 0.5, alpha: 0.95))
+                ctx.fillEllipse(in: CGRect(x: x - 14, y: y - 14, width: 28, height: 28))
             }
         }) else { return nil }
         // Shallow depth of field: everything behind the partition is soft.

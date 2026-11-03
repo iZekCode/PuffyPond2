@@ -153,46 +153,70 @@ enum Studio {
         ctx.restoreGState()
     }
 
-    /// The room behind the easel, as if shot with a shallow depth of field: a warm wall with soft window
-    /// light from the left, a wooden floor and a leafy plant on the right — everything out of focus.
+    /// The room behind the easel, as if shot with a shallow depth of field: the inside of a treehouse, with
+    /// honey-coloured planks, a bright window ringed with leaves, string lights, hanging foliage and a
+    /// wooden floor — everything out of focus.
     static func backdrop() -> PlatformImage? {
         let w = 1600, h = 1000
         return Toybox.platformImage(Toybox.image(width: w, height: h) { ctx in
             let space = CGColorSpaceCreateDeviceRGB()
-            // Wall: brighter near the window, a touch darker toward the right corner.
-            let wall = [CGColor(red: 0.95, green: 0.93, blue: 0.89, alpha: 1),
-                        CGColor(red: 0.86, green: 0.83, blue: 0.78, alpha: 1),
-                        CGColor(red: 0.78, green: 0.75, blue: 0.70, alpha: 1)] as CFArray
+            var seed: UInt32 = 11
+            func random() -> CGFloat {
+                seed = seed &* 1_664_525 &+ 1_013_904_223
+                return CGFloat(seed >> 8) / CGFloat(1 << 24)
+            }
+            func leaf(x: CGFloat, y: CGFloat, radius: ClosedRange<CGFloat>) {
+                let r = radius.lowerBound + random() * (radius.upperBound - radius.lowerBound)
+                let g = Float(0.5 + 0.28 * random())
+                softBlob(ctx, at: CGPoint(x: x, y: y), radius: r, color: SIMD4(0.2 + 0.14 * Float(random()), g, 0.15 + 0.1 * Float(random()), 0.8),
+                         scaleY: 1.25)
+            }
+            // Planked wall: honey wood, brighter near the window.
+            let wall = [CGColor(red: 0.82, green: 0.64, blue: 0.43, alpha: 1),
+                        CGColor(red: 0.69, green: 0.51, blue: 0.34, alpha: 1),
+                        CGColor(red: 0.55, green: 0.4, blue: 0.27, alpha: 1)] as CFArray
             if let g = CGGradient(colorsSpace: space, colors: wall, locations: [0, 0.6, 1]) {
                 ctx.drawLinearGradient(g, start: CGPoint(x: 0, y: CGFloat(h)), end: CGPoint(x: CGFloat(w), y: 0), options: [])
             }
-            // Window light pooled on the wall (left), built from stacked soft glows.
-            softBlob(ctx, at: CGPoint(x: 260, y: 640), radius: 520, color: SIMD4(1, 0.98, 0.93, 0.75), scaleY: 1.1)
-            softBlob(ctx, at: CGPoint(x: 220, y: 700), radius: 260, color: SIMD4(1, 1, 0.97, 0.9), scaleY: 1.5)
-            // Faint window-frame shadows in the light.
-            ctx.setFillColor(CGColor(red: 0.6, green: 0.58, blue: 0.55, alpha: 0.06))
-            ctx.fill(CGRect(x: 215, y: 380, width: 34, height: 560))
-            ctx.fill(CGRect(x: 40, y: 640, width: 420, height: 30))
+            for k in 0..<10 {   // plank seams and uneven planks
+                ctx.setFillColor(CGColor(red: 0.3, green: 0.2, blue: 0.12, alpha: 0.12))
+                ctx.fill(CGRect(x: CGFloat(k) * 165 + 20, y: 0, width: 7, height: CGFloat(h)))
+                ctx.setFillColor(CGColor(red: 1, green: 0.9, blue: 0.7, alpha: 0.05 * random()))
+                ctx.fill(CGRect(x: CGFloat(k) * 165 + 27, y: 0, width: 158, height: CGFloat(h)))
+            }
+            // The window: a pool of bright green-gold daylight on the left, ringed with leaves.
+            softBlob(ctx, at: CGPoint(x: 260, y: 650), radius: 330, color: SIMD4(0.93, 0.98, 0.72, 0.95), scaleY: 1.25)
+            softBlob(ctx, at: CGPoint(x: 240, y: 680), radius: 170, color: SIMD4(1, 1, 0.9, 0.95), scaleY: 1.4)
+            for _ in 0..<32 {
+                let angle = random() * 2 * .pi
+                let distance = 230 + random() * 130
+                leaf(x: 260 + cos(angle) * distance * 1.15, y: 650 + sin(angle) * distance * 1.1, radius: 40...95)
+            }
+            // Dappled sunlight on the planks.
+            for _ in 0..<12 {
+                softBlob(ctx, at: CGPoint(x: 100 + random() * 1300, y: 150 + random() * 650), radius: 40 + random() * 60,
+                         color: SIMD4(1, 0.96, 0.7, 0.22), scaleY: 0.9)
+            }
             // Wooden floor along the bottom, blurred.
-            let floor = [CGColor(red: 0.55, green: 0.42, blue: 0.31, alpha: 0),
-                         CGColor(red: 0.55, green: 0.42, blue: 0.31, alpha: 0.85),
-                         CGColor(red: 0.45, green: 0.33, blue: 0.24, alpha: 1)] as CFArray
+            let floor = [CGColor(red: 0.5, green: 0.36, blue: 0.24, alpha: 0),
+                         CGColor(red: 0.5, green: 0.36, blue: 0.24, alpha: 0.9),
+                         CGColor(red: 0.4, green: 0.28, blue: 0.18, alpha: 1)] as CFArray
             if let g = CGGradient(colorsSpace: space, colors: floor, locations: [0, 0.35, 1]) {
                 ctx.drawLinearGradient(g, start: CGPoint(x: 0, y: 260), end: CGPoint(x: 0, y: 0), options: [])
             }
-            // A potted plant at the right, deep out of focus.
-            softBlob(ctx, at: CGPoint(x: 1390, y: 170), radius: 120, color: SIMD4(0.72, 0.42, 0.3, 0.9), scaleY: 0.9)
-            let leaves: [(CGFloat, CGFloat, CGFloat, Float)] = [
-                (1330, 430, 150, 0.34), (1450, 520, 170, 0.28), (1520, 380, 140, 0.38), (1380, 620, 130, 0.42),
-                (1260, 560, 110, 0.36), (1560, 640, 150, 0.3), (1460, 300, 120, 0.4), (1300, 300, 100, 0.33),
-            ]
-            for (x, y, r, g) in leaves {
-                softBlob(ctx, at: CGPoint(x: x, y: y), radius: r, color: SIMD4(0.22, g + 0.18, 0.2, 0.75), scaleY: 1.25)
+            // Foliage climbing in from the right, and a fringe hanging from the roof.
+            for _ in 0..<52 { leaf(x: 1100 + random() * 450, y: 180 + random() * 700, radius: 45...100) }
+            for _ in 0..<26 { leaf(x: random() * 1600, y: 900 + random() * 120, radius: 40...90) }
+            // String lights swagged across the top.
+            for k in 0..<15 {
+                let x = 60 + CGFloat(k) * 105
+                let y = 850 - sin(CGFloat(k) / 14 * .pi) * 70 - (k % 2 == 0 ? 0 : 16)
+                softBlob(ctx, at: CGPoint(x: x, y: y), radius: 34, color: SIMD4(1, 0.9, 0.5, 0.95))
+                softBlob(ctx, at: CGPoint(x: x, y: y), radius: 12, color: SIMD4(1, 1, 0.9, 1))
             }
-            softBlob(ctx, at: CGPoint(x: 1420, y: 520), radius: 90, color: SIMD4(0.55, 0.75, 0.45, 0.5))
             // Gentle corner shading (lens vignette in the photo).
             softBlob(ctx, at: CGPoint(x: CGFloat(w) / 2, y: CGFloat(h) / 2), radius: 900,
-                     color: SIMD4(1, 1, 1, 0.12), scaleY: 0.7)
+                     color: SIMD4(1, 1, 1, 0.1), scaleY: 0.7)
         })
     }
 
