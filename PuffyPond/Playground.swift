@@ -59,7 +59,6 @@ final class Playground {
     @ObservationIgnored private var toolBeforePointerErase: PaintTool?
     /// Red and orange: the ladybug's own colours.
     var buddyColors: [Int] = [0, 3]
-    var buddyKinds: [CritterKind] = [.ladybug, .ladybug]
     var buddyTools: [PaintTool] = [.brush, .brush]
     /// How big the ladybug is, and so how wide its brush paints (every leg scales with it).
     var brushSize: Float = 1
@@ -255,7 +254,7 @@ final class Playground {
 
         for slot in 0..<2 {
             let start = SIMD3<Float>(slot == 0 ? -1.2 : 1.2, -0.9, 0.5)
-            let buddy = Buddy(slot: slot, colorIndex: buddyColors[slot], kind: buddyKinds[slot], start: start)
+            let buddy = Buddy(slot: slot, colorIndex: buddyColors[slot], kind: .ladybug, start: start)
             scene.rootNode.addChildNode(buddy.critter.root)
             buddies.append(buddy)
         }
@@ -826,8 +825,6 @@ final class Playground {
         if drawingExists != hasDrawing { hasDrawing = drawingExists }
         let colors = buddies.map(\.colorIndex)
         if colors != buddyColors { buddyColors = colors }
-        let kinds = buddies.map(\.critter.kind)
-        if kinds != buddyKinds { buddyKinds = kinds }
         let tools = buddies.map(\.tool)
         if tools != buddyTools { buddyTools = tools }
 

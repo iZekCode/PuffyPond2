@@ -233,15 +233,15 @@ struct GardenCastTests {
             let critter = kind.make(color: kind.signatureColor, at: .zero)
             drive(critter, vx: 0, frames: 90)
             let rest = facing(critter, front: front)
-            #expect(abs(rest.x) < 0.2, "\(kind.name) waits facing the camera")
+            #expect(abs(rest.x) < 0.2, "\(kind) waits facing the camera")
 
             drive(critter, vx: 2, frames: 90)
-            #expect(facing(critter, front: front).x > 0.8, "\(kind.name) heads right")
+            #expect(facing(critter, front: front).x > 0.8, "\(kind) heads right")
             drive(critter, vx: -2, frames: 150)
-            #expect(facing(critter, front: front).x < -0.8, "\(kind.name) heads left")
+            #expect(facing(critter, front: front).x < -0.8, "\(kind) heads left")
 
             drive(critter, vx: 0, frames: 120)
-            #expect(abs(facing(critter, front: front).x) < 0.2, "\(kind.name) faces the camera again")
+            #expect(abs(facing(critter, front: front).x) < 0.2, "\(kind) faces the camera again")
         }
     }
 
@@ -250,7 +250,7 @@ struct GardenCastTests {
         for kind in [CritterKind.ladybug, .mushroom, .snail] {
             let critter = kind.make(color: kind.signatureColor, at: .zero)
             drive(critter, vx: 2, frames: 90)
-            #expect(critter.leanNode.simdOrientation.act(SIMD3(0, 1, 0)).z > 0.3, "\(kind.name)")
+            #expect(critter.leanNode.simdOrientation.act(SIMD3(0, 1, 0)).z > 0.3, "\(kind)")
         }
     }
 

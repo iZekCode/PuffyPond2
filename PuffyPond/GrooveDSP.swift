@@ -5,8 +5,6 @@ import os
 nonisolated enum Sfx: UInt8, Sendable, CaseIterable {
     case blip      // a critter lays a bead of paint (a = height 0…1, b = pan)
     case pop       // something pops (b = pan)
-    case boing     // a creature gets bumped (a = size 0…1, b = pan)
-    case rise      // drawing starts to transform
     case fanfare   // creature is born
     case swap      // tried to save an empty canvas (b = pan)
     case fizzle    // transform with nothing to inflate
@@ -20,9 +18,7 @@ nonisolated enum Sfx: UInt8, Sendable, CaseIterable {
     case quack     // a rubber duck (b = pan)
     case splat     // a hard slap of wet paint (a = strength 0…1, b = pan)
     case honk      // clown horn: "ha-HONK"
-    case bloop     // a cartoon bubble (b = pan)
     case bonk      // a wooden cartoon "bonk" (b = pan)
-    case splorp    // a wet, silly splorp (b = pan)
     case chicken   // a rubber chicken squawk (b = pan)
     case slurp     // a wet smear for the blender (a = speed 0…1, b = pan)
     case poof      // a soft spore puff (b = pan)
@@ -395,13 +391,6 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
             start(.noise, 0, peak: 0.5, decay: 0.07, at: 0, pan: pan, filter: .bandPass(1000, q: 0.7, sr: sampleRate))
             start(.sine, 180, peak: 0.4, decay: 0.12, at: 0, pan: pan, glideFrom: 700, glideTime: 0.02)
             start(.sine, Self.hz(96), peak: 0.08, decay: 0.2, at: Int(0.03 * sampleRate), pan: pan)
-        case .boing:
-            let base: Float = 420 - 200 * min(max(e.a, 0), 1)
-            start(.sine, base * 0.35, peak: 0.3, decay: 0.55, at: 0, pan: pan, glideFrom: base, glideTime: 0.12,
-                  vibrato: (0.07, 9))
-        case .rise:
-            start(.triangle, 1300, peak: 0.12, decay: 1.2, at: 0, attack: 0.25, glideFrom: 260, glideTime: 0.35)
-            start(.noise, 0, peak: 0.08, decay: 0.9, at: 0, attack: 0.4, filter: .bandPass(1800, q: 1.2, sr: sampleRate))
         case .fanfare:
             start(.noise, 0, peak: 0.45, decay: 0.08, at: 0, filter: .bandPass(900, q: 0.7, sr: sampleRate))
             start(.sine, 70, peak: 0.6, decay: 0.3, at: 0, glideFrom: 240, glideTime: 0.03)
@@ -468,9 +457,6 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
                 start(.square, base * 1.012, peak: 0.12, decay: 0.25, at: at, attack: 0.01, glideFrom: base * 0.8,
                       glideTime: 0.03, cutoff: 2000)
             }
-        case .bloop:
-            start(.sine, 800, peak: 0.12, decay: 0.12, at: 0, pan: pan, glideFrom: 300, glideTime: 0.04,
-                  vibrato: (0.05, 20))
         case .fizzle:
             start(.sine, 220, peak: 0.12, decay: 0.4, at: 0, glideFrom: 500, glideTime: 0.2)
             start(.noise, 0, peak: 0.1, decay: 0.3, at: 0, filter: .bandPass(700, q: 0.8, sr: sampleRate))
@@ -478,12 +464,6 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
             start(.sine, 110, peak: 0.35, decay: 0.18, at: 0, pan: pan, attack: 0.001, glideFrom: 320, glideTime: 0.04)
             start(.sine, 900, peak: 0.12, decay: 0.05, at: 0, pan: pan, attack: 0.001)
             start(.noise, 0, peak: 0.2, decay: 0.015, at: 0, pan: pan, filter: .bandPass(1800, q: 4, sr: sampleRate))
-        case .splorp:
-            start(.noise, 0, peak: 0.2, decay: 0.2, at: 0, pan: pan, attack: 0.02,
-                  filter: .bandPass(400, q: 2, sr: sampleRate))
-            start(.sine, 160, peak: 0.22, decay: 0.25, at: 0, pan: pan, glideFrom: 420, glideTime: 0.12,
-                  vibrato: (0.15, 16))
-            start(.sine, 80, peak: 0.16, decay: 0.2, at: Int(0.05 * sampleRate), pan: pan, glideFrom: 160, glideTime: 0.1)
         case .chicken:
             for (k, base) in [Float(600), 560].enumerated() {
                 let at = Int(Float(k) * 0.17 * sampleRate)

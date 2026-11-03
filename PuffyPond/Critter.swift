@@ -10,34 +10,6 @@ enum CritterKind: Int, CaseIterable, Equatable {
     /// The cast in tool-column order (butterfly brush, ladybug brush, eraser, blender).
     static let gardenCast: [CritterKind] = [.butterfly, .ladybug, .mushroom, .snail]
 
-    var name: String {
-        switch self {
-        case .snail: return "Snail"
-        case .ladybug: return "Ladybug"
-        case .butterfly: return "Butterfly"
-        case .mushroom: return "Mushroom"
-        }
-    }
-
-    /// What kind of brush it is.
-    var brush: String {
-        switch self {
-        case .snail: return "blender"
-        case .ladybug: return "bundle brush"
-        case .butterfly: return "bundle brush"
-        case .mushroom: return "eraser"
-        }
-    }
-
-    var symbol: String {
-        switch self {
-        case .snail: return "tornado"
-        case .ladybug: return "scribble.variable"
-        case .butterfly: return "drop.halffull"
-        case .mushroom: return "cloud.fill"
-        }
-    }
-
     /// Its own color while it waits in a critter bubble.
     var signatureColor: SIMD3<Float> {
         switch self {
@@ -94,9 +66,6 @@ class Critter {
     private(set) var clock: Float = 0
     /// Where the eyes drift on their own, on top of following the motion (gallery visitors look up).
     var gazeBias = SIMD2<Float>.zero
-    /// Turn sideways toward the travel direction (profile animals) instead of facing the camera.
-    var turnsToMotion = false
-    private var yaw: Float = -0.35
     /// -1 (heading left) … 0 (facing the camera) … 1 (heading right): how far it has turned toward its travel.
     private(set) var side: Float = 0
     private var travelDirection: Float = 1
@@ -205,7 +174,7 @@ class Critter {
     func update(dt: Float, target: SIMD3<Float>, visible: Bool, painting: Bool, beatPulse: Float) {
         clock += dt
         presence.step(to: visible ? 1 : 0, stiffness: 160, damping: 14, dt: dt)
-        move(dt: dt, target: target, painting: painting)
+        position.step(to: target, stiffness: followStiffness, damping: followDamping, dt: dt)
         let v = position.velocity
 
         let leanGoal = SIMD3(max(-0.45, min(0.45, -v.y * 0.1)),
@@ -213,10 +182,6 @@ class Critter {
                              max(-0.5, min(0.5, -v.x * 0.13))) * leanAmount
         lean += (leanGoal - lean) * min(1, dt * 8)
         if facesMotion { turnToTravel(velocity: v, dt: dt) }
-        if turnsToMotion, abs(v.x) > 0.25 {
-            let goal: Float = v.x > 0 ? -0.35 : -Float.pi + 0.35
-            yaw += (goal - yaw) * min(1, dt * 7)
-        }
 
         if let r = reaction, clock > r.until { reaction = nil }
         let activityMood: Mood = painting ? (speed > 1.8 ? .excited : .blowing) : .calm
@@ -240,7 +205,7 @@ class Critter {
             nextBlink = Float.random(in: 2...5)
         }
         let lid = Toybox.blinkScale(clock - blinkStart) * (1 - face.squint * 0.8)
-        let gaze = SIMD2(max(-0.8, min(0.8, v.x * 0.3)) * (turnsToMotion ? 0 : 1) + (turnsToMotion ? 0.6 : 0),
+        let gaze = SIMD2(max(-0.8, min(0.8, v.x * 0.3)),
                          max(-0.8, min(0.8, v.y * 0.3)) + (mood == .surprised ? 0.4 : 0)) + gazeBias
         for (i, eye) in eyes.enumerated() {
             eye.root.simdScale = SIMD3(face.eyeScale, lid * face.eyeScale, 1)
@@ -263,7 +228,7 @@ class Critter {
         if facesMotion {
             leanNode.simdOrientation = headingOrientation * Self.orientation(euler: lean)
         } else {
-            leanNode.simdEulerAngles = lean + SIMD3(0, turnsToMotion ? yaw : 0, 0)
+            leanNode.simdEulerAngles = lean
         }
         squashNode.simdScale = squash.value
         let hidden = presence.value < 0.01 && !visible
@@ -324,11 +289,6 @@ class Critter {
     /// How much paint this critter wipes away around itself while its tool is the eraser (world units).
     var eraseRadius: Float { 0.26 }
     var bob: Float { sin(clock * 2.2) * 0.02 }
-
-    /// How the critter travels toward the hand (a spring by default).
-    func move(dt: Float, target: SIMD3<Float>, painting: Bool) {
-        position.step(to: target, stiffness: followStiffness, damping: followDamping, dt: dt)
-    }
 
     /// Called every frame the critter wipes away some paint (it munches, scrubs...).
     func scrubbed() {}
