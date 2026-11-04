@@ -19,7 +19,10 @@ struct CanvasLayout {
     static let sidePotSpacing: Float = 0.9
     static let potRadius: Float = 0.2
     /// The critter bubbles on the left are bigger, so the little critter inside is easy to see.
-    static let bubbleRadius: Float = 0.27
+    static let bubbleRadius: Float = 0.405
+    /// The bubbles' column stands just clear of the canvas's left edge, spaced so the big bubbles don't touch.
+    static let bubbleShelfX: Float = canvasSize.x * 0.5 + bubbleRadius + 0.12
+    static let bubbleSpacing: Float = 0.95
     static let strokeRadius: Float = 0.085
     static let paintHoverZ: Float = 0.24        // how high the brush animal hovers while painting
     static let brushSizeRange: ClosedRange<Float> = 0.6...2.4
@@ -34,7 +37,7 @@ struct CanvasLayout {
         guard width > 0, height > 0 else { return }
         aspect = width / height
         let needHalfH = Self.canvasSize.y * 0.5 * 1.04
-        let needHalfW = (Self.shelfX + max(Self.potRadius, Self.bubbleRadius) + 0.3) * 1.04   // the columns stand nearer the camera than the canvas
+        let needHalfW = (max(Self.shelfX + Self.potRadius, Self.bubbleShelfX + Self.bubbleRadius) + 0.3) * 1.04   // the columns stand nearer the camera than the canvas
         // The pots above the canvas (and their rub ring) stand at the pots' depth.
         let needPotsH = (Self.topPotY + 0.32 - Self.cameraY) * 1.04
         cameraDistance = max(Self.canvasZ + max(needHalfH / Self.tanHalfFOV, needHalfW / (Self.tanHalfFOV * aspect)),
@@ -86,6 +89,11 @@ struct CanvasLayout {
         let side = count - top
         let i = k - top
         return SIMD2(shelfX, canvasCenter.y - 0.1 + (Float(side - 1) / 2 - Float(i)) * sidePotSpacing)
+    }
+
+    /// Height of bubble `k` of `count` in the left column, centred on the canvas.
+    static func bubbleY(_ k: Int, of count: Int) -> Float {
+        canvasCenter.y + (Float(count - 1) / 2 - Float(k)) * bubbleSpacing
     }
 
     /// Height of slot `k` in a column of `count` pots or bubbles, centred on the canvas.

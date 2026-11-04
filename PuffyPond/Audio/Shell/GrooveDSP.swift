@@ -195,6 +195,7 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
     }
 
     func setEnergy(_ value: Float) { shared[1] = Double(value) }
+    /// Mutes only the background music. Sound effects (the critters, paint, pops) keep playing.
     func setMuted(_ muted: Bool) { shared[2] = muted ? 0 : 1 }
     func setTune(_ tune: Tune) { shared[3] = Double(tune.rawValue) }
     /// Musical time in beats (quarter notes) since start.
@@ -560,14 +561,16 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
         }
         let block = Float(frameCount) / sampleRate
         energy += (Float(shared[1]) - energy) * (1 - exp(-block / 1.2))
-        let masterTarget = Float(shared[2])
+        // shared[2] only switches the background music; the effects always play.
+        let musicOn = shared[2] > 0.5
+        let masterTarget: Float = 1
 
         // Sequencer: trigger every 16th note sample-accurately.
         for n in 0..<frameCount {
             stepClock += 1
             if stepClock >= samplesPerStep {
                 stepClock -= samplesPerStep
-                playStep(at: n)
+                if musicOn { playStep(at: n) }   // the beat clock keeps running while the music is off
                 step += 1
                 totalSteps += 1
                 if step == 16 {

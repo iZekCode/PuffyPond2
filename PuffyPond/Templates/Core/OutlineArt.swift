@@ -103,6 +103,15 @@ enum TemplateKind: String, CaseIterable {
         }
     }
 
+    /// Where it sits in the template list (1 = easy).
+    var level: Int {
+        switch difficulty {
+        case .easy: return 1
+        case .medium: return 2
+        case .hard: return 3
+        }
+    }
+
     var difficulty: TemplateDifficulty {
         switch self {
         case .pebble, .bean, .puddle: return .easy

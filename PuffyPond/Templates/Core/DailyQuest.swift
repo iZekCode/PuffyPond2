@@ -1,10 +1,14 @@
 import Foundation
 
-/// A challenge of the day. Lives in its own pool, apart from the template list.
+/// One of the first ten pictures (they used to be the daily quest's own pool; now they are templates like any other,
+/// and the ids stay so older quest paintings still find their outline).
 struct Quest: Equatable, Identifiable {
     let id: String
     let title: String
     let art: OutlineArt
+
+    /// Simple pictures are easy, the ones with more parts medium.
+    var level: Int { art.paths.count <= 3 ? 1 : 2 }
 }
 
 enum QuestCatalog {
@@ -67,7 +71,8 @@ enum QuestCatalog {
     static func quest(id: String) -> Quest? { all.first { $0.id == id } }
 }
 
-/// Picks the quest of the day: rolled once per local day, remembered, and never the same as yesterday's.
+/// Picks the quest of the day from the templates: rolled once per local day, remembered, and never the same as
+/// yesterday's. Any template can come up, including ones already painted, so they get tried again.
 final class DailyQuestStore {
     static let defaultsKey = "dailyQuests"
 
@@ -86,14 +91,24 @@ final class DailyQuestStore {
         self.roll = roll
     }
 
-    func quest(for date: Date) -> Quest {
+    func quest(for date: Date) -> TemplateDesign {
+        let rolled = defaults.dictionary(forKey: Self.defaultsKey) as? [String: String] ?? [:]
+        if let id = rolled[key(for: date)], let quest = TemplateCatalog.design(id: id) { return quest }
+        return pick(for: date, avoiding: nil)
+    }
+
+    /// Picks another template for today (the shuffle button), never the one showing now.
+    func reroll(for date: Date) -> TemplateDesign {
+        let rolled = defaults.dictionary(forKey: Self.defaultsKey) as? [String: String] ?? [:]
+        return pick(for: date, avoiding: rolled[key(for: date)])
+    }
+
+    private func pick(for date: Date, avoiding current: String?) -> TemplateDesign {
         var rolled = defaults.dictionary(forKey: Self.defaultsKey) as? [String: String] ?? [:]
         let today = key(for: date)
-        if let id = rolled[today], let quest = QuestCatalog.quest(id: id) { return quest }
-
         let before = calendar.date(byAdding: .day, value: -1, to: date).map(key(for:))
         let yesterdaysID = before.flatMap { rolled[$0] }
-        let pool = QuestCatalog.all.filter { $0.id != yesterdaysID }
+        let pool = TemplateCatalog.all.filter { $0.id != yesterdaysID && $0.id != current }
         let quest = pool[min(max(roll(pool.count), 0), pool.count - 1)]
 
         rolled[today] = quest.id

@@ -15,6 +15,8 @@ struct Painting: Identifiable, Equatable {
     var paintURL: URL { url.deletingPathExtension().appendingPathExtension("paint") }
     /// What was painted, stroke by stroke.
     var timelapseURL: URL { url.deletingPathExtension().appendingPathExtension("timelapse") }
+    /// The camera timelapse: the child painting (only on this device).
+    var cameraURL: URL { url.deletingPathExtension().appendingPathExtension("camera") }
 
     static func sidecarURL(for png: URL) -> URL {
         png.deletingPathExtension().appendingPathExtension("json")

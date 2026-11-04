@@ -113,8 +113,8 @@ final class EaselScene {
             pots.append(pot)
         }
         for (k, tool) in PaintTool.allCases.enumerated() {
-            let y = CanvasLayout.columnY(k, of: PaintTool.allCases.count)
-            critterPots.append(CritterPot(tool: tool, at: SIMD3(-CanvasLayout.shelfX, y, 0.3)))
+            let y = CanvasLayout.bubbleY(k, of: PaintTool.allCases.count)
+            critterPots.append(CritterPot(tool: tool, at: SIMD3(-CanvasLayout.bubbleShelfX, y, CanvasLayout.potZ)))
         }
         for pot in critterPots {
             scene.rootNode.addChildNode(pot.root)
@@ -140,7 +140,7 @@ final class EaselScene {
             pot.root.simdPosition.x = spot.x
             pot.root.simdPosition.y = spot.y
         }
-        for pot in critterPots { pot.root.simdPosition.x = -CanvasLayout.shelfX }
+        for pot in critterPots { pot.root.simdPosition.x = -CanvasLayout.bubbleShelfX }
     }
 
     /// Whether `p` (canvas plane) is under a pot or bubble: rubbing one must not paint or erase behind it.

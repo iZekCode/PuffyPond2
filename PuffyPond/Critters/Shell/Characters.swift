@@ -114,7 +114,7 @@ final class CritterPot {
         root.addChildNode(bubble)
         // A little lavender stand so the bubble reads against the white canvas.
         let stand = Toybox.balloon(SIMD3(0.55, 0.5, 0.9), wobble: 0, roughness: 0.25)
-        root.addChildNode(Toybox.node(SCNTorus(ringRadius: 0.19, pipeRadius: 0.04), stand, at: SIMD3(0, -Self.radius + 0.01, 0)))
+        root.addChildNode(Toybox.node(SCNTorus(ringRadius: 0.28, pipeRadius: 0.05), stand, at: SIMD3(0, -Self.radius + 0.01, 0)))
 
         let ringMaterial = SCNMaterial()
         ringMaterial.lightingModel = .constant
@@ -132,7 +132,7 @@ final class CritterPot {
 
         // The little resident drifts around inside the bubble (added to the scene by the playground).
         resident = tool.critterKind.make(color: tool.critterKind.signatureColor, at: position)
-        resident.sizeScale = 0.72
+        resident.sizeScale = 1.08
     }
 
     /// The resident's scene node.

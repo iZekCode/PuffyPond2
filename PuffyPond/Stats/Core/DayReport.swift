@@ -37,6 +37,22 @@ struct DayReport {
         stats = Self.merge(paintings.compactMap(\.record.stats))
     }
 
+    /// Seconds of painting per canvas cell over `paintings`, for one hand or both (`side` nil).
+    /// Nil when none of them has a heatmap for that choice (no movement data, or saved before hands were split).
+    static func heatmap(of paintings: [Painting], side: Side?) -> [Double]? {
+        let count = SessionStats.heatmapColumns * SessionStats.heatmapRows
+        var cells = [Double](repeating: 0, count: count)
+        var found = false
+        for stats in paintings.compactMap(\.record.stats) {
+            let source: [UInt16]?
+            if let side { source = stats.sideHeatmaps[side] } else { source = stats.heatmap }
+            guard let source else { continue }
+            found = true
+            for (i, hundredths) in source.enumerated() where i < count { cells[i] += Double(hundredths) / 100 }
+        }
+        return found ? cells : nil
+    }
+
     private static func merge(_ sessions: [SessionStats]) -> Stats? {
         guard !sessions.isEmpty else { return nil }
         var stats = Stats()

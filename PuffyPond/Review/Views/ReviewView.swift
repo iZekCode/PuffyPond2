@@ -21,6 +21,8 @@ struct ReviewView: View {
     let keepDrawing: () -> Void
     let save: () -> Void
     let back: () -> Void
+    /// The child painting, sped up; shown in a corner window when there is one.
+    var camera: CameraTimelapse? = nil
     @State private var stage = ReviewStage()
     @State private var frames: [String: CGRect] = [:]
     @State private var leaving = false
@@ -41,6 +43,12 @@ struct ReviewView: View {
                     .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.space))
                         .onChanged { drag in stage.pointer = uv(drag.location, in: proxy.size) }
                         .onEnded { _ in stage.pointer = nil })
+
+                if let camera {
+                    CameraTimelapseBadge(timelapse: camera)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(20 * scale)
+                }
 
                 VStack {
                     titleBadge
@@ -166,13 +174,6 @@ struct ReviewView: View {
                                                           width: frame.width / size.width,
                                                           height: frame.height / size.height))
         }
-    }
-}
-
-extension TemplateChoice {
-    /// What the painting was traced from, for page titles.
-    var title: String? {
-        isDailyQuest ? QuestCatalog.quest(id: templateID)?.title : TemplateCatalog.kind(id: templateID)?.title
     }
 }
 

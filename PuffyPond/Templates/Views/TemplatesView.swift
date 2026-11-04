@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The daily quest on top, then every template in unlock order. A template opens once a painting of
-/// the one before it is saved in the gallery.
+/// The daily quest on top (any template, picked at random for the day), then every template by level, easy first.
+/// All of them are open. The tiles show the picture big; the name is only a small caption.
 struct TemplatesView: View {
     let router: AppRouter
     let gallery: Gallery
@@ -10,7 +10,6 @@ struct TemplatesView: View {
     @Environment(\.uiScale) private var scale
 
     var body: some View {
-        let saved = gallery.savedTemplateIDs
         let questDone = gallery.paintings(on: Date()).contains { $0.record.isDailyQuest }
         ZStack {
             PageBackground()
@@ -36,18 +35,19 @@ struct TemplatesView: View {
                 }
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22 * scale) {
-                        QuestCard(quest: quest, icon: icons[quest.id], done: questDone) {
-                            router.go(.instruction(TemplateChoice(templateID: quest.id, isDailyQuest: true)))
-                        }
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16 * scale), count: 3),
-                                  spacing: 16 * scale) {
-                            ForEach(TemplateCatalog.ordered, id: \.id) { kind in
-                                let unlocked = TemplateCatalog.isUnlocked(kind, saved: saved)
-                                TemplateTile(kind: kind, icon: icons[kind.id], unlocked: unlocked,
-                                             lockedHint: TemplateCatalog.previous(of: kind)?.title) {
-                                    router.go(.instruction(TemplateChoice(templateID: kind.id, isDailyQuest: false)))
+                        HStack(spacing: 14 * scale) {
+                            QuestCard(quest: quest, icon: icons[quest.id], done: questDone) {
+                                router.go(.instruction(TemplateChoice(templateID: quest.id, isDailyQuest: true)))
+                            }
+                            // Another random template for today's quest.
+                            RoundButton(symbol: "shuffle", tint: .purple) {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                                    quest = DailyQuestStore().reroll(for: Date())
                                 }
                             }
+                        }
+                        ForEach(TemplateCatalog.levels, id: \.self) { level in
+                            levelSection(level)
                         }
                     }
                     .padding(.horizontal, 4 * scale)
@@ -59,16 +59,28 @@ struct TemplatesView: View {
         }
     }
 
+    private func levelSection(_ level: Int) -> some View {
+        VStack(alignment: .leading, spacing: 12 * scale) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16 * scale), count: 4),
+                      spacing: 16 * scale) {
+                ForEach(TemplateCatalog.all.filter { $0.level == level }) { design in
+                    TemplateTile(design: design, icon: icons[design.id]) {
+                        router.go(.instruction(TemplateChoice(templateID: design.id, isDailyQuest: false)))
+                    }
+                }
+            }
+        }
+    }
+
     private static func makeIcons() -> [String: CGImage] {
         var icons: [String: CGImage] = [:]
-        for kind in TemplateKind.allCases { icons[kind.id] = kind.art.iconImage(side: 192) }
-        for quest in QuestCatalog.all { icons[quest.id] = quest.art.iconImage(side: 192) }
+        for design in TemplateCatalog.all { icons[design.id] = design.art.iconImage(side: 256) }
         return icons
     }
 }
 
 private struct QuestCard: View {
-    let quest: Quest
+    let quest: TemplateDesign
     let icon: CGImage?
     let done: Bool
     let action: () -> Void
@@ -78,7 +90,7 @@ private struct QuestCard: View {
         let shape = RoundedRectangle(cornerRadius: 30 * scale, style: .continuous)
         Button(action: action) {
             HStack(spacing: 20 * scale) {
-                TileIcon(image: icon, side: 110 * scale)
+                TileIcon(image: icon, side: 150 * scale)
                     .padding(8 * scale)
                     .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 22 * scale, style: .continuous))
                 VStack(alignment: .leading, spacing: 6 * scale) {
@@ -87,7 +99,7 @@ private struct QuestCard: View {
                         .padding(.horizontal, 12 * scale).padding(.vertical, 4 * scale)
                         .background(.white.opacity(0.28), in: Capsule())
                     Text(quest.title)
-                        .font(.system(size: 34 * scale, weight: .black, design: .rounded))
+                        .font(.system(size: 22 * scale, weight: .heavy, design: .rounded))
                     Text(done ? "Selesai hari ini. Lukis lagi kalau mau" : "Lukis dan simpan ke galeri")
                         .font(.system(size: 16 * scale, weight: .semibold, design: .rounded))
                         .opacity(0.9)
@@ -111,46 +123,30 @@ private struct QuestCard: View {
 }
 
 private struct TemplateTile: View {
-    let kind: TemplateKind
+    let design: TemplateDesign
     let icon: CGImage?
-    let unlocked: Bool
-    let lockedHint: String?
     let action: () -> Void
     @Environment(\.uiScale) private var scale
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: 26 * scale, style: .continuous)
         Button(action: action) {
-            VStack(spacing: 8 * scale) {
-                ZStack {
-                    TileIcon(image: icon, side: 110 * scale)
-                        .saturation(unlocked ? 1 : 0)
-                        .opacity(unlocked ? 1 : 0.35)
-                    if !unlocked {
-                        Image(systemName: "lock.fill")
-                            .font(.system(size: 34 * scale, weight: .bold))
-                            .foregroundStyle(.gray)
-                    }
-                }
-                Text(kind.title)
-                    .font(.system(size: 20 * scale, weight: .heavy, design: .rounded))
-                    .foregroundStyle(unlocked ? Color(red: 0.25, green: 0.2, blue: 0.35) : .gray)
-                if !unlocked, let lockedHint {
-                    Text("Simpan lukisan \(lockedHint) untuk membuka")
-                        .font(.system(size: 13 * scale, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.gray)
-                        .multilineTextAlignment(.center)
-                }
+            VStack(spacing: 4 * scale) {
+                // The picture is the tile; the name is just a small caption under it.
+                TileIcon(image: icon, side: 150 * scale)
+                Text(design.title)
+                    .font(.system(size: 13 * scale, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-            .padding(14 * scale)
-            .frame(maxWidth: .infinity, minHeight: 190 * scale)
-            .background(.white.opacity(unlocked ? 0.95 : 0.55), in: shape)
+            .padding(10 * scale)
+            .frame(maxWidth: .infinity)
+            .background(.white.opacity(0.95), in: shape)
             .overlay(shape.stroke(.white, lineWidth: 3))
-            .shadow(color: .black.opacity(unlocked ? 0.12 : 0.04), radius: 8, y: 4)
+            .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
             .contentShape(shape)
         }
         .buttonStyle(.plain)
-        .disabled(!unlocked)
     }
 }
 

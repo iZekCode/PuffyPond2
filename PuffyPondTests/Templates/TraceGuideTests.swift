@@ -150,15 +150,9 @@ struct TraceGuideTests {
     }
 
     @Test func everyTemplateAndQuestCanBeGuided() {
-        for kind in TemplateKind.allCases {
-            let lines = kind.shape(center: .zero, size: SIMD2(4.6, 2.7)).lines
-            let g = TraceGuide(lines: lines)
-            #expect(g != nil)
-            #expect(g?.legs.isEmpty == false)
-        }
-        for quest in QuestCatalog.all {
-            let lines = quest.art.shape(center: .zero, size: SIMD2(4.6, 2.7)).lines
-            #expect(TraceGuide(lines: lines)?.legs.isEmpty == false)
+        for design in TemplateCatalog.all {
+            let lines = design.art.shape(center: .zero, size: SIMD2(4.6, 2.7)).lines
+            #expect(TraceGuide(lines: lines)?.legs.isEmpty == false, "\(design.id)")
         }
     }
 }

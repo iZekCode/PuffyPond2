@@ -44,11 +44,15 @@ struct ContentView: View {
         .environment(\.uiScale, Platform.isPad ? 1.2 : 1)
         .onChange(of: onCanvas, initial: true) { _, canvas in
             playground.isAway = !canvas
+            tracker.cameraTimelapse.isRecording = canvas
             watchBody(canvas)
         }
         .onChange(of: router.route) { old, new in
             // Coming from the distance check is a new session; coming back from the review page is not.
-            if case .canvas(let choice) = new, case .instruction = old { playground.begin(choice) }
+            if case .canvas(let choice) = new, case .instruction = old {
+                playground.begin(choice)
+                tracker.cameraTimelapse.reset()
+            }
         }
         .onAppear {
             Platform.keepAwake()
@@ -95,7 +99,8 @@ struct ContentView: View {
         case let .review(draft):
             ReviewView(photos: draft.photos, recording: draft.recording, title: draft.choice?.title ?? "Bebas",
                        date: Date(), mode: .fresh, audio: playground.audio, relay: pageHands,
-                       keepDrawing: { router.go(.canvas(draft.choice)) }, save: { save(draft) }, back: {})
+                       keepDrawing: { router.go(.canvas(draft.choice)) }, save: { save(draft) }, back: {},
+                       camera: draft.camera)
                 .id(draft.id)
                 .transition(.opacity)
         case let .viewPainting(painting, origin):
@@ -114,15 +119,18 @@ struct ContentView: View {
     private func saveImage() {
         guard case .canvas(let choice) = router.route, let photo = playground.finishPainting() else { return }
         router.go(.review(ReviewDraft(photos: photo, choice: choice, stats: playground.sessionStats(),
-                                        recording: playground.timelapseRecording())))
+                                        recording: playground.timelapseRecording(),
+                                        camera: tracker.cameraTimelapse.snapshot())))
     }
 
     /// Hangs the reviewed painting, with its template and movement stats, and walks over to see it.
     private func save(_ draft: ReviewDraft) {
         let record = PaintingRecord(date: Date(), templateID: draft.choice?.templateID,
                                     isDailyQuest: draft.choice?.isDailyQuest ?? false, stats: draft.stats)
-        guard gallery.add(draft.photos, recording: draft.recording, record: record) != nil else { return }
+        guard gallery.add(draft.photos, recording: draft.recording, camera: draft.camera, record: record) != nil
+        else { return }
         playground.clearCanvas()
+        tracker.cameraTimelapse.reset()
         router.go(.gallery3D(start: 0, justHung: true))
     }
 

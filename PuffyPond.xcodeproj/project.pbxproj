@@ -304,7 +304,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Puffy Pond";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.graphics-design";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Puffy Pond mengikuti gerakan tanganmu supaya kamu bisa menggambar makhluk balon di udara. Video diproses di perangkatmu dan tidak pernah disimpan.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Puffy Pond mengikuti gerakan tanganmu supaya kamu bisa menggambar makhluk balon di udara. Video diproses di perangkatmu; hanya cuplikan kecil untuk timelapse yang disimpan bersama lukisan, di perangkat ini saja.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -358,7 +358,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Puffy Pond";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.graphics-design";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Puffy Pond mengikuti gerakan tanganmu supaya kamu bisa menggambar makhluk balon di udara. Video diproses di perangkatmu dan tidak pernah disimpan.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Puffy Pond mengikuti gerakan tanganmu supaya kamu bisa menggambar makhluk balon di udara. Video diproses di perangkatmu; hanya cuplikan kecil untuk timelapse yang disimpan bersama lukisan, di perangkat ini saja.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

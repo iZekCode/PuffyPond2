@@ -196,7 +196,8 @@ private struct DayDetail: View {
                 } else {
                     paintingsCard
                     if let stats = report.stats {
-                        heatmapCard(stats)
+                        HeatmapCard(paintings: report.paintings.filter { $0.record.stats != nil })
+                            .id(report.day)
                         dominanceCard(stats)
                         romCard(stats)
                     } else {
@@ -272,20 +273,6 @@ private struct DayDetail: View {
                 Text("Perkiraan dari kamera, bukan pengukuran klinis.")
                     .font(.system(size: 11 * scale, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private func heatmapCard(_ stats: DayReport.Stats) -> some View {
-        Card {
-            VStack(alignment: .leading, spacing: 10 * scale) {
-                Text("Peta panas")
-                    .font(.system(size: 18 * scale, weight: .heavy, design: .rounded))
-                    .foregroundStyle(ink)
-                Text("Di mana tanganmu melukis di kanvas")
-                    .font(.system(size: 13 * scale, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
-                HeatmapView(cells: stats.heatmap)
             }
         }
     }
@@ -370,9 +357,74 @@ private struct StatRow: View {
     }
 }
 
-/// The day's painting time per canvas cell, drawn as a soft glow over a blank canvas frame.
+/// Where the hands painted, filterable by hand (both, left, right) and by painting (the whole day or one picture).
+private struct HeatmapCard: View {
+    /// The day's paintings that have movement data, newest first.
+    let paintings: [Painting]
+    @State private var side: Side?
+    @State private var painting: Painting?
+    @Environment(\.uiScale) private var scale
+
+    private var cells: [Double]? {
+        DayReport.heatmap(of: painting.map { [$0] } ?? paintings, side: side)
+    }
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 10 * scale) {
+                Text("Peta panas")
+                    .font(.system(size: 18 * scale, weight: .heavy, design: .rounded))
+                    .foregroundStyle(ink)
+                Text("Di mana tanganmu melukis di kanvas")
+                    .font(.system(size: 13 * scale, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 8 * scale) {
+                    chip("Kedua tangan", selected: side == nil, tint: .orange) { side = nil }
+                    chip("Kiri", selected: side == .left, tint: .teal) { side = .left }
+                    chip("Kanan", selected: side == .right, tint: .pink) { side = .right }
+                }
+                if paintings.count > 1 {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8 * scale) {
+                            chip("Semua gambar", selected: painting == nil, tint: .indigo) { painting = nil }
+                            ForEach(Array(paintings.reversed().enumerated()), id: \.element.id) { index, item in
+                                chip("Gambar \(index + 1) · \(item.date.formatted(.dateTime.hour().minute()))",
+                                     selected: painting == item, tint: .indigo) { painting = item }
+                            }
+                        }
+                    }
+                }
+                if let cells {
+                    HeatmapView(cells: cells, tint: side)
+                } else {
+                    Text("Gambar ini dibuat sebelum data per tangan ada.")
+                        .font(.system(size: 14 * scale, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func chip(_ title: String, selected: Bool, tint: Color, action: @escaping () -> Void) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) { action() }
+        } label: {
+            Text(title)
+                .font(.system(size: 14 * scale, weight: .bold, design: .rounded))
+                .padding(.horizontal, 12 * scale)
+                .padding(.vertical, 6 * scale)
+                .foregroundStyle(selected ? .white : tint)
+                .background(selected ? tint : tint.opacity(0.12), in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Painting time per canvas cell, drawn as a soft glow over a blank canvas frame.
 private struct HeatmapView: View {
     let cells: [Double]
+    /// Both hands glow yellow → red; one hand glows in its own color (left teal, right pink).
+    var tint: Side? = nil
     @Environment(\.uiScale) private var scale
 
     var body: some View {
@@ -380,7 +432,7 @@ private struct HeatmapView: View {
             .aspectRatio(CGFloat(Playground.canvasSize.x / Playground.canvasSize.y), contentMode: .fit)
             .frame(maxWidth: .infinity)
             .overlay {
-                if let image = Self.image(cells) {
+                if let image = Self.image(cells, tint: tint) {
                     Image(decorative: image, scale: 1)
                         .resizable()
                         .interpolation(.high)
@@ -393,14 +445,19 @@ private struct HeatmapView: View {
     }
 
     /// One pixel per cell, top row first: transparent where nothing was painted, yellow → red as time grows.
-    static func image(_ cells: [Double]) -> CGImage? {
+    static func image(_ cells: [Double], tint: Side? = nil) -> CGImage? {
         let columns = SessionStats.heatmapColumns, rows = SessionStats.heatmapRows
         guard cells.count == columns * rows, let peak = cells.max(), peak > 0 else { return nil }
         var pixels = [UInt8](repeating: 0, count: columns * rows * 4)
         for (i, value) in cells.enumerated() where value > 0 {
             let t = sqrt(value / peak)   // square root so light use still shows
             let alpha = 0.25 + 0.75 * t
-            let rgb = (1.0, 0.85 - 0.65 * t, 0.2 - 0.2 * t)
+            let rgb: (Double, Double, Double)
+            switch tint {
+            case nil: rgb = (1.0, 0.85 - 0.65 * t, 0.2 - 0.2 * t)
+            case .left?: rgb = (0.45 - 0.4 * t, 0.85 - 0.3 * t, 0.85 - 0.25 * t)
+            case .right?: rgb = (1.0 - 0.1 * t, 0.6 - 0.45 * t, 0.75 - 0.35 * t)
+            }
             // Premultiplied alpha.
             pixels[i * 4 + 0] = UInt8(rgb.0 * alpha * 255)
             pixels[i * 4 + 1] = UInt8(rgb.1 * alpha * 255)

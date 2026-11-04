@@ -29,6 +29,7 @@ struct SessionRecorder {
     private var sawBody = false
     private var painting: [Side: Double] = [:]
     private var heat = [Double](repeating: 0, count: SessionStats.heatmapColumns * SessionStats.heatmapRows)
+    private var sideHeat: [Side: [Double]] = [:]
     private var lastPose: [Side: HandPose] = [:]
     private var gripCycles: [Side: Int] = [:]
 
@@ -67,6 +68,7 @@ struct SessionRecorder {
             let column = min(max(Int(p.x * Float(columns)), 0), columns - 1)
             let row = min(max(Int(p.y * Float(rows)), 0), rows - 1)
             heat[row * columns + column] += dt
+            sideHeat[side, default: [Double](repeating: 0, count: columns * rows)][row * columns + column] += dt
         }
     }
 
@@ -131,6 +133,7 @@ struct SessionRecorder {
         stats.duration = duration
         stats.pinchSeconds = painting
         stats.heatmap = heat.map { UInt16(min(($0 * 100).rounded(), Double(UInt16.max))) }
+        stats.sideHeatmaps = sideHeat.mapValues { cells in cells.map { UInt16(min(($0 * 100).rounded(), Double(UInt16.max))) } }
         stats.gripCycles = gripCycles
         stats.romDegrees = abduction.peaks
         stats.elbowExtension = elbow.peaks

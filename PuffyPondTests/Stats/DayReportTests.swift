@@ -81,4 +81,22 @@ struct DayReportTests {
         let report = DayReport(day: date(1, hour: 12), paintings: [still], calendar: calendar)
         #expect(try #require(report.stats).dominance.isEmpty)
     }
+
+    @Test func heatmapCanBeFilteredByHandAndPainting() {
+        let count = SessionStats.heatmapColumns * SessionStats.heatmapRows
+        var a = SessionStats()
+        a.heatmap = Array(repeating: 100, count: count)
+        a.sideHeatmaps = [.left: Array(repeating: 100, count: count)]
+        var b = SessionStats()
+        b.heatmap = Array(repeating: 200, count: count)
+        b.sideHeatmaps = [.right: Array(repeating: 200, count: count)]
+        let first = painting(Date(), stats: a)
+        let second = painting(Date().addingTimeInterval(60), stats: b)
+
+        #expect(DayReport.heatmap(of: [first, second], side: nil)?.first == 3)
+        #expect(DayReport.heatmap(of: [first, second], side: .left)?.first == 1)
+        #expect(DayReport.heatmap(of: [first, second], side: .right)?.first == 2)
+        #expect(DayReport.heatmap(of: [first], side: .right) == nil)   // that painting has no right-hand data
+        #expect(DayReport.heatmap(of: [second], side: nil)?.first == 2)
+    }
 }

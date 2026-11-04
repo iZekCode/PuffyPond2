@@ -13,6 +13,7 @@ struct PaintingViewerPage: View {
     private struct Loaded: @unchecked Sendable {
         let photos: CanvasPhotos
         let recording: StrokeRecording?
+        let camera: CameraTimelapse?
     }
 
     var body: some View {
@@ -20,7 +21,7 @@ struct PaintingViewerPage: View {
             if let loaded {
                 ReviewView(photos: loaded.photos, recording: loaded.recording, title: title, date: painting.date,
                            mode: .viewing, audio: audio, relay: relay, keepDrawing: {}, save: {},
-                           back: { router.go(origin.route) })
+                           back: { router.go(origin.route) }, camera: loaded.camera)
             } else {
                 PageBackground()
                 ProgressView()
@@ -30,7 +31,8 @@ struct PaintingViewerPage: View {
             let painting = painting
             let result = await Task.detached(priority: .userInitiated) { () -> Loaded? in
                 guard let photos = Gallery.photos(of: painting) else { return nil }
-                return Loaded(photos: photos, recording: Gallery.recording(of: painting))
+                return Loaded(photos: photos, recording: Gallery.recording(of: painting),
+                              camera: Gallery.cameraTimelapse(of: painting))
             }.value
             if let result {
                 loaded = result

@@ -17,6 +17,8 @@ struct SessionStats: Codable, Equatable {
     /// Time the drawing hands spent painting, per canvas cell (`heatmapColumns` × `heatmapRows`, row-major,
     /// top-left first), in hundredths of a second.
     var heatmap: [UInt16] = Array(repeating: 0, count: heatmapColumns * heatmapRows)
+    /// The same heatmap split per hand (empty for sessions saved before it existed).
+    var sideHeatmaps: [Side: [UInt16]] = [:]
     /// Seconds each hand spent painting. Named after the original pinch; with the fist controls it counts fist time.
     var pinchSeconds: [Side: Double] = [:]
     /// Straightest elbow per arm, in degrees (180 = fully straight).
@@ -38,6 +40,7 @@ struct SessionStats: Codable, Equatable {
         duration = try c.decodeIfPresent(TimeInterval.self, forKey: .duration) ?? 0
         romDegrees = try c.decodeIfPresent([Side: Double].self, forKey: .romDegrees) ?? [:]
         heatmap = try c.decodeIfPresent([UInt16].self, forKey: .heatmap) ?? heatmap
+        sideHeatmaps = try c.decodeIfPresent([Side: [UInt16]].self, forKey: .sideHeatmaps) ?? [:]
         pinchSeconds = try c.decodeIfPresent([Side: Double].self, forKey: .pinchSeconds) ?? [:]
         elbowExtension = try c.decodeIfPresent([Side: Double].self, forKey: .elbowExtension) ?? [:]
         reachHeight = try c.decodeIfPresent([Side: Double].self, forKey: .reachHeight) ?? [:]

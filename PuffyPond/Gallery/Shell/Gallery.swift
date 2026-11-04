@@ -61,14 +61,15 @@ final class Gallery {
     /// Hangs a finished painting with everything the review page needs to play with it again: the paint alone, the
     /// stroke-by-stroke timelapse (when something was recorded), and, once for all paintings, the bare canvas.
     @discardableResult
-    func add(_ photos: CanvasPhotos, recording: StrokeRecording?, record: PaintingRecord = PaintingRecord(date: Date()))
-        -> Painting? {
+    func add(_ photos: CanvasPhotos, recording: StrokeRecording?, camera: CameraTimelapse? = nil,
+             record: PaintingRecord = PaintingRecord(date: Date())) -> Painting? {
         var record = record
         let usable = recording.flatMap { $0.isEmpty ? nil : $0 }
         record.timelapseVersion = usable == nil ? nil : StrokeRecording.formatVersion
         guard let painting = add(photos.whole, record: record) else { return nil }
         _ = Self.writePNG(photos.paint, to: painting.paintURL)
         if let usable { try? usable.encoded().write(to: painting.timelapseURL, options: .atomic) }
+        if let camera, !camera.isEmpty { try? camera.encoded().write(to: painting.cameraURL, options: .atomic) }
         let canvas = Self.bareCanvasURL(in: folder)
         if !FileManager.default.fileExists(atPath: canvas.path) { _ = Self.writePNG(photos.canvas, to: canvas) }
         return painting
@@ -87,6 +88,12 @@ final class Gallery {
     nonisolated static func recording(of painting: Painting) -> StrokeRecording? {
         guard let data = try? Data(contentsOf: painting.timelapseURL) else { return nil }
         return StrokeRecording(data: data)
+    }
+
+    /// The child painting it, or nil when the painting has no camera timelapse.
+    nonisolated static func cameraTimelapse(of painting: Painting) -> CameraTimelapse? {
+        guard let data = try? Data(contentsOf: painting.cameraURL) else { return nil }
+        return CameraTimelapse(data: data)
     }
 
     /// The painting's three photos for the review page, or nil when its image cannot be read. A painting made before
@@ -112,6 +119,7 @@ final class Gallery {
         try? FileManager.default.removeItem(at: painting.sidecarURL)
         try? FileManager.default.removeItem(at: painting.paintURL)
         try? FileManager.default.removeItem(at: painting.timelapseURL)
+        try? FileManager.default.removeItem(at: painting.cameraURL)
         paintings.removeAll { $0 == painting }
     }
 

@@ -3,7 +3,7 @@ import Foundation
 import Observation
 import SwiftUI
 
-/// The template a drawing session starts from. The daily quest comes from its own pool.
+/// The template a drawing session starts from; `isDailyQuest` when it was picked as the day's quest.
 struct TemplateChoice: Equatable, Hashable {
     let templateID: String
     let isDailyQuest: Bool
@@ -26,6 +26,8 @@ struct ReviewDraft: Equatable {
     let stats: SessionStats?
     /// What was painted, for the timelapse; nil when nothing was recorded.
     let recording: StrokeRecording?
+    /// The child painting, from the camera; nil when the camera was off.
+    var camera: CameraTimelapse? = nil
 
     var image: CGImage { photos.whole }
 

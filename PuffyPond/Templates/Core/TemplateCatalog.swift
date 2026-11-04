@@ -1,32 +1,37 @@
 import Foundation
 
 extension TemplateChoice {
-    /// The outline to trace: a template from the catalog, or the day's quest from its own pool.
-    var art: OutlineArt? {
-        isDailyQuest ? QuestCatalog.quest(id: templateID)?.art : TemplateCatalog.kind(id: templateID)?.art
-    }
+    /// The outline to trace. The daily quest is one of the templates too, so both come from the catalog.
+    var art: OutlineArt? { TemplateCatalog.design(id: templateID)?.art }
+
+    /// What the painting was traced from, for page titles.
+    var title: String? { TemplateCatalog.design(id: templateID)?.title }
 }
 
-/// The templates in unlock order, and which of them a person can start from.
+/// Every template, easy → hard, all open from the start (no locks).
 enum TemplateCatalog {
-    /// Easy → hard (the levels are never shown). Each template opens once the one before it has a saved painting.
-    static let ordered: [TemplateKind] = TemplateKind.allCases.sorted {
-        ($0.difficulty, index(of: $0)) < ($1.difficulty, index(of: $1))
-    }
+    /// The abstract shapes, the first ten pictures and the newer pictures, sorted by level (keeping that order
+    /// within a level).
+    static let all: [TemplateDesign] = {
+        let shapes = TemplateKind.allCases.map {
+            TemplateDesign(id: $0.id, title: $0.title, level: $0.level, art: $0.art)
+        }
+        let firstPictures = QuestCatalog.all.map {
+            TemplateDesign(id: $0.id, title: $0.title, level: $0.level, art: $0.art)
+        }
+        let everything = shapes + firstPictures + TemplateDesign.pictures
+        return everything.enumerated()
+            .sorted { ($0.element.level, $0.offset) < ($1.element.level, $1.offset) }
+            .map(\.element)
+    }()
 
+    private static let byID: [String: TemplateDesign] = Dictionary(all.map { ($0.id, $0) }) { first, _ in first }
+
+    static func design(id: String) -> TemplateDesign? { byID[id] }
+
+    /// The abstract shape with this id (its ids are stored with old paintings), if it is one.
     static func kind(id: String) -> TemplateKind? { TemplateKind(rawValue: id) }
 
-    static func previous(of kind: TemplateKind) -> TemplateKind? {
-        guard let i = ordered.firstIndex(of: kind), i > 0 else { return nil }
-        return ordered[i - 1]
-    }
-
-    /// Derived from the saved paintings every time, so deleting a painting can lock a template again.
-    /// - Parameter saved: ids of the templates that have at least one painting in the gallery.
-    static func isUnlocked(_ kind: TemplateKind, saved: Set<String>) -> Bool {
-        guard let before = previous(of: kind) else { return true }
-        return saved.contains(before.id)
-    }
-
-    private static func index(of kind: TemplateKind) -> Int { TemplateKind.allCases.firstIndex(of: kind) ?? 0 }
+    /// The levels that have templates, easy first.
+    static var levels: [Int] { Array(Set(all.map(\.level))).sorted() }
 }

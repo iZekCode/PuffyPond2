@@ -115,6 +115,8 @@ nonisolated final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBuf
     /// The one live camera picture. Each page that shows it hosts this same layer, so the session is attached
     /// once: attaching a second preview layer to the running session blocked the main thread for 9 seconds.
     let previewLayer = CameraPreviewLayer()
+    /// Keeps a small snapshot every so often while the canvas shows, for the camera timelapse.
+    let cameraTimelapse = CameraTimelapseRecorder()
     /// Set before calling `start`. Delivered on the main actor once per processed frame.
     var onFrame: (@MainActor @Sendable (HandFrame) -> Void)?
     /// Set before calling `start`. Delivered once per processed frame while `bodyPoseEnabled` is on.
@@ -271,6 +273,7 @@ nonisolated final class HandTracker: NSObject, AVCaptureVideoDataOutputSampleBuf
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        cameraTimelapse.offer(pixelBuffer, at: CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds)
         let width = CVPixelBufferGetWidth(pixelBuffer)
         let height = CVPixelBufferGetHeight(pixelBuffer)
         let aspect = Float(width) / Float(max(height, 1))
