@@ -100,6 +100,7 @@ Paths in the table are relative to `PuffyPond/`.
 | `Stats/Core/SessionRecorder.swift`, `Stats/Core/SessionStats.swift` | Records painting time, heatmap, grip cycles and ROM during a canvas session; the saved stats |
 | `Templates/Core/TemplateCatalog.swift`, `Templates/Core/DailyQuest.swift` | Template order and unlocks; the daily quest pool and the roll of the day |
 | `Templates/Core/OutlineArt.swift`, `Templates/Shell/TemplateOutline.swift` | Outline art (SVG-style paths) and the nine abstract templates; the dotted guide on the canvas |
+| `Templates/Core/TraceGuide.swift`, `Templates/Shell/GuideArrow.swift`, `Templates/Shell/GuideVoice.swift` | Tracing guide: splits the outline into steps ("Naik ke atas!", "Turun sedikit lagi!"), follows the brush along it, points an arrow at the next stretch and reads the step aloud in Indonesian (device voice). The megaphone button mutes the voice; the step stays on screen as text |
 | `Input/Core/DistanceGate.swift` | Shoulder width in the camera image → too close / too far / good, with the hold timer |
 | `Input/Core/SwipeDetector.swift` | Open hand sweeping down → walk on or back in the 3D gallery |
 | `Input/Shell/HandFrameRelay.swift` | Passes camera hand frames to the review page and the 3D gallery |

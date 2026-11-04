@@ -9,17 +9,17 @@ struct ModePickerView: View {
         ZStack {
             PageBackground()
             VStack(spacing: 32 * scale) {
-                Text("What do you want to paint?")
+                Text("Mau melukis apa?")
                     .font(.system(size: 40 * scale, weight: .black, design: .rounded))
                     .foregroundStyle(PageBackground.titleGradient)
                     .multilineTextAlignment(.center)
                 HStack(spacing: 24 * scale) {
-                    ModeCard(title: "Freeform", detail: "A blank canvas, anything you like",
+                    ModeCard(title: "Bebas", detail: "Kanvas kosong, lukis apa saja yang kamu suka",
                              symbol: "scribble.variable", tint: .pink) { router.go(.instruction(nil)) }
-                    ModeCard(title: "Choose template", detail: "Trace a dotted outline",
+                    ModeCard(title: "Pilih templat", detail: "Ikuti garis putus-putus",
                              symbol: "square.grid.2x2.fill", tint: .orange) { router.go(.templates) }
                 }
-                HomeButton(title: "Home", symbol: "house.fill", tint: .green) { router.home() }
+                HomeButton(title: "Beranda", symbol: "house.fill", tint: .green) { router.home() }
             }
             .padding(24 * scale)
         }

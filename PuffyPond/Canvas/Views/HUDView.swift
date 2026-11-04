@@ -27,9 +27,11 @@ struct HUDView: View {
                         }
                         .padding(.horizontal, 24 * scale)
                         hintBubble
+                        guideBubble
                     } else {
                         title
                         hintBubble
+                        guideBubble
                         colorChips
                     }
                     Spacer()
@@ -60,11 +62,11 @@ struct HUDView: View {
             }
             focusButton
         }
-        .confirmationDialog("Leave without saving?", isPresented: $confirmingHome, titleVisibility: .visible) {
-            Button("Leave", role: .destructive, action: goHome)
-            Button("Keep drawing", role: .cancel) {}
+        .confirmationDialog("Keluar tanpa menyimpan?", isPresented: $confirmingHome, titleVisibility: .visible) {
+            Button("Keluar", role: .destructive, action: goHome)
+            Button("Lanjut menggambar", role: .cancel) {}
         } message: {
-            Text("This painting isn't saved yet.")
+            Text("Lukisan ini belum disimpan.")
         }
     }
 
@@ -85,15 +87,15 @@ struct HUDView: View {
 
     private var hintContent: (symbol: String, text: String) {
         switch playground.hint {
-        case .starting: return ("camera.fill", "Waking up the camera…")
-        case .raiseHands: return ("hand.raised.fill", "Raise both hands — a paint buddy follows each one")
-        case .roaming: return ("hand.raised.fill", "Make a fist to paint · rub a pot for a color, a bubble for a new tool")
-        case .pickingColor: return ("drop.fill", "Rub rub rub! Swipe through the pot to soak up the color")
-        case .drawing: return ("paintbrush.pointed.fill", "Swoosh! Keep your fist closed and sweep your arm")
-        case .erasing: return ("cloud.fill", "Mushroom puff! Keep your fist closed to puff the paint away")
-        case .readyToHang: return ("photo.artframe", "All done? Tap Save image")
-        case .tracing: return ("scribble.variable", "Make a fist and follow the dotted line · the mushroom puffs it away")
-        case .touchMode: return ("hand.draw.fill", "Drag to draw · tap Save image when you're done")
+        case .starting: return ("camera.fill", "Membangunkan kamera…")
+        case .raiseHands: return ("hand.raised.fill", "Angkat kedua tanganmu — satu teman cat akan mengikuti setiap tangan")
+        case .roaming: return ("hand.raised.fill", "Kepalkan tangan untuk melukis · gosok pot untuk ganti warna, gosok gelembung untuk alat baru")
+        case .pickingColor: return ("drop.fill", "Gosok, gosok, gosok! Geser melewati pot supaya warnanya meresap")
+        case .drawing: return ("paintbrush.pointed.fill", "Wuuss! Tetap kepalkan tanganmu dan ayunkan lenganmu")
+        case .erasing: return ("cloud.fill", "Pof jamur! Tetap kepalkan tanganmu untuk meniup cat sampai hilang")
+        case .readyToHang: return ("photo.artframe", "Sudah selesai? Ketuk Simpan gambar")
+        case .tracing: return ("scribble.variable", "Kepalkan tangan dan ikuti garis putus-putus · jamur akan meniupnya hilang")
+        case .touchMode: return ("hand.draw.fill", "Seret untuk menggambar · ketuk Simpan gambar kalau sudah selesai")
         }
     }
 
@@ -115,6 +117,25 @@ struct HUDView: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: playground.hint)
     }
 
+    /// What to do next along the dotted outline, in words. Stays on screen when the spoken directions are muted.
+    @ViewBuilder
+    private var guideBubble: some View {
+        if let text = playground.guideText {
+            HStack(spacing: 10 * scale) {
+                Image(systemName: "signpost.right.fill")
+                    .font(.system(size: 16 * scale, weight: .bold))
+                Text(text)
+                    .font(.system(size: 17 * scale, weight: .heavy, design: .rounded))
+            }
+            .padding(.horizontal, 18 * scale)
+            .padding(.vertical, 8 * scale)
+            .background(Color(red: 1, green: 0.93, blue: 0.8).opacity(0.92), in: Capsule())
+            .overlay(Capsule().stroke(.white, lineWidth: 2))
+            .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+            .foregroundStyle(Color(red: 0.55, green: 0.25, blue: 0.1))
+        }
+    }
+
     // MARK: Buddy colors
 
     /// Each buddy's current paint and brush animal, so it's always clear what you'll draw with.
@@ -130,7 +151,7 @@ struct HUDView: View {
         let colorName = Paint.names[index % Paint.names.count]
         let tool = slot < playground.buddyTools.count ? playground.buddyTools[slot] : .brush
         let symbol = tool.symbol
-        let label = tool.usesColor ? "\(colorName) \(tool.name)" : tool.name
+        let label = tool.usesColor ? "\(tool.name) \(colorName)" : tool.name
         var tint = Paint.swiftUI(Paint.colors[index % Paint.colors.count])
         if !tool.usesColor { tint = Color(red: 0.55, green: 0.5, blue: 0.7) }
         return HStack(spacing: 8 * scale) {
@@ -185,6 +206,12 @@ struct HUDView: View {
             RoundButton(symbol: playground.musicOn ? "speaker.wave.2.fill" : "speaker.slash.fill", tint: .purple) {
                 playground.toggleMusic()
             }
+            if playground.guideText != nil {
+                RoundButton(symbol: playground.guideVoiceOn ? "megaphone.fill" : "megaphone",
+                            tint: playground.guideVoiceOn ? .orange : .gray) {
+                    playground.toggleGuideVoice()
+                }
+            }
             RoundButton(symbol: playground.showCameraPreview ? "video.fill" : "video.slash.fill", tint: .teal) {
                 playground.showCameraPreview.toggle()
             }
@@ -219,7 +246,7 @@ struct HUDView: View {
             HStack(spacing: 8 * scale) {
                 Image(systemName: "photo.artframe")
                     .font(.system(size: 18 * scale, weight: .bold))
-                Text("Save image")
+                Text("Simpan gambar")
                     .font(.system(size: 18 * scale, weight: .heavy, design: .rounded))
             }
             .foregroundStyle(.white)
@@ -292,18 +319,18 @@ private struct GuideCard: View {
     }
 
     private let rows: [Row] = [
-        Row(symbol: "hand.raised.fill", color: .orange, title: "Open hand = move",
-            detail: "Each hand has a paint buddy that follows you around. An open hand never paints."),
-        Row(symbol: "paintbrush.pointed.fill", color: .blue, title: "Fist = paint",
-            detail: "Close your hand and sweep your arm. Open it to stop."),
-        Row(symbol: "drop.fill", color: .mint, title: "Rub a paint pot = new color",
-            detail: "Swipe your buddy back and forth through a pot on the right until it soaks up the color."),
-        Row(symbol: "sparkles", color: .indigo, title: "Rub a bubble = new tool",
-            detail: "Butterfly brush (blue, green, purple), ladybug brush (red, orange, yellow), mushroom eraser, snail blender."),
-        Row(symbol: "cloud.fill", color: .pink, title: "Mushroom = eraser",
-            detail: "Pick the mushroom bubble and make a fist to puff paint away. The dotted guide stays."),
-        Row(symbol: "photo.artframe", color: .purple, title: "All done? Save it",
-            detail: "Tap Save image to look it over, then hang it in the gallery for the critters to admire."),
+        Row(symbol: "hand.raised.fill", color: .orange, title: "Tangan terbuka = bergerak",
+            detail: "Setiap tangan punya teman cat yang mengikutimu ke mana-mana. Tangan terbuka tidak pernah melukis."),
+        Row(symbol: "paintbrush.pointed.fill", color: .blue, title: "Kepalan = melukis",
+            detail: "Kepalkan tanganmu lalu ayunkan lenganmu. Buka tangan untuk berhenti."),
+        Row(symbol: "drop.fill", color: .mint, title: "Gosok pot cat = warna baru",
+            detail: "Geser temanmu bolak-balik melewati pot di sebelah kanan sampai warnanya meresap."),
+        Row(symbol: "sparkles", color: .indigo, title: "Gosok gelembung = alat baru",
+            detail: "Kuas kupu-kupu (biru, hijau, ungu), kuas kepik (merah, jingga, kuning), penghapus jamur, pencampur siput."),
+        Row(symbol: "cloud.fill", color: .pink, title: "Jamur = penghapus",
+            detail: "Pilih gelembung jamur lalu kepalkan tangan untuk meniup cat sampai hilang. Garis putus-putusnya tetap ada."),
+        Row(symbol: "photo.artframe", color: .purple, title: "Sudah selesai? Simpan!",
+            detail: "Ketuk Simpan gambar untuk melihatnya dulu, lalu gantung di galeri supaya para hewan bisa mengaguminya."),
     ]
 
     var body: some View {
@@ -312,9 +339,9 @@ private struct GuideCard: View {
                 .contentShape(Rectangle())
                 .onTapGesture(perform: dismiss)
             VStack(alignment: .leading, spacing: 18 * scale) {
-                Text("Let's make friends!")
+                Text("Ayo berteman!")
                     .font(.system(size: 30 * scale, weight: .black, design: .rounded))
-                Text("Stand back so the camera sees both hands. Big, happy moves work best.")
+                Text("Mundur sedikit supaya kamera bisa melihat kedua tanganmu. Gerakan besar dan ceria paling bagus.")
                     .font(.system(size: 15 * scale, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 28 * scale, alignment: .top),
@@ -335,7 +362,7 @@ private struct GuideCard: View {
                         }
                     }
                 }
-                Text("Raise your hands to start · tap to close")
+                Text("Angkat tanganmu untuk mulai · ketuk untuk menutup")
                     .font(.system(size: 13 * scale, weight: .semibold, design: .rounded))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
@@ -359,16 +386,16 @@ private struct CameraNotice: View {
     var body: some View {
         VStack(spacing: 12) {
             Image(systemName: "video.slash.fill").font(.largeTitle)
-            Text(denied ? "Camera access is off" : "No camera found")
+            Text(denied ? "Akses kamera mati" : "Kamera tidak ditemukan")
                 .font(.system(size: 18, weight: .bold, design: .rounded))
             Text(denied
-                 ? "Puffy Pond needs the camera to see your hands. Video never leaves your device. You can still draw with the mouse or your finger."
-                 : "You can still draw with the mouse or your finger.")
+                 ? "Puffy Pond butuh kamera untuk melihat tanganmu. Video tidak pernah keluar dari perangkatmu. Kamu tetap bisa menggambar dengan mouse atau jarimu."
+                 : "Kamu tetap bisa menggambar dengan mouse atau jarimu.")
                 .font(.system(size: 14, design: .rounded))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
             if denied {
-                Button("Open Settings") { Platform.openCameraSettings() }
+                Button("Buka Pengaturan") { Platform.openCameraSettings() }
                     .buttonStyle(.borderedProminent)
             }
         }

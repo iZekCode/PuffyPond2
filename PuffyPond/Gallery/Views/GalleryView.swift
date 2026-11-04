@@ -72,11 +72,11 @@ struct GalleryView: View {
                     RoundButton(symbol: "house.fill", tint: .blue, action: home)
                     Spacer()
                     VStack(spacing: 4) {
-                        Text("Puffy Pond Gallery")
+                        Text("Galeri Puffy Pond")
                             .font(.system(size: 26 * scale, weight: .black, design: .rounded))
                         if let current {
                             Text("\(current.date.formatted(.dateTime.month(.wide).day().hour().minute()))"
-                                 + (gallery.paintings.count > 1 ? " · \(index + 1) of \(gallery.paintings.count)" : ""))
+                                 + (gallery.paintings.count > 1 ? " · \(index + 1) dari \(gallery.paintings.count)" : ""))
                                 .font(.system(size: 14 * scale, weight: .semibold, design: .rounded))
                                 .foregroundStyle(.secondary)
                         }
@@ -91,14 +91,14 @@ struct GalleryView: View {
                 }
                 Spacer()
                 HStack(alignment: .bottom) {
-                    PillButton(title: "View gallery in 2D", symbol: "square.grid.2x2.fill", tint: .orange,
+                    PillButton(title: "Lihat galeri 2D", symbol: "square.grid.2x2.fill", tint: .orange,
                                action: show2D)
                     Spacer()
                     if gallery.paintings.count > 1 {
                         SwipeHint()
                     }
                     Spacer()
-                    PillButton(title: "Watch it being painted", symbol: "play.fill", tint: .pink) {
+                    PillButton(title: "Tonton proses melukisnya", symbol: "play.fill", tint: .pink) {
                         if let current { watch(current) }
                     }
                     .overlay(alignment: .trailing) {
@@ -128,10 +128,10 @@ struct GalleryView: View {
 
             if gallery.paintings.isEmpty {
                 VStack(spacing: 20 * scale) {
-                    Text("No paintings yet")
+                    Text("Belum ada lukisan")
                         .font(.system(size: 34 * scale, weight: .black, design: .rounded))
                         .foregroundStyle(Color(red: 0.25, green: 0.2, blue: 0.35))
-                    HomeButton(title: "Start drawing", symbol: "paintbrush.pointed.fill", tint: .pink,
+                    HomeButton(title: "Mulai menggambar", symbol: "paintbrush.pointed.fill", tint: .pink,
                                action: startDrawing)
                 }
                 .padding(32 * scale)
@@ -144,8 +144,9 @@ struct GalleryView: View {
             updateTargets()
         }
         .onChange(of: index) { _, _ in updateTargets() }
-        .confirmationDialog("Take this painting down?", isPresented: $confirmingRemoval, titleVisibility: .visible) {
-            Button("Take it down", role: .destructive, action: removeCurrent)
+        .confirmationDialog("Turunkan lukisan ini?", isPresented: $confirmingRemoval, titleVisibility: .visible) {
+            Button("Turunkan", role: .destructive, action: removeCurrent)
+            Button("Batal", role: .cancel) {}
         }
         .onAppear {
             hall.hang(gallery.paintings.map(\.url))
@@ -235,8 +236,8 @@ private struct SwipeHint: View {
                 .font(.system(size: 24 * scale))
                 .offset(x: swiped ? -10 * scale : 10 * scale)
             VStack(alignment: .leading, spacing: 2 * scale) {
-                Text("Swipe your palm left to walk on, right to go back")
-                Text("Hold a fist on the painting to watch it being painted")
+                Text("Gesekkan telapak tanganmu ke kiri untuk maju, ke kanan untuk kembali")
+                Text("Tahan kepalan di atas lukisan untuk menonton proses melukisnya")
             }
             .font(.system(size: 14 * scale, weight: .bold, design: .rounded))
             .foregroundStyle(Color(red: 0.25, green: 0.2, blue: 0.35))

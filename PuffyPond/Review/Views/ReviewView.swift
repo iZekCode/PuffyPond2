@@ -94,17 +94,17 @@ struct ReviewView: View {
 
     @ViewBuilder private var buttons: some View {
         if stage.phase == .timelapse {
-            button(Self.skipID, "Skip", "forward.fill", .teal) { stage.skipTimelapse() }
+            button(Self.skipID, "Lewati", "forward.fill", .teal) { stage.skipTimelapse() }
         } else {
             if stage.canReplay {
-                button(Self.replayID, "Replay", "arrow.counterclockwise", .purple) { stage.replay() }
+                button(Self.replayID, "Putar ulang", "arrow.counterclockwise", .purple) { stage.replay() }
             }
             switch mode {
             case .fresh:
-                button(Self.keepID, "Keep drawing", "paintbrush.pointed.fill", .orange) { leave(keepDrawing) }
-                button(Self.saveID, "Save to gallery", "building.columns.fill", .pink) { leave(save) }
+                button(Self.keepID, "Lanjut menggambar", "paintbrush.pointed.fill", .orange) { leave(keepDrawing) }
+                button(Self.saveID, "Simpan ke galeri", "building.columns.fill", .pink) { leave(save) }
             case .viewing:
-                button(Self.backID, "Back", "chevron.left", .blue) { leave(back) }
+                button(Self.backID, "Kembali", "chevron.left", .blue) { leave(back) }
             }
         }
     }
@@ -133,8 +133,8 @@ struct ReviewView: View {
 
     private var hint: some View {
         Text(stage.phase == .timelapse
-             ? "Watch your painting come to life · hold an open hand on Skip to jump ahead"
-             : "Fist to grab · two fists to stretch · open hand to splash · hold an open hand on a button")
+             ? "Lihat lukisanmu jadi hidup · tahan tangan terbuka di tombol Lewati untuk maju cepat"
+             : "Kepalan untuk menggenggam · dua kepalan untuk meregangkan · tangan terbuka untuk memercikkan · tahan tangan terbuka di tombol untuk menekannya")
             .font(.system(size: 13 * scale, weight: .semibold, design: .rounded))
             .foregroundStyle(Color(red: 0.25, green: 0.2, blue: 0.35).opacity(0.7))
             .multilineTextAlignment(.center)

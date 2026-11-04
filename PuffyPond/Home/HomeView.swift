@@ -16,18 +16,18 @@ struct HomeView: View {
                         .foregroundStyle(PageBackground.titleGradient)
                         .shadow(color: .white, radius: 0, x: 0, y: 3)
                         .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
-                    Text("Paint with your hands")
+                    Text("Melukis dengan tanganmu")
                         .font(.system(size: 20 * scale, weight: .bold, design: .rounded))
                         .foregroundStyle(Color(red: 0.25, green: 0.2, blue: 0.35).opacity(0.7))
                 }
-                HomeButton(title: "Start drawing", symbol: "paintbrush.pointed.fill", tint: .pink) {
+                HomeButton(title: "Mulai menggambar", symbol: "paintbrush.pointed.fill", tint: .pink) {
                     router.go(.modePicker)
                 }
                 HStack(spacing: 20 * scale) {
-                    HomeButton(title: "View gallery", symbol: "building.columns.fill", tint: .orange) {
+                    HomeButton(title: "Lihat galeri", symbol: "building.columns.fill", tint: .orange) {
                         router.go(.gallery3D(start: 0, justHung: false))
                     }
-                    HomeButton(title: "Report", symbol: "calendar", tint: .indigo) {
+                    HomeButton(title: "Laporan", symbol: "calendar", tint: .indigo) {
                         router.go(.report)
                     }
                 }

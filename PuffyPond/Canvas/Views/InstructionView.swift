@@ -27,7 +27,7 @@ struct InstructionView: View {
         ZStack {
             PageBackground()
             VStack(spacing: 14 * scale) {
-                Text("Get ready")
+                Text("Bersiap!")
                     .font(.system(size: 34 * scale, weight: .black, design: .rounded))
                     .foregroundStyle(PageBackground.titleGradient)
                     .shadow(color: .white, radius: 0, x: 0, y: 2)
@@ -35,15 +35,15 @@ struct InstructionView: View {
                     preview
                     hint
                 } else {
-                    Text(cameraStatus == .starting ? "Waking up the camera…"
-                         : "No camera, so no distance check. Tap Skip to draw with your finger.")
+                    Text(cameraStatus == .starting ? "Membangunkan kamera…"
+                         : "Tidak ada kamera, jadi jarak tidak dicek. Ketuk Lewati untuk menggambar dengan jarimu.")
                         .font(.system(size: 18 * scale, weight: .bold, design: .rounded))
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
                         .frame(maxHeight: .infinity)
                 }
                 Button(action: advance) {
-                    Text("Skip")
+                    Text("Lewati")
                         .font(.system(size: 18 * scale, weight: .heavy, design: .rounded))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 28 * scale)
@@ -169,11 +169,11 @@ struct InstructionView: View {
 
     private var hintText: (symbol: String, text: String) {
         switch state {
-        case .noPerson: return ("person.fill.questionmark", "Stand in front of the camera")
-        case .tooFar: return ("arrow.down.right.and.arrow.up.left", "Come closer")
-        case .tooClose: return ("arrow.up.left.and.arrow.down.right", "Step back a little")
-        case .offCenter: return ("arrow.left.and.right", "Stand in the middle")
-        case .holding, .ready: return ("checkmark.circle.fill", "Perfect, hold still")
+        case .noPerson: return ("person.fill.questionmark", "Berdirilah di depan kamera")
+        case .tooFar: return ("arrow.down.right.and.arrow.up.left", "Maju sedikit")
+        case .tooClose: return ("arrow.up.left.and.arrow.down.right", "Mundur sedikit")
+        case .offCenter: return ("arrow.left.and.right", "Berdirilah di tengah")
+        case .holding, .ready: return ("checkmark.circle.fill", "Bagus sekali, tahan sebentar ya")
         }
     }
 
@@ -200,7 +200,7 @@ struct InstructionView: View {
             Text(hintText.text)
                 .font(.system(size: 22 * scale, weight: .heavy, design: .rounded))
                 .foregroundStyle(Color(red: 0.25, green: 0.2, blue: 0.35))
-            Text("About 1 m from the screen")
+            Text("Sekitar 1 m dari layar")
                 .font(.system(size: 15 * scale, weight: .semibold, design: .rounded))
                 .foregroundStyle(.secondary)
         }

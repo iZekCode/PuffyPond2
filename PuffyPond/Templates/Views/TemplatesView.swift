@@ -17,18 +17,18 @@ struct TemplatesView: View {
             VStack(spacing: 16 * scale) {
                 HStack {
                     Button { router.go(.modePicker) } label: {
-                        Label("Back", systemImage: "chevron.left")
+                        Label("Kembali", systemImage: "chevron.left")
                             .font(.system(size: 20 * scale, weight: .heavy, design: .rounded))
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.indigo)
                     Spacer()
-                    Text("Templates")
+                    Text("Templat")
                         .font(.system(size: 34 * scale, weight: .black, design: .rounded))
                         .foregroundStyle(PageBackground.titleGradient)
                     Spacer()
                     Button { router.home() } label: {
-                        Label("Home", systemImage: "house.fill")
+                        Label("Beranda", systemImage: "house.fill")
                             .font(.system(size: 20 * scale, weight: .heavy, design: .rounded))
                     }
                     .buttonStyle(.plain)
@@ -82,13 +82,13 @@ private struct QuestCard: View {
                     .padding(8 * scale)
                     .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 22 * scale, style: .continuous))
                 VStack(alignment: .leading, spacing: 6 * scale) {
-                    Label("Daily quest", systemImage: "star.fill")
+                    Label("Tantangan harian", systemImage: "star.fill")
                         .font(.system(size: 16 * scale, weight: .heavy, design: .rounded))
                         .padding(.horizontal, 12 * scale).padding(.vertical, 4 * scale)
                         .background(.white.opacity(0.28), in: Capsule())
                     Text(quest.title)
                         .font(.system(size: 34 * scale, weight: .black, design: .rounded))
-                    Text(done ? "Done today. Paint it again if you like" : "Paint it and save it to the gallery")
+                    Text(done ? "Selesai hari ini. Lukis lagi kalau mau" : "Lukis dan simpan ke galeri")
                         .font(.system(size: 16 * scale, weight: .semibold, design: .rounded))
                         .opacity(0.9)
                 }
@@ -136,7 +136,7 @@ private struct TemplateTile: View {
                     .font(.system(size: 20 * scale, weight: .heavy, design: .rounded))
                     .foregroundStyle(unlocked ? Color(red: 0.25, green: 0.2, blue: 0.35) : .gray)
                 if !unlocked, let lockedHint {
-                    Text("Save a painting of \(lockedHint) to unlock")
+                    Text("Simpan lukisan \(lockedHint) untuk membuka")
                         .font(.system(size: 13 * scale, weight: .semibold, design: .rounded))
                         .foregroundStyle(.gray)
                         .multilineTextAlignment(.center)

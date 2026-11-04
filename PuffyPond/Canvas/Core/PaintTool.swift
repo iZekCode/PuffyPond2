@@ -7,10 +7,10 @@ enum PaintTool: Int, CaseIterable, Equatable {
 
     var name: String {
         switch self {
-        case .wingBrush: return "Wing brush"
-        case .brush: return "Brush"
-        case .eraser: return "Eraser"
-        case .blender: return "Blender"
+        case .wingBrush: return "Kuas sayap"
+        case .brush: return "Kuas"
+        case .eraser: return "Penghapus"
+        case .blender: return "Pencampur"
         }
     }
 

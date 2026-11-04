@@ -29,7 +29,7 @@ struct Gallery2DView: View {
                 HStack {
                     RoundButton(symbol: "house.fill", tint: .blue, action: router.home)
                     Spacer()
-                    Text("Gallery")
+                    Text("Galeri")
                         .font(.system(size: 30 * scale, weight: .black, design: .rounded))
                         .foregroundStyle(PageBackground.titleGradient)
                     Spacer()
@@ -39,10 +39,10 @@ struct Gallery2DView: View {
                 }
                 if gallery.paintings.isEmpty {
                     Spacer()
-                    Text("No paintings yet")
+                    Text("Belum ada lukisan")
                         .font(.system(size: 30 * scale, weight: .black, design: .rounded))
                         .foregroundStyle(Color(red: 0.25, green: 0.2, blue: 0.35))
-                    HomeButton(title: "Start drawing", symbol: "paintbrush.pointed.fill", tint: .pink) {
+                    HomeButton(title: "Mulai menggambar", symbol: "paintbrush.pointed.fill", tint: .pink) {
                         router.go(.modePicker)
                     }
                     Spacer()

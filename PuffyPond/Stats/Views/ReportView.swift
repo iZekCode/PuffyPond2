@@ -19,7 +19,7 @@ struct ReportView: View {
                 HStack {
                     RoundButton(symbol: "house.fill", tint: .blue, action: router.home)
                     Spacer()
-                    Text("Report")
+                    Text("Laporan")
                         .font(.system(size: 30 * scale, weight: .black, design: .rounded))
                         .foregroundStyle(PageBackground.titleGradient)
                     Spacer()
@@ -186,7 +186,7 @@ private struct DayDetail: View {
                     Card {
                         VStack(spacing: 8 * scale) {
                             Text("🎨").font(.system(size: 44 * scale))
-                            Text("No drawing this day")
+                            Text("Tidak ada gambar di hari ini")
                                 .font(.system(size: 20 * scale, weight: .heavy, design: .rounded))
                                 .foregroundStyle(ink)
                         }
@@ -196,12 +196,12 @@ private struct DayDetail: View {
                 } else {
                     paintingsCard
                     if let stats = report.stats {
-                        romCard(stats)
                         heatmapCard(stats)
                         dominanceCard(stats)
+                        romCard(stats)
                     } else {
                         Card {
-                            Text("No movement data — these were drawn by touch or before tracking existed.")
+                            Text("Tidak ada data gerakan — gambar ini dibuat dengan sentuhan atau sebelum pelacakan ada.")
                                 .font(.system(size: 15 * scale, weight: .semibold, design: .rounded))
                                 .foregroundStyle(.secondary)
                         }
@@ -216,11 +216,11 @@ private struct DayDetail: View {
         Card {
             VStack(alignment: .leading, spacing: 10 * scale) {
                 HStack(spacing: 8 * scale) {
-                    Text(report.paintings.count == 1 ? "1 painting" : "\(report.paintings.count) paintings")
+                    Text("\(report.paintings.count) lukisan")
                         .font(.system(size: 18 * scale, weight: .heavy, design: .rounded))
                         .foregroundStyle(ink)
                     if report.questDone {
-                        Label("Quest done", systemImage: "star.fill")
+                        Label("Tantangan selesai", systemImage: "star.fill")
                             .font(.system(size: 13 * scale, weight: .bold, design: .rounded))
                             .foregroundStyle(.orange)
                     }
@@ -246,10 +246,10 @@ private struct DayDetail: View {
     private func romCard(_ stats: DayReport.Stats) -> some View {
         Card {
             VStack(alignment: .leading, spacing: 10 * scale) {
-                Text("Highest ROM")
+                Text("ROM tertinggi (jangkauan gerak)")
                     .font(.system(size: 18 * scale, weight: .heavy, design: .rounded))
                     .foregroundStyle(ink)
-                Text("Arm raised out to the side")
+                Text("Lengan diangkat ke samping")
                     .font(.system(size: 13 * scale, weight: .semibold, design: .rounded))
                     .foregroundStyle(.secondary)
                 HStack(spacing: 12 * scale) {
@@ -257,19 +257,19 @@ private struct DayDetail: View {
                     SideValue(side: .right, text: degrees(stats.highestROM[.right]), tint: .pink)
                 }
                 Divider()
-                StatRow(title: "Straightest elbow",
-                        value: "L \(degrees(stats.elbowExtension[.left])) · R \(degrees(stats.elbowExtension[.right]))")
-                StatRow(title: "Hand above shoulder",
-                        value: "L \(widths(stats.reachHeight[.left])) · R \(widths(stats.reachHeight[.right]))")
-                StatRow(title: "Grip cycles",
-                        value: "L \(stats.gripCycles[.left] ?? 0) · R \(stats.gripCycles[.right] ?? 0)")
+                StatRow(title: "Siku paling lurus",
+                        value: "Ki \(degrees(stats.elbowExtension[.left])) · Ka \(degrees(stats.elbowExtension[.right]))")
+                StatRow(title: "Tangan di atas bahu",
+                        value: "Ki \(widths(stats.reachHeight[.left])) · Ka \(widths(stats.reachHeight[.right]))")
+                StatRow(title: "Siklus menggenggam",
+                        value: "Ki \(stats.gripCycles[.left] ?? 0) · Ka \(stats.gripCycles[.right] ?? 0)")
                 if stats.maxTrunkLean > 15 {
-                    Label("Leaned over to reach (\(Int(stats.maxTrunkLean.rounded()))°)",
+                    Label("Membungkuk untuk menjangkau (\(Int(stats.maxTrunkLean.rounded()))°)",
                           systemImage: "exclamationmark.triangle.fill")
                         .font(.system(size: 13 * scale, weight: .bold, design: .rounded))
                         .foregroundStyle(.orange)
                 }
-                Text("Camera estimates, not a clinical measurement.")
+                Text("Perkiraan dari kamera, bukan pengukuran klinis.")
                     .font(.system(size: 11 * scale, weight: .medium, design: .rounded))
                     .foregroundStyle(.secondary)
             }
@@ -279,10 +279,10 @@ private struct DayDetail: View {
     private func heatmapCard(_ stats: DayReport.Stats) -> some View {
         Card {
             VStack(alignment: .leading, spacing: 10 * scale) {
-                Text("Heatmap")
+                Text("Peta panas")
                     .font(.system(size: 18 * scale, weight: .heavy, design: .rounded))
                     .foregroundStyle(ink)
-                Text("Where your hands painted on the canvas")
+                Text("Di mana tanganmu melukis di kanvas")
                     .font(.system(size: 13 * scale, weight: .semibold, design: .rounded))
                     .foregroundStyle(.secondary)
                 HeatmapView(cells: stats.heatmap)
@@ -293,11 +293,11 @@ private struct DayDetail: View {
     private func dominanceCard(_ stats: DayReport.Stats) -> some View {
         Card {
             VStack(alignment: .leading, spacing: 10 * scale) {
-                Text("Hand dominance")
+                Text("Dominasi tangan")
                     .font(.system(size: 18 * scale, weight: .heavy, design: .rounded))
                     .foregroundStyle(ink)
                 if stats.dominance.isEmpty {
-                    Text("No painting time recorded")
+                    Text("Waktu melukis tidak tercatat")
                         .font(.system(size: 14 * scale, weight: .semibold, design: .rounded))
                         .foregroundStyle(.secondary)
                 } else {
@@ -313,9 +313,9 @@ private struct DayDetail: View {
                     .clipShape(Capsule())
                     .overlay(Capsule().stroke(.white, lineWidth: 2))
                     HStack {
-                        Text("Left \(percent(left))").foregroundStyle(.teal)
+                        Text("Kiri \(percent(left))").foregroundStyle(.teal)
                         Spacer()
-                        Text("Right \(percent(right))").foregroundStyle(.pink)
+                        Text("Kanan \(percent(right))").foregroundStyle(.pink)
                     }
                     .font(.system(size: 15 * scale, weight: .heavy, design: .rounded))
                 }
@@ -342,7 +342,7 @@ private struct SideValue: View {
 
     var body: some View {
         VStack(spacing: 2 * scale) {
-            Text(side == .left ? "Left" : "Right")
+            Text(side == .left ? "Kiri" : "Kanan")
                 .font(.system(size: 13 * scale, weight: .bold, design: .rounded))
                 .foregroundStyle(tint)
             Text(text)
@@ -422,8 +422,8 @@ private struct StripThumbnail: View {
     @Environment(\.uiScale) private var scale
 
     private var title: String {
-        guard let id = painting.record.templateID else { return "Freeform" }
-        return TemplateChoice(templateID: id, isDailyQuest: painting.record.isDailyQuest).title ?? "Freeform"
+        guard let id = painting.record.templateID else { return "Bebas" }
+        return TemplateChoice(templateID: id, isDailyQuest: painting.record.isDailyQuest).title ?? "Bebas"
     }
 
     var body: some View {

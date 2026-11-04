@@ -1,0 +1,117 @@
+import Testing
+@testable import PuffyPond
+
+@MainActor
+struct TraceGuideTests {
+    /// Up, then down the other side: a mountain, 3 units per side.
+    private let mountain: [[SIMD2<Float>]] = [[SIMD2(0, 0), SIMD2(3, 3), SIMD2(6, 0)]]
+
+    private func guide(_ lines: [[SIMD2<Float>]]) -> TraceGuide { TraceGuide(lines: lines)! }
+
+    @Test func nothingToFollowMakesNoGuide() {
+        #expect(TraceGuide(lines: []) == nil)
+        #expect(TraceGuide(lines: [[SIMD2(1, 1)]]) == nil)
+    }
+
+    @Test func directionsFollowTheAngle() {
+        #expect(TraceGuide.Direction(angle: 0) == .east)
+        #expect(TraceGuide.Direction(angle: .pi / 2) == .north)
+        #expect(TraceGuide.Direction(angle: .pi) == .west)
+        #expect(TraceGuide.Direction(angle: -.pi / 2) == .south)
+        #expect(TraceGuide.Direction(angle: -.pi / 4) == .southEast)
+    }
+
+    @Test func aMountainIsUpThenDown() {
+        let g = guide(mountain)
+        #expect(g.legs.count == 2)
+        #expect(g.legs[0].direction == .northEast)
+        #expect(g.legs[1].direction == .southEast)
+        #expect(g.legs[0].text.hasPrefix("Ayo mulai dari sini!"))
+        #expect(g.legs[0].text.contains("naik"))
+        #expect(g.legs[1].text.contains("turun"))
+    }
+
+    @Test func sentencesSoundLikeAGuide() {
+        func say(_ d: TraceGuide.Direction, short: Bool = false, after: TraceGuide.Direction? = nil,
+                 first: Bool = false, last: Bool = false) -> String {
+            TraceGuide.sentence(direction: d, isShort: short, previous: after, isFirst: first,
+                                startsShape: first, isLast: last)
+        }
+        #expect(say(.north, first: true) == "Ayo mulai dari sini! Naik ke atas!")
+        #expect(say(.south, after: .north) == "Sekarang turun ke bawah!")
+        #expect(say(.southEast, after: .south) == "Turun ke kanan lagi!")
+        #expect(say(.south, short: true, after: .southEast) == "Turun sedikit lagi!")
+        #expect(say(.east, short: true, after: .north) == "Lalu sedikit ke kanan!")
+    }
+
+    @Test func theBrushMovesTheGuideAlong() {
+        var g = guide([[SIMD2(0, 0), SIMD2(0, 4)]])
+        #expect(g.cursor == 0)
+        #expect(g.advance(to: SIMD2(0, 0.1)) != .none)
+        #expect(g.cursor > 0)
+        let moved = g.cursor
+        #expect(g.advance(to: SIMD2(3, 3)) == .none)      // far from the line: no progress
+        #expect(g.cursor == moved)
+    }
+
+    @Test func cuttingAcrossTheShapeDoesNotCount() {
+        var g = guide([[SIMD2(0, 0), SIMD2(0, 4)]])
+        #expect(g.advance(to: SIMD2(0, 3.9)) == .none)     // too far ahead of the start
+        #expect(g.cursor == 0)
+    }
+
+    @Test func tracingTheWholeLineFinishes() {
+        var g = guide([[SIMD2(0, 0), SIMD2(0, 4)]])
+        var y: Float = 0
+        var last = TraceGuide.Progress.none
+        while y <= 4.2 {
+            let progress = g.advance(to: SIMD2(0, y))
+            if progress != .none { last = progress }
+            y += 0.2
+        }
+        #expect(g.isFinished)
+        #expect(last == .finished)
+        #expect(g.text == TraceGuide.finishText)
+    }
+
+    @Test func nextStepIsAnnouncedWhenTheBrushGetsClose() {
+        var g = guide(mountain)
+        #expect(g.currentLeg == 0)
+        var sawChange = false
+        var t: Float = 0
+        while t <= 6, !g.isFinished {
+            // Walk along the mountain: up the first side, down the second.
+            let point: SIMD2<Float> = t <= 3 ? SIMD2(t, t) : SIMD2(t, 6 - t)
+            if g.advance(to: point) == .legChanged { sawChange = true }
+            t += 0.15
+        }
+        #expect(sawChange)
+        #expect(g.isFinished)
+    }
+
+    @Test func eachShapeOfAnOutlineGetsItsOwnIntro() {
+        let g = guide([[SIMD2(0, 0), SIMD2(0, 3)], [SIMD2(2, 0), SIMD2(2, 3)]])
+        #expect(g.legs.count == 2)
+        #expect(g.legs[0].path == 0)
+        #expect(g.legs[1].path == 1)
+        #expect(g.legs[1].text.hasPrefix("Bagian berikutnya!"))
+    }
+
+    @Test func theArrowPointsTheWayOfTheLine() {
+        let g = guide([[SIMD2(0, 0), SIMD2(0, 4)]])
+        #expect(abs(g.heading - .pi / 2) < 0.1)
+    }
+
+    @Test func everyTemplateAndQuestCanBeGuided() {
+        for kind in TemplateKind.allCases {
+            let lines = kind.shape(center: .zero, size: SIMD2(4.6, 2.7)).lines
+            let g = TraceGuide(lines: lines)
+            #expect(g != nil)
+            #expect(g?.legs.isEmpty == false)
+        }
+        for quest in QuestCatalog.all {
+            let lines = quest.art.shape(center: .zero, size: SIMD2(4.6, 2.7)).lines
+            #expect(TraceGuide(lines: lines)?.legs.isEmpty == false)
+        }
+    }
+}

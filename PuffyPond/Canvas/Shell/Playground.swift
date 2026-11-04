@@ -13,6 +13,17 @@ final class Playground {
     var showGuide = true
     var showCameraPreview = true
     var musicOn = true
+    /// Spoken tracing directions on or off (the megaphone button). Remembered between launches.
+    var guideVoiceOn = GuideVoice.savedOn {
+        didSet {
+            guard guideVoiceOn != oldValue else { return }
+            voice.isMuted = !guideVoiceOn
+            GuideVoice.save(on: guideVoiceOn)
+            if guideVoiceOn, let guide, !isAway { voice.say(guide.text) }
+        }
+    }
+    /// The current tracing direction in words, so it stays readable when the voice is off. Nil without an outline.
+    var guideText: String?
     var hint: Hint = .starting
     var hasDrawing = false
     /// Another page is showing: hands stop painting until the kids come back to the easel.
@@ -21,6 +32,7 @@ final class Playground {
         didSet {
             guard isAway, !oldValue else { return }
             input.reset()
+            voice.stop()
             pointerEnded()
             for slot in strokeBook.activeSlots { finishStroke(slot: slot) }
             previewHands = []
@@ -67,6 +79,13 @@ final class Playground {
     @ObservationIgnored private var strokeBook = StrokeBook()
     /// The dotted animal to trace, if one is on the canvas.
     @ObservationIgnored private(set) var template: TemplateOutline?
+    /// Follows the brush along the outline: which direction to say next, and where the arrow goes.
+    @ObservationIgnored private var guide: TraceGuide?
+    @ObservationIgnored private var guideArrow: GuideArrow?
+    @ObservationIgnored private let voice = GuideVoice(muted: !GuideVoice.savedOn)
+    /// Seconds since the guide last spoke or the brush last made progress; negative while waiting to say hello.
+    @ObservationIgnored private var guideQuiet: Float = 0
+    @ObservationIgnored private var guideRepeats = 0
     /// What you actually see: wet, textured paint on the canvas.
     @ObservationIgnored private let paintLayer: PaintLayer
     @ObservationIgnored private let timelapse = TimelapseRecorder()
@@ -256,6 +275,8 @@ final class Playground {
                        color: paints ? wearers.first?.color : nil)
         }
         template?.update()
+        guideArrow?.update(dt: dt)
+        tickGuide(dt: dt)
 
         paintLayer.update(dt: dt)
 
@@ -293,6 +314,7 @@ final class Playground {
         lay(dabs, color: buddy.color, ncaModel: buddy.colorIndex, seed: Float(slot) * 13.7 + Float(strokeBook.count) * 2.3,
             brush: buddy.critter.kind)
         strokeBook.stamped(slot: slot, at: p)
+        if buddy.tool.usesColor { advanceGuide(at: p) }
         if let hold = buddy.critter.holdProgress, now - lastHoldSound > 0.45 {
             lastHoldSound = now
             audio.play(.ooze, a: hold, pan: panFor(p.x))
@@ -377,11 +399,16 @@ final class Playground {
 
     /// Wipes the paint, strokes and tracing guide off the easel.
     func clearCanvas() {
+        wipePaint()
+        template?.fadeAway()
+        template = nil
+        stopGuide()
+    }
+
+    private func wipePaint() {
         strokeBook.clear()
         paintLayer.clear()
         timelapse.reset()
-        template?.fadeAway()
-        template = nil
     }
 
     /// Starts a fresh canvas session: clears the easel, lays the chosen outline, resets the stats.
@@ -389,8 +416,10 @@ final class Playground {
         clearCanvas()
         if let choice, let art = choice.art {
             let kind = choice.isDailyQuest ? nil : TemplateCatalog.kind(id: choice.templateID)
-            showOutline(TemplateOutline(art: art, kind: kind, canvasCenter: SIMD2(0, 0.1), canvasSize: Self.canvasSize,
-                                        z: Self.canvasZ + 0.0008))
+            let outline = TemplateOutline(art: art, kind: kind, canvasCenter: SIMD2(0, 0.1), canvasSize: Self.canvasSize,
+                                          z: Self.canvasZ + 0.0008)
+            showOutline(outline)
+            startGuide(on: outline)
         }
         recorder = SessionRecorder()
     }
@@ -401,9 +430,63 @@ final class Playground {
     /// Everything painted since the canvas was last cleared, for the review page's timelapse.
     func timelapseRecording() -> StrokeRecording? { timelapse.snapshot() }
 
+    /// The refresh button: wipes the paint but keeps the dotted outline, and the guide starts over from the top.
     func clearAll() {
-        clearCanvas()
+        wipePaint()
+        if let template { startGuide(on: template) }
         audio.play(.pop)
+    }
+
+    // MARK: - Tracing guide (arrow + spoken directions)
+
+    func toggleGuideVoice() { guideVoiceOn.toggle() }
+
+    private func startGuide(on outline: TemplateOutline) {
+        stopGuide()
+        guard let guide = TraceGuide(lines: outline.lines) else { return }
+        self.guide = guide
+        guideText = guide.text
+        guideQuiet = -1.2   // a moment to settle before the first direction
+        guideRepeats = 0
+        let arrow = GuideArrow(z: Self.canvasZ + 0.004)
+        arrow.move(to: guide.target, heading: guide.heading)
+        scene.rootNode.addChildNode(arrow.node)
+        guideArrow = arrow
+    }
+
+    private func stopGuide() {
+        voice.stop()
+        guideArrow?.fadeAway()
+        guideArrow = nil
+        guide = nil
+        if guideText != nil { guideText = nil }
+    }
+
+    /// The brush is painting at `point`: move the guide on if it is on the next stretch of the outline.
+    private func advanceGuide(at point: SIMD2<Float>) {
+        guard var current = guide else { return }
+        let progress = current.advance(to: point)
+        guard progress != .none else { return }
+        guide = current
+        guideQuiet = 0
+        guideRepeats = 0
+        if guideText != current.text { guideText = current.text }
+        guideArrow?.move(to: current.target, heading: current.heading)
+        if progress == .legChanged || progress == .finished { voice.say(current.text) }
+        if progress == .finished { guideArrow?.hide() }
+    }
+
+    private func tickGuide(dt: Float) {
+        guard let current = guide, !isAway else { return }
+        let before = guideQuiet
+        guideQuiet += dt
+        if before < 0, guideQuiet >= 0 { voice.say(current.text); return }
+        // Say it again if the child seems stuck, but not forever.
+        if guideQuiet >= 10, guideRepeats < 2, !current.isFinished {
+            guideQuiet = 0
+            guideRepeats += 1
+            voice.say(current.text)
+        }
     }
 
     // MARK: - HUD

@@ -32,6 +32,8 @@ extension OutlineArt {
 final class TemplateOutline {
     /// The template it came from (nil for a daily-quest outline).
     let kind: TemplateKind?
+    /// The outline's polylines in world units (y up), for the tracing guide.
+    let lines: [[SIMD2<Float>]]
     let node = SCNNode()
     private let material = SCNMaterial()
     private let origin: SIMD2<Float>        // bottom-left of the canvas
@@ -57,6 +59,7 @@ final class TemplateOutline {
         size = canvasSize
         // Big and bold so small kids can follow it; nudged up a little, clear of the bubbles on the tray.
         let shape = art.shape(center: canvasCenter + SIMD2(0, 0.15), size: canvasSize * SIMD2(0.72, 0.68) * art.spread)
+        lines = shape.lines
         marks = shape.lines.flatMap { Self.dashes($0) } + shape.eyes.map { [$0] }
 
         let plane = SCNPlane(width: CGFloat(canvasSize.x), height: CGFloat(canvasSize.y))

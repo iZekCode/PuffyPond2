@@ -20,7 +20,7 @@ enum Platform {
         #if os(macOS)
         if awakeActivity == nil {
             awakeActivity = ProcessInfo.processInfo.beginActivity(
-                options: [.idleDisplaySleepDisabled, .userInitiated], reason: "Playing with hand gestures")
+                options: [.idleDisplaySleepDisabled, .userInitiated], reason: "Bermain dengan gerakan tangan")
         }
         #else
         UIApplication.shared.isIdleTimerDisabled = true

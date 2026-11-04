@@ -89,7 +89,19 @@ enum TemplateKind: String, CaseIterable {
 
     var id: String { rawValue }
 
-    var title: String { "\(self)".capitalized }
+    var title: String {
+        switch self {
+        case .pebble: return "Kerikil"
+        case .bean: return "Kacang"
+        case .puddle: return "Genangan"
+        case .bumpy: return "Benjol"
+        case .wiggle: return "Meliuk"
+        case .peanut: return "Kacang tanah"
+        case .reach: return "Jangkauan"
+        case .sprawl: return "Menyebar"
+        case .zigzag: return "Zig-zag"
+        }
+    }
 
     var difficulty: TemplateDifficulty {
         switch self {

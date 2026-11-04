@@ -41,7 +41,7 @@ struct PaintingViewerPage: View {
     }
 
     private var title: String {
-        guard let id = painting.record.templateID else { return "Freeform" }
-        return TemplateChoice(templateID: id, isDailyQuest: painting.record.isDailyQuest).title ?? "Freeform"
+        guard let id = painting.record.templateID else { return "Bebas" }
+        return TemplateChoice(templateID: id, isDailyQuest: painting.record.isDailyQuest).title ?? "Bebas"
     }
 }

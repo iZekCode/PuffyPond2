@@ -111,7 +111,7 @@ final class Effects {
     }
 
     private func popText(color: SIMD3<Float>) -> SCNNode {
-        let text = SCNText(string: "POP!", extrusionDepth: 0.4)
+        let text = SCNText(string: "DOR!", extrusionDepth: 0.4)
         text.font = PlatformFont.systemFont(ofSize: 2, weight: .black)
         text.flatness = 0.05
         text.chamferRadius = 0.15

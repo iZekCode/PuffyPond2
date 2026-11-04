@@ -13,7 +13,7 @@ enum Paint {
         SIMD3(0.54, 0.42, 0.77), // purple   (butterfly)
     ]
 
-    static let names = ["Red", "Blue", "Yellow", "Orange", "Green", "Purple"]
+    static let names = ["Merah", "Biru", "Kuning", "Jingga", "Hijau", "Ungu"]
 
     /// The colours (indices into `colors`) each brush animal paints with, in the order its pots are shown.
     /// Only the garden brushes are limited to a palette; every other animal paints with any colour.

@@ -93,7 +93,7 @@ struct ContentView: View {
             InstructionView(router: router, tracker: tracker, cameraStatus: playground.cameraStatus, choice: choice)
                 .transition(.opacity)
         case let .review(draft):
-            ReviewView(photos: draft.photos, recording: draft.recording, title: draft.choice?.title ?? "Freeform",
+            ReviewView(photos: draft.photos, recording: draft.recording, title: draft.choice?.title ?? "Bebas",
                        date: Date(), mode: .fresh, audio: playground.audio, relay: pageHands,
                        keepDrawing: { router.go(.canvas(draft.choice)) }, save: { save(draft) }, back: {})
                 .id(draft.id)

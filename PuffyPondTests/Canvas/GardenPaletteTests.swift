@@ -25,8 +25,8 @@ struct GardenPaletteTests {
 
     @Test func butterflyAndLadybugHaveTheirOwnColours() {
         let names = { (kind: CritterKind) in Paint.palette(for: kind)!.map { Paint.names[$0] } }
-        #expect(names(.butterfly) == ["Blue", "Green", "Purple"])
-        #expect(names(.ladybug) == ["Red", "Orange", "Yellow"])
+        #expect(names(.butterfly) == ["Biru", "Hijau", "Ungu"])
+        #expect(names(.ladybug) == ["Merah", "Jingga", "Kuning"])
         #expect(Paint.palette(for: .mushroom) == nil)
         #expect(Paint.palette(for: .snail) == nil)
     }
