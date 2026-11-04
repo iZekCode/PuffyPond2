@@ -22,7 +22,7 @@ final class Playground {
             guard isAway, !oldValue else { return }
             input.reset()
             pointerEnded()
-            for slot in Array(activeStroke.keys) { finishStroke(slot: slot) }
+            for slot in strokeBook.activeSlots { finishStroke(slot: slot) }
             previewHands = []
         }
     }
@@ -61,10 +61,7 @@ final class Playground {
     @ObservationIgnored private(set) var buddies: [Buddy] = []
     @ObservationIgnored private var lastSlurp: Double = 0
     @ObservationIgnored private var lastHoldSound: Double = 0
-    @ObservationIgnored private var strokes: [Stroke] = []
-    @ObservationIgnored private var activeStroke: [Int: Stroke] = [:]
-    @ObservationIgnored private var lastBead: [Int: SIMD2<Float>] = [:]
-    @ObservationIgnored private var blipDistance: [Int: Float] = [:]
+    @ObservationIgnored private var strokeBook = StrokeBook()
     @ObservationIgnored private(set) var pots: [PaintPot] = []
     @ObservationIgnored private(set) var critterPots: [CritterPot] = []
     /// The dotted animal to trace, if one is on the canvas.
@@ -73,7 +70,6 @@ final class Playground {
     @ObservationIgnored private let paintLayer = PaintLayer(center: SIMD2(0, 0.1), size: Playground.canvasSize,
                                                             z: Playground.canvasZ + 0.0015)
     @ObservationIgnored private let timelapse = TimelapseRecorder()
-    @ObservationIgnored private var lastStamp: [Int: SIMD2<Float>] = [:]
     @ObservationIgnored private var frameDT: Float = 1.0 / 60.0
     @ObservationIgnored private var lastGurgle: [Int: Double] = [:]
     @ObservationIgnored private var flashCounter = 0
@@ -401,14 +397,14 @@ final class Playground {
         }
 
         // Lay real paint every frame, the way this tool paints.
-        let from = lastStamp[slot] ?? p
+        let from = strokeBook.stampStart(slot: slot, at: p)
         // The ladybug paints with its legs too, so its brush always comes from the animal itself.
         let dabs = buddy.tool != .brush
             ? buddy.tool.dabs(from: from, to: p, radius: Self.strokeRadius, speed: buddy.critter.speed)
             : buddy.critter.dabs(from: from, to: p, radius: Self.strokeRadius, speed: buddy.critter.speed)
-        lay(dabs, color: buddy.color, ncaModel: buddy.colorIndex, seed: Float(slot) * 13.7 + Float(strokes.count) * 2.3,
+        lay(dabs, color: buddy.color, ncaModel: buddy.colorIndex, seed: Float(slot) * 13.7 + Float(strokeBook.count) * 2.3,
             brush: buddy.critter.kind)
-        lastStamp[slot] = p
+        strokeBook.stamped(slot: slot, at: p)
         if let hold = buddy.critter.holdProgress, now - lastHoldSound > 0.45 {
             lastHoldSound = now
             audio.play(.ooze, a: hold, pan: panFor(p.x))
@@ -422,26 +418,15 @@ final class Playground {
             return
         }
 
-        let spacing = Self.strokeRadius * 0.6
-        if let stroke = activeStroke[slot], let last = lastBead[slot] {
-            let beads = StrokePath.beads(from: last, to: p, spacing: spacing)
-            guard !beads.isEmpty else { return }
-            for q in beads { stroke.add(q, now: now) }
-            lastBead[slot] = p
-            blipDistance[slot, default: 0] += simd_distance(p, last)
-            if blipDistance[slot, default: 0] > 0.16 {
-                blipDistance[slot] = 0
-                audio.play(.blip, a: CanvasLayout.blipHeight(p), pan: panFor(p.x))
-            }
-        } else {
-            let stroke = Stroke(color: buddy.color, radius: Self.strokeRadius, surfaceZ: Self.canvasZ + Self.strokeRadius * 0.55,
-                                brush: buddy.critter.kind)
-            stroke.add(p, now: now)
-            strokes.append(stroke)
-            activeStroke[slot] = stroke
-            lastBead[slot] = p
+        switch strokeBook.paint(slot: slot, at: p, now: now, color: buddy.color, brush: buddy.critter.kind,
+                                spacing: Self.strokeRadius * 0.6) {
+        case .started:
             buddy.critter.gulp()
             audio.play(.blip, a: CanvasLayout.blipHeight(p), pan: panFor(p.x))
+        case .blip:
+            audio.play(.blip, a: CanvasLayout.blipHeight(p), pan: panFor(p.x))
+        case nil:
+            break
         }
     }
 
@@ -456,13 +441,9 @@ final class Playground {
     }
 
     private func finishStroke(slot: Int) {
-        if activeStroke[slot] != nil, slot < buddies.count {
-            let buddy = buddies[slot]
-            buddy.critter.react(.happy, for: 0.7)   // proud of that line
+        if strokeBook.finish(slot: slot), slot < buddies.count {
+            buddies[slot].critter.react(.happy, for: 0.7)   // proud of that line
         }
-        activeStroke[slot] = nil
-        lastBead[slot] = nil
-        lastStamp[slot] = nil
     }
 
     func erase(with buddy: Buddy, now: Double) {
@@ -476,31 +457,7 @@ final class Playground {
             timelapse.recordErase(at: p, radius: r, dt: frameDT)
         }
         // The mushroom only wipes paint: the dotted guide stays.
-        var erasedAny = false
-        var newStrokes: [Stroke] = []
-        for stroke in strokes {
-            // Split into the runs that survive.
-            guard let runs = StrokePath.cut(stroke.points, at: p, radius: r) else {
-                newStrokes.append(stroke)
-                continue
-            }
-            erasedAny = true
-            if let first = runs.first {
-                stroke.replacePoints(first)
-                newStrokes.append(stroke)
-                for run in runs.dropFirst() {
-                    let piece = Stroke(color: stroke.color, radius: stroke.radius, surfaceZ: stroke.surfaceZ, brush: stroke.brush)
-                    piece.replacePoints(run)
-                    scene.rootNode.addChildNode(piece.node)
-                    newStrokes.append(piece)
-                }
-            } else {
-                stroke.node.removeFromParentNode()
-                for (slot, active) in activeStroke where active === stroke { activeStroke[slot] = nil }
-            }
-        }
-        strokes = newStrokes
-        if erasedAny {
+        if strokeBook.erase(at: p, radius: r) {
             buddy.scrubbed()
             if now - lastPoof > 0.09 {
                 lastPoof = now
@@ -516,11 +473,11 @@ final class Playground {
     /// Photographs the finished painting (just the canvas and its paint, lit like the studio). The paint
     /// stays on the easel, so "Keep drawing" on the review page carries on. Nil when there's nothing painted yet.
     func finishPainting() -> CanvasPhotos? {
-        guard !strokes.isEmpty else {
+        guard !strokeBook.isEmpty else {
             audio.play(.swap)
             return nil
         }
-        for slot in Array(activeStroke.keys) { finishStroke(slot: slot) }
+        for slot in strokeBook.activeSlots { finishStroke(slot: slot) }
         guard let photo = photographCanvas() else {
             audio.play(.fizzle)
             return nil
@@ -591,15 +548,11 @@ final class Playground {
 
     /// Wipes the paint, strokes and tracing guide off the easel.
     func clearCanvas() {
-        for stroke in strokes { stroke.node.removeFromParentNode() }
-        strokes.removeAll()
+        strokeBook.clear()
         paintLayer.clear()
         timelapse.reset()
         template?.fadeAway()
         template = nil
-        activeStroke = [:]
-        lastBead = [:]
-        lastStamp = [:]
     }
 
     /// Starts a fresh canvas session: clears the easel, lays the chosen outline, resets the stats.
@@ -704,12 +657,12 @@ final class Playground {
     }
 
     private func publishHUD(dt: Float, hands: [HandState], drawing: Bool, erasing: Bool, rubbing: Bool) {
-        let next = Hint.pick(erasing: erasing, drawing: drawing, rubbing: rubbing, hasStrokes: !strokes.isEmpty,
+        let next = Hint.pick(erasing: erasing, drawing: drawing, rubbing: rubbing, hasStrokes: !strokeBook.isEmpty,
                              hasTemplate: template != nil,
                              cameraHandsTracking: hands.contains { $0.tracking && !$0.isPointer },
                              cameraStatus: cameraStatus)
         if next != hint { hint = next }
-        let drawingExists = !strokes.isEmpty
+        let drawingExists = !strokeBook.isEmpty
         if drawingExists != hasDrawing { hasDrawing = drawingExists }
         let colors = buddies.map(\.colorIndex)
         if colors != buddyColors { buddyColors = colors }

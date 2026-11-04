@@ -110,7 +110,8 @@ Paths in the table are relative to `PuffyPond/`.
 | `Critters/Core/CritterKind.swift`, `Springs.swift`, `Face.swift`, `BuddyMode.swift` | The cast, brush dabs, springs, moods and faces, what a hand's buddy is doing |
 | `Critters/Shell/Critter.swift`, `Characters.swift`, `LimbBundle.swift` | Character base (body rig, face nodes), pots, bubbles, buddies, springy limbs, the shared limb brush |
 | `Critters/Shell/Ladybug.swift`, `Butterfly.swift`, `Mushroom.swift`, `Snail.swift` | The four garden paint characters; `LimbBrush.swift` is the leg brush the ladybug uses |
-| `Canvas/Core/StrokePoint.swift`, `Canvas/Shell/Stroke.swift`, `Canvas/Shell/MeshBuilder.swift` | Stroke paths (what's been drawn, for erasing) and geometry helpers |
+| `Canvas/Core/StrokeBook.swift`, `StrokePoint.swift` | Stroke paths (what's been drawn, for erasing), each hand's stroke in progress, when a stroke starts or blips |
+| `Canvas/Shell/MeshBuilder.swift` | Builds SceneKit geometry from plain arrays (the springy limbs) |
 | `Canvas/Core/BrushStyle.swift`, `Canvas/Shell/PaintLayer.swift`, `PaintShaders.metal` | Wet paint simulated on the GPU (Metal compute): dabs, advection, leveling, mixing, drips, drying, normal map |
 | `Canvas/Core/Paint.swift` | The six paint colours and which brush owns which |
 | `Canvas/Core/CanvasLayout.swift`, `StrokePath.swift`, `PotRub.swift`, `Hint.swift`, `FrameTiming.swift` | The easel's pure rules: camera fit and view → world mapping, where a brush may paint, how strokes grow and split under the eraser, rubbing pots and bubbles, which hint shows, frame timing |
