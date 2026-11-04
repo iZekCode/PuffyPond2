@@ -14,6 +14,11 @@ struct HandState {
     var velocity: SIMD2<Float>
     var tracking: Bool
     var isPointer = false
+
+    /// The mouse or finger as the left hand: always a fist, so it paints with the left buddy's tool.
+    static func pointer(at p: SIMD2<Float>, previous: SIMD2<Float>, dt: Float) -> HandState {
+        HandState(slot: 0, pose: .fist, position: p, velocity: (p - previous) / dt, tracking: true, isPointer: true)
+    }
 }
 
 /// Palm-level reading of one Vision observation.

@@ -310,8 +310,7 @@ final class Playground {
         if let p = pointer {
             let previous = pointerPrevious ?? p
             hands.removeAll { $0.slot == 0 }
-            hands.append(HandState(slot: 0, pose: .fist, position: p,
-                                   velocity: (p - previous) / dt, tracking: true, isPointer: true))
+            hands.append(.pointer(at: p, previous: previous, dt: dt))
             pointerPrevious = p
         }
 
@@ -355,16 +354,15 @@ final class Playground {
         }
         if !isAway { recorder.record(hands: recorded, dt: Double(dt)) }
         var rubbing = false
+        let rubs = buddies.map { (target: $0.rubbingPot, amount: $0.rubAmount) }
         for pot in pots {
-            let rubbers = buddies.filter { $0.rubbingPot == .color(pot.colorIndex) }
-            let progress = rubbers.map(\.rubAmount).max() ?? 0
+            let progress = PotRub.progress(of: .color(pot.colorIndex), rubs: rubs)
             if progress > 0 { rubbing = true }
             let wearing = buddies.filter { $0.colorIndex == pot.colorIndex }.count
             pot.update(dt: dt, beatPulse: beatPulse, rubProgress: min(progress, 1), selectedCount: wearing)
         }
         for pot in critterPots {
-            let rubbers = buddies.filter { $0.rubbingPot == pot.target }
-            let progress = rubbers.map(\.rubAmount).max() ?? 0
+            let progress = PotRub.progress(of: pot.target, rubs: rubs)
             if progress > 0 { rubbing = true }
             let wearers = buddies.filter { wears($0, pot.target) }
             let paints: Bool
@@ -633,50 +631,34 @@ final class Playground {
     /// Dip a critter into a pot and rub/swipe: it soaks up the color (faster the more you rub).
     /// Rub it in a critter bubble instead and it turns into that brush animal.
     func rubPots(_ buddy: Buddy, dt: Float, now: Double) {
-        func stop() {
-            buddy.rubbingPot = nil
-            buddy.rubAmount = 0
-            buddy.critter.colorPreview = nil
-        }
-        // The eraser is a critter like any other, so it can dip into pots and bubbles while it erases
-        // (a mouse or finger is always "fist", so the mushroom would otherwise be stuck as the mushroom).
-        guard buddy.mode != .idle else { return stop() }
         let p = buddy.toolPosition
-        func near(_ c: SIMD3<Float>) -> Bool { CanvasLayout.touches(SIMD2(p.x, p.y), potAt: c) }
-        let target: PotTarget
-        let potPosition: SIMD3<Float>
-        if let pot = pots.first(where: { near($0.root.simdPosition) }), pot.colorIndex != buddy.colorIndex {
-            target = .color(pot.colorIndex)
-            potPosition = pot.root.simdPosition
-        } else if let pot = critterPots.first(where: { near($0.root.simdPosition) }), !wears(buddy, pot.target) {
-            target = pot.target
-            potPosition = pot.root.simdPosition
-        } else {
-            return stop()
+        let rubber = PotRub.Rubber(idle: buddy.mode == .idle, position: SIMD2(p.x, p.y), colorIndex: buddy.colorIndex,
+                                   tool: buddy.tool, speed: buddy.critter.speed)
+        let step = PotRub.step(target: buddy.rubbingPot, amount: buddy.rubAmount, rubber: rubber,
+                               colorPots: pots.map { PotRub.Pot(target: .color($0.colorIndex), position: $0.root.simdPosition) },
+                               toolPots: critterPots.map { PotRub.Pot(target: $0.target, position: $0.root.simdPosition) },
+                               dt: dt)
+        buddy.rubbingPot = step.target
+        buddy.rubAmount = step.amount
+        guard let pot = step.pot else {
+            buddy.critter.colorPreview = nil
+            return
         }
-        if buddy.rubbingPot != target {
-            buddy.rubbingPot = target
-            buddy.rubAmount = 0
-            bouncePot(target, 0.6)
-        }
-        buddy.rubAmount += PotTarget.rubGain(dt: dt, speed: buddy.critter.speed)
-        let progress = min(buddy.rubAmount, 1)
-        if case .color(let index) = target { buddy.critter.colorPreview = (Paint.colors[index], progress * 0.85) }
+        let target = pot.target
+        let potPosition = pot.position
+        if step.started { bouncePot(target, 0.6) }
+        if case .color(let index) = target { buddy.critter.colorPreview = (Paint.colors[index], step.progress * 0.85) }
         let pan = panFor(potPosition.x)
         if now - (lastGurgle[buddy.slot] ?? 0) > 0.11 {
             lastGurgle[buddy.slot] = now
-            audio.play(.gurgle, a: progress, pan: pan)
+            audio.play(.gurgle, a: step.progress, pan: pan)
         }
-        guard progress >= 1 else { return }
-        buddy.rubbingPot = nil
-        buddy.rubAmount = 0
+        guard step.picked else { return }
         bouncePot(target, 1.5)
         switch target {
         case .color(let index):
             buddy.pick(index)
-            // A colour belongs to one brush animal: dip into the other one's colour and become that animal.
-            if buddy.tool.usesColor, let owner = Paint.owner(of: index), owner != buddy.critter.kind,
-               let tool = PaintTool.allCases.first(where: { $0.critterKind == owner }) {
+            if let tool = PotRub.tool(afterPicking: index, tool: buddy.tool, critter: buddy.critter.kind) {
                 finishStroke(slot: buddy.slot)
                 if let old = buddy.equip(tool) {
                     old.root.removeFromParentNode()
