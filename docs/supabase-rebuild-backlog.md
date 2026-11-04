@@ -111,6 +111,50 @@ E2 is deliberately early so that Wave 3 never depends on the network.
 
 The engine path (Lane B, Lane C, F1 to F5, H1) is not on the critical path, so it can run fully in parallel with the backend path. It only needs `LocalGalleryStore` (E2) to finish the Canvas page.
 
+## Timeline: due Sunday 15 November 2026
+
+Assumptions: planning starts Wednesday 4 November, which leaves 12 days. The existing code in this repo is ported and used as reference rather than rewritten blind, and work is split across parallel sessions per lane. A full rebuild of every chunk does not fit, so the plan has a cut line (see below).
+
+| Day | Date | Focus | Chunks |
+|---|---|---|---|
+| Wed | 4 Nov | Decisions and skeleton | 0.1, 0.2 |
+| Thu | 5 Nov | Contracts, start lanes | 0.3, then start A1, B1, C1, D4 |
+| Fri | 6 Nov | Wave 1 in parallel | A1 to A3, B1 to B3, C1 to C2, D1 to D4 |
+| Sat | 7 Nov | Wave 1 in parallel | A4, C3, finish B and D; Wave 1 merge |
+| Sun | 8 Nov | Perf gate and auth | C4, E1, E2 |
+| Mon | 9 Nov | Backend bridge | E3, F1 |
+| Tue | 10 Nov | Critters and sync | F2 to F5 in parallel, E4 |
+| Wed | 11 Nov | Pages in parallel | G1, G2, G3, G4 |
+| Thu | 12 Nov | Canvas integration | H1 |
+| Fri | 13 Nov | End-to-end flow | Home to Canvas to Review to Gallery to Report, synced through Supabase; bug fixing |
+| Sat | 14 Nov | Hardening lite and release build | I3 subset: RLS audit, account and data deletion, privacy check, TestFlight build |
+| Sun | 15 Nov | Buffer and submission | Fixes only, no new work |
+
+### Milestones
+
+- **Thu 5 Nov:** Wave 0 done, contracts merged. Lanes can start.
+- **Sat 7 Nov:** Wave 1 merged. Backend schema with RLS tested, engine paints with a fake input.
+- **Mon 9 Nov:** perf gate passed (C4) and auth working on a device.
+- **Wed 11 Nov:** all feature pages exist against `LocalGalleryStore`.
+- **Fri 13 Nov:** full flow works end to end with Supabase sync. Feature freeze.
+- **Sun 15 Nov:** delivered.
+
+### Cut line if time slips
+
+Drop in this order, keeping the core flow (paint, save, gallery, report, sync) intact:
+
+1. I2 NCA model.
+2. I1 Timelapse.
+3. A5 daily quest edge function (roll the quest on the client from a seeded pool).
+4. G3 3D gallery hall (ship the 2D grid only).
+5. Review page polish (G2), keeping only grab and release.
+
+### Checkpoints that need a decision
+
+- **Wed 4 Nov (0.1):** auth model and consent approach must be decided on day one. Every day this slips moves the whole critical path.
+- **Sun 8 Nov (C4):** if the Metal engine misses the frame budget on the target iPad, stop and fix it before building pages on top.
+- **Wed 11 Nov:** if H1 is not startable by Thursday morning, apply the first two cuts.
+
 ## Risks
 
 - **0.1 is the biggest risk.** A wrong call on consent, auth or what gets uploaded forces schema and RLS rework.
