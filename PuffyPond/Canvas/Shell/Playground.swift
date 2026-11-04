@@ -5,19 +5,6 @@ import Observation
 import QuartzCore
 import simd
 
-nonisolated enum CameraStatus: Equatable { case starting, running, denied, unavailable }
-
-nonisolated enum Hint: Equatable {
-    case starting, raiseHands, roaming, pickingColor, drawing, erasing, readyToHang, tracing, touchMode
-}
-
-/// "You picked a color" moment for the HUD.
-nonisolated struct ColorFlash: Equatable {
-    let slot: Int
-    let colorIndex: Int
-    let id: Int
-}
-
 /// The whole toy: the 3D world, the two hand buddies, wet paint on the canvas, and the groove.
 @Observable
 final class Playground {
@@ -97,20 +84,14 @@ final class Playground {
     /// Movement stats of the current canvas session (camera hands and body only).
     @ObservationIgnored private var recorder = SessionRecorder()
 
-    // Layout
-    @ObservationIgnored private var aspect: Float = 16.0 / 10.0
-    @ObservationIgnored private var cameraDistance: Float = 7
-    @ObservationIgnored private let cameraY: Float = 0.1
-    @ObservationIgnored private let tanHalfFOV = Float(tan(17.0 * Double.pi / 180))
-    /// A big canvas (≈ 1.8× wider than before) — lots of room for broad arm strokes.
-    static let canvasSize = SIMD2<Float>(6.4, 4.0)
-    static let canvasZ: Float = 0.04            // front face of the canvas
-    /// The pot and bubble columns sit just outside the canvas's left and right edges.
-    static let shelfX: Float = canvasSize.x * 0.5 + 0.38
-    static let shelfSpacing: Float = 0.62
-    static let strokeRadius: Float = 0.085
-    static let paintHoverZ: Float = 0.24        // how high the brush animal hovers while painting
-    static let brushSizeRange: ClosedRange<Float> = 0.6...2.4
+    // Layout (see `CanvasLayout`)
+    @ObservationIgnored private var canvasLayout = CanvasLayout()
+    static let canvasSize = CanvasLayout.canvasSize
+    static let canvasZ = CanvasLayout.canvasZ
+    static let shelfX = CanvasLayout.shelfX
+    static let strokeRadius = CanvasLayout.strokeRadius
+    static let paintHoverZ = CanvasLayout.paintHoverZ
+    static let brushSizeRange = CanvasLayout.brushSizeRange
 
     // Timing
     @ObservationIgnored private var clock: Float = 0
@@ -179,7 +160,7 @@ final class Playground {
         camera.bloomThreshold = 0.95
         camera.bloomBlurRadius = 8
         cameraNode.camera = camera
-        cameraNode.simdPosition = SIMD3(0, cameraY, cameraDistance)
+        cameraNode.simdPosition = SIMD3(0, CanvasLayout.cameraY, canvasLayout.cameraDistance)
         scene.rootNode.addChildNode(cameraNode)
 
         // Overhead light from the top centre: a neutral spot that lights the canvas almost evenly (like Splash
@@ -234,17 +215,14 @@ final class Playground {
         // Two columns just outside the canvas, so dipping never smears the painting:
         // paint pots down the right (rub a critter in one to pick up its color),
         // critter bubbles down the left (rub one to become that brush animal, or to pick up that paint tool).
-        func columnY(_ k: Int, of count: Int) -> Float {
-            0.1 + (Float(count - 1) / 2 - Float(k)) * Self.shelfSpacing
-        }
         let potColors = Paint.potOrder
         for (k, colorIndex) in potColors.enumerated() {
-            let pot = PaintPot(colorIndex: colorIndex, at: SIMD3(Self.shelfX, columnY(k, of: potColors.count), 0.3))
+            let pot = PaintPot(colorIndex: colorIndex, at: SIMD3(Self.shelfX, CanvasLayout.columnY(k, of: potColors.count), 0.3))
             scene.rootNode.addChildNode(pot.root)
             pots.append(pot)
         }
         for (k, tool) in PaintTool.allCases.enumerated() {
-            let y = columnY(k, of: PaintTool.allCases.count)
+            let y = CanvasLayout.columnY(k, of: PaintTool.allCases.count)
             critterPots.append(CritterPot(tool: tool, at: SIMD3(-Self.shelfX, y, 0.3)))
         }
         for pot in critterPots {
@@ -265,11 +243,8 @@ final class Playground {
     /// window shape, with a little room around them, so nothing is hidden behind a pot or a bubble.
     func layout(size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
-        aspect = Float(size.width / size.height)
-        let needHalfH = Self.canvasSize.y * 0.5 * 1.04
-        let needHalfW = (Self.shelfX + PaintPot.radius + 0.3) * 1.04   // the columns stand nearer the camera than the canvas
-        cameraDistance = Self.canvasZ + max(needHalfH / tanHalfFOV, needHalfW / (tanHalfFOV * aspect))
-        cameraNode.simdPosition = SIMD3(0, cameraY, cameraDistance)
+        canvasLayout.fit(width: Float(size.width), height: Float(size.height))
+        cameraNode.simdPosition = SIMD3(0, CanvasLayout.cameraY, canvasLayout.cameraDistance)
         placeShelves()
     }
 
@@ -281,22 +256,12 @@ final class Playground {
 
     /// Whether `p` (canvas plane) is under a pot or bubble: rubbing one must not paint or erase behind it.
     func isOverShelf(_ p: SIMD2<Float>) -> Bool {
-        let reach = PaintPot.radius + 0.14
-        return pots.contains { simd_distance(p, SIMD2($0.root.simdPosition.x, $0.root.simdPosition.y + 0.04)) < reach }
-            || critterPots.contains { simd_distance(p, SIMD2($0.root.simdPosition.x, $0.root.simdPosition.y + 0.04)) < reach }
+        pots.contains { CanvasLayout.touches(p, potAt: $0.root.simdPosition) }
+            || critterPots.contains { CanvasLayout.touches(p, potAt: $0.root.simdPosition) }
     }
 
     /// Visible half-size of the view at depth z.
-    func visibleHalfSize(atZ z: Float) -> SIMD2<Float> {
-        let halfH = (cameraDistance - z) * tanHalfFOV
-        return SIMD2(halfH * aspect, halfH)
-    }
-
-    /// View UV (0…1, y down) → point in the world at depth z.
-    private func worldPoint(_ uv: SIMD2<Float>, z: Float) -> SIMD3<Float> {
-        let h = visibleHalfSize(atZ: z)
-        return SIMD3((uv.x * 2 - 1) * h.x, cameraY + (1 - uv.y * 2) * h.y, z)
-    }
+    func visibleHalfSize(atZ z: Float) -> SIMD2<Float> { canvasLayout.visibleHalfSize(atZ: z) }
 
     // MARK: - Input
 
@@ -335,13 +300,11 @@ final class Playground {
     // MARK: - Frame loop
 
     private func tick(dt rawDT: Float) {
-        let dt = min(max(rawDT, 1.0 / 240.0), 1.0 / 20.0)
+        let dt = FrameTiming.clampedDT(rawDT)
         frameDT = dt
         let now = CACurrentMediaTime()
         clock += dt
-        let beat = audio.beat
-        let beatFraction = Float(beat - beat.rounded(.down))
-        let beatPulse = exp(-beatFraction * 6)
+        let beatPulse = FrameTiming.beatPulse(beat: audio.beat)
 
         var hands = input.advance(dt: dt, now: now)
         if let p = pointer {
@@ -364,20 +327,11 @@ final class Playground {
             buddy.setMode(mode)
             if mode != .paint { finishStroke(slot: buddy.slot) }
 
-            // Painting, the animal comes down close to the canvas so its legs can lie on it.
-            // A bigger brush animal hovers higher, so its body stays clear of the canvas.
-            let bigBrush = buddy.critter.usesSizeSlider ? max(brushSize, 1) : 1
-            let buddyZ: Float = mode == .paint ? Self.canvasZ + (Self.paintHoverZ - Self.canvasZ) * bigBrush : 0.42
+            let buddyZ = CanvasLayout.buddyZ(painting: mode == .paint,
+                                             brushSize: buddy.critter.usesSizeSlider ? brushSize : nil)
             if buddy.critter.usesSizeSlider { buddy.critter.sizeScale = brushSize }
-            let target: SIMD3<Float>
-            if let hand {
-                target = worldPoint(hand.position, z: buddyZ)
-            } else {
-                // Idle: drift in lazy loops so the buddies always feel alive.
-                let h = visibleHalfSize(atZ: buddyZ)
-                let t = clock * 0.35 + Float(buddy.slot) * 3.1
-                target = SIMD3(sin(t) * h.x * 0.6, cameraY - h.y * 0.62 + sin(t * 2.3) * 0.15, buddyZ)
-            }
+            let target = hand.map { canvasLayout.worldPoint($0.position, z: buddyZ) }
+                ?? canvasLayout.idleTarget(slot: buddy.slot, clock: clock, z: buddyZ)
             buddy.critter.update(dt: dt, target: target, visible: true,
                                  painting: mode == .paint || mode == .erase, beatPulse: beatPulse)
 
@@ -396,7 +350,7 @@ final class Playground {
             if let hand, !hand.isPointer {
                 recorded.append(SessionRecorder.Hand(slot: hand.slot, pose: hand.pose,
                                                      painting: mode == .paint || mode == .erase,
-                                                     canvas: canvasUV(buddy.toolPosition)))
+                                                     canvas: CanvasLayout.canvasUV(buddy.toolPosition)))
             }
         }
         if !isAway { recorder.record(hands: recorded, dt: Double(dt)) }
@@ -425,43 +379,28 @@ final class Playground {
         effects.update(dt: dt)
         shake = max(0, shake - dt * 4)
         let jolt = shake * shake * 0.05
-        cameraNode.simdPosition = SIMD3(Float.random(in: -jolt...jolt), cameraY + Float.random(in: -jolt...jolt),
-                                        cameraDistance)
+        cameraNode.simdPosition = SIMD3(Float.random(in: -jolt...jolt), CanvasLayout.cameraY + Float.random(in: -jolt...jolt),
+                                        canvasLayout.cameraDistance)
 
         // Music swells with how much you move.
-        energy += (min(movement / 3, 1) - energy) * min(1, dt * 1.5)
+        energy = FrameTiming.energy(energy, movement: movement, dt: dt)
         audio.update(energy: energy, now: now)
 
         publishHUD(dt: dt, hands: hands, drawing: drawingNow, erasing: erasingNow, rubbing: rubbing)
     }
 
-    /// A world point → canvas (0…1, y down), nil when it's off the canvas.
-    private func canvasUV(_ p: SIMD3<Float>) -> SIMD2<Float>? {
-        let size = Self.canvasSize
-        let uv = SIMD2((p.x + size.x * 0.5) / size.x, (0.1 + size.y * 0.5 - p.y) / size.y)
-        guard uv.x >= 0, uv.x <= 1, uv.y >= 0, uv.y <= 1 else { return nil }
-        return uv
-    }
-
-    private func panFor(_ x: Float) -> Float {
-        max(-1, min(1, x / max(visibleHalfSize(atZ: 0.5).x, 0.1)))
-    }
+    private func panFor(_ x: Float) -> Float { canvasLayout.pan(forX: x) }
 
     // MARK: - Painting
 
     private func paint(with buddy: Buddy, now: Double) {
         let slot = buddy.slot
         let p3 = buddy.critter.position.value
-        let half = Self.canvasSize * 0.5 - SIMD2(repeating: Self.strokeRadius)
-        let center = SIMD2<Float>(0, 0.1)
-        var p = SIMD2(p3.x, p3.y)
-        // Only a little slack sideways: reaching for a pot or bubble beside the canvas shouldn't paint.
-        let onCanvas = abs(p.x - center.x) <= half.x + 0.05 && abs(p.y - center.y) <= half.y + 0.12
-        guard onCanvas, !isOverShelf(p) else {
+        let raw = SIMD2(p3.x, p3.y)
+        guard let p = CanvasLayout.brushPoint(raw), !isOverShelf(raw) else {
             finishStroke(slot: slot)
             return
         }
-        p = simd_clamp(p, center - half, center + half)
 
         // Lay real paint every frame, the way this tool paints.
         let from = lastStamp[slot] ?? p
@@ -487,19 +426,14 @@ final class Playground {
 
         let spacing = Self.strokeRadius * 0.6
         if let stroke = activeStroke[slot], let last = lastBead[slot] {
-            let gap = simd_distance(p, last)
-            guard gap >= spacing else { return }
-            let steps = min(Int(gap / spacing), 12)
-            for s in 1...steps {
-                let q = last + (p - last) * (Float(s) / Float(steps))
-                stroke.add(q, now: now)
-            }
+            let beads = StrokePath.beads(from: last, to: p, spacing: spacing)
+            guard !beads.isEmpty else { return }
+            for q in beads { stroke.add(q, now: now) }
             lastBead[slot] = p
-            blipDistance[slot, default: 0] += gap
+            blipDistance[slot, default: 0] += simd_distance(p, last)
             if blipDistance[slot, default: 0] > 0.16 {
                 blipDistance[slot] = 0
-                let height = (p.y - center.y) / Self.canvasSize.y + 0.5
-                audio.play(.blip, a: height, pan: panFor(p.x))
+                audio.play(.blip, a: CanvasLayout.blipHeight(p), pan: panFor(p.x))
             }
         } else {
             let stroke = Stroke(color: buddy.color, radius: Self.strokeRadius, surfaceZ: Self.canvasZ + Self.strokeRadius * 0.55,
@@ -509,7 +443,7 @@ final class Playground {
             activeStroke[slot] = stroke
             lastBead[slot] = p
             buddy.critter.gulp()
-            audio.play(.blip, a: (p.y - center.y) / Self.canvasSize.y + 0.5, pan: panFor(p.x))
+            audio.play(.blip, a: CanvasLayout.blipHeight(p), pan: panFor(p.x))
         }
     }
 
@@ -540,28 +474,19 @@ final class Playground {
         let r = buddy.eraseRadius
         paintLayer.erase(at: p, radius: r, dt: frameDT)
         // Only erasing on the canvas is part of the timelapse (the eraser also roams the shelf and the floor).
-        if abs(p.x) <= Self.canvasSize.x / 2, abs(p.y - 0.1) <= Self.canvasSize.y / 2 {
+        if CanvasLayout.isOnCanvas(p) {
             timelapse.recordErase(at: p, radius: r, dt: frameDT)
         }
         // The mushroom only wipes paint: the dotted guide stays.
         var erasedAny = false
         var newStrokes: [Stroke] = []
         for stroke in strokes {
-            guard stroke.points.contains(where: { simd_distance($0.p, p) < r }) else {
+            // Split into the runs that survive.
+            guard let runs = StrokePath.cut(stroke.points, at: p, radius: r) else {
                 newStrokes.append(stroke)
                 continue
             }
             erasedAny = true
-            // Split into the runs that survive.
-            var runs: [[StrokePoint]] = [[]]
-            for point in stroke.points {
-                if simd_distance(point.p, p) < r {
-                    if !(runs.last?.isEmpty ?? true) { runs.append([]) }
-                } else {
-                    runs[runs.count - 1].append(point)
-                }
-            }
-            runs.removeAll { $0.isEmpty }
             if let first = runs.first {
                 stroke.replacePoints(first)
                 newStrokes.append(stroke)
@@ -717,9 +642,7 @@ final class Playground {
         // (a mouse or finger is always "fist", so the mushroom would otherwise be stuck as the mushroom).
         guard buddy.mode != .idle else { return stop() }
         let p = buddy.toolPosition
-        func near(_ c: SIMD3<Float>) -> Bool {
-            simd_distance(SIMD2(p.x, p.y), SIMD2(c.x, c.y + 0.04)) < PaintPot.radius + 0.14
-        }
+        func near(_ c: SIMD3<Float>) -> Bool { CanvasLayout.touches(SIMD2(p.x, p.y), potAt: c) }
         let target: PotTarget
         let potPosition: SIMD3<Float>
         if let pot = pots.first(where: { near($0.root.simdPosition) }), pot.colorIndex != buddy.colorIndex {
@@ -736,8 +659,7 @@ final class Playground {
             buddy.rubAmount = 0
             bouncePot(target, 0.6)
         }
-        // Slow animals (the snail) can't rub fast, so just sitting in the pot counts for a lot too.
-        buddy.rubAmount += dt * 0.9 + min(buddy.critter.speed, 3) * dt * 0.9
+        buddy.rubAmount += PotTarget.rubGain(dt: dt, speed: buddy.critter.speed)
         let progress = min(buddy.rubAmount, 1)
         if case .color(let index) = target { buddy.critter.colorPreview = (Paint.colors[index], progress * 0.85) }
         let pan = panFor(potPosition.x)
@@ -800,26 +722,10 @@ final class Playground {
     }
 
     private func publishHUD(dt: Float, hands: [HandState], drawing: Bool, erasing: Bool, rubbing: Bool) {
-        let next: Hint
-        if erasing {
-            next = .erasing
-        } else if drawing {
-            next = .drawing
-        } else if rubbing {
-            next = .pickingColor
-        } else if !strokes.isEmpty {
-            next = .readyToHang
-        } else if template != nil {
-            next = .tracing
-        } else if hands.contains(where: { $0.tracking && !$0.isPointer }) {
-            next = .roaming
-        } else if cameraStatus == .denied || cameraStatus == .unavailable {
-            next = .touchMode
-        } else if cameraStatus == .starting {
-            next = .starting
-        } else {
-            next = .raiseHands
-        }
+        let next = Hint.pick(erasing: erasing, drawing: drawing, rubbing: rubbing, hasStrokes: !strokes.isEmpty,
+                             hasTemplate: template != nil,
+                             cameraHandsTracking: hands.contains { $0.tracking && !$0.isPointer },
+                             cameraStatus: cameraStatus)
         if next != hint { hint = next }
         let drawingExists = !strokes.isEmpty
         if drawingExists != hasDrawing { hasDrawing = drawingExists }

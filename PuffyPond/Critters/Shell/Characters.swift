@@ -7,7 +7,7 @@ final class PaintPot {
     let root = SCNNode()
     let colorIndex: Int
     let color: SIMD3<Float>
-    static let radius: Float = 0.2
+    static let radius = CanvasLayout.potRadius
     private let body = SCNNode()
     private let blob: SCNNode
     private let blobMaterial: SCNMaterial

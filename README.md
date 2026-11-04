@@ -113,6 +113,7 @@ Paths in the table are relative to `PuffyPond/`.
 | `Canvas/Core/StrokePoint.swift`, `Canvas/Shell/Stroke.swift`, `Canvas/Shell/MeshBuilder.swift` | Stroke paths (what's been drawn, for erasing) and geometry helpers |
 | `Canvas/Core/BrushStyle.swift`, `Canvas/Shell/PaintLayer.swift`, `PaintShaders.metal` | Wet paint simulated on the GPU (Metal compute): dabs, advection, leveling, mixing, drips, drying, normal map |
 | `Canvas/Core/Paint.swift` | The six paint colours and which brush owns which |
+| `Canvas/Core/CanvasLayout.swift`, `StrokePath.swift`, `Hint.swift`, `FrameTiming.swift` | The easel's pure rules: camera fit and view → world mapping, where a brush may paint, how strokes grow and split under the eraser, which hint shows, frame timing |
 | `Canvas/Shell/Studio.swift`, `Toybox.swift`, `Effects.swift` | Treehouse backdrop, linen and easel textures; glossy materials; petals and fireflies |
 | `Audio/Shell/GrooveDSP.swift` | Live-synthesized music (a bouncy garden tune, plus a silly tune for the review page), sound effects and beat clock |
 | `Canvas/Views/HUDView.swift`, `App/Platform.swift` | Canvas overlay and Mac/iOS differences (mouse, views, camera preview) |

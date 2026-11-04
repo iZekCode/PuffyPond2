@@ -15,4 +15,10 @@ enum BuddyMode: Equatable {
 enum PotTarget: Equatable {
     case color(Int)
     case tool(PaintTool)
+
+    /// How much one frame of rubbing fills the pot's progress (1 = picked). Slow animals (the snail) can't rub
+    /// fast, so just sitting in the pot counts for a lot too.
+    static func rubGain(dt: Float, speed: Float) -> Float {
+        dt * 0.9 + min(speed, 3) * dt * 0.9
+    }
 }
