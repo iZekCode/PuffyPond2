@@ -4,6 +4,8 @@ Plan for rebuilding Puffy Pond from scratch with a Supabase backend. This docume
 
 ## Scope and decisions
 
+The decisions below are recorded in [ADR 0001](adr/0001-supabase-backend.md). The data model is in [supabase-erd.md](supabase-erd.md).
+
 - **Platform:** iPad only, landscape, full screen only (`UIRequiresFullScreen = YES`). No Mac, Catalyst, Stage Manager or split view.
 - **Backend:** Supabase for auth, Postgres (paintings, session stats, daily quest) and Storage (painting PNGs).
 - **Engine unchanged in kind:** Metal wet-paint simulation, SceneKit stages, Vision hand and body pose, all on device.
@@ -25,7 +27,7 @@ This reverses the current README promise of "No network, no accounts". Wave 0 de
 |---|---|---|---|---|
 | 0.1 | Product decisions and ADR | SEQ | none | ADR records: auth model (Sign in with Apple, anonymous-first or not), parental consent approach for a children's app, what is synced (PNG, stats, timelapse or not), local-first sync policy, what is never uploaded |
 | 0.2 | Project skeleton | SEQ | 0.1 | iPad-only Xcode project, landscape lock, `UIRequiresFullScreen`, feature folders, test target, CI, `supabase init` with local stack, `supabase-swift` via SPM |
-| 0.3 | Contracts | SEQ | 0.2 | Draft DB schema, domain types (`Painting`, `SessionStats`, `TemplateID`), and repository protocols (`GalleryRepository`, `StatsRepository`, `QuestSource`). This is the seam that lets Wave 1 run in parallel |
+| 0.3 | Contracts | SEQ | 0.2 | ERD and schema draft in [supabase-erd.md](supabase-erd.md), domain types (`Painting`, `SessionStats`, `TemplateID`), and repository protocols (`GalleryRepository`, `StatsRepository`, `QuestSource`). This is the seam that lets Wave 1 run in parallel |
 
 ## Wave 1: Four parallel lanes
 
@@ -35,11 +37,12 @@ Chunks inside a lane are SEQ unless noted. The lanes are PAR with each other.
 
 | ID | Chunk | Needs |
 |---|---|---|
-| A1 | Migrations: `profiles`, `paintings`, `painting_stats`, `daily_quest` | 0.3 |
+| A1 | Migrations: `profiles`, `paintings`, `painting_stats` (no `daily_quest`; the quest is computed on the client) | 0.3 |
 | A2 | Row level security policies | A1 |
 | A3 | Storage bucket `paintings` (private) and its policies | A1 |
 | A4 | pgTAP tests for RLS and Storage access | A2, A3 |
-| A5 | Edge function or cron for the daily quest (optional; the client can roll it locally from a seeded pool) | A1 |
+| A5 | `delete-account` edge function: remove the user's Storage objects, then the auth user (required by App Store guideline 5.1.1(v)) | A1, A3 |
+| A6 | Cleanup job for abandoned anonymous users and old tombstones (optional) | A1 |
 
 ### Lane B: Input
 
@@ -65,7 +68,7 @@ Until Lane B lands, C1 to C3 use a fake point-stream input.
 | ID | Chunk | Needs |
 |---|---|---|
 | D1 | Audio: `GrooveDSP`, sound effects, beat clock | 0.2 |
-| D2 | Templates: `TemplateCatalog`, `OutlineArt`, `DailyQuest` (pure, against `QuestSource`) | 0.3 |
+| D2 | Templates: port `TemplateCatalog`, `OutlineArt` and the quest pool. Make the quest of the day deterministic: stable hash of the local date, never equal to yesterday's, guarded by `questPoolVersion`, pure, behind `QuestSource` | 0.3 |
 | D3 | Treehouse garden theme and shared visual tokens | 0.2 |
 | D4 | `AppRouter`, `Route`, Home page | 0.2 |
 
@@ -73,7 +76,8 @@ Until Lane B lands, C1 to C3 use a fake point-stream input.
 
 | ID | Chunk | Mode | Needs |
 |---|---|---|---|
-| E1 | Auth: Sign in with Apple, session in Keychain, restore on launch | SEQ | A1, 0.2 |
+| E0 | Consent onboarding and parental gate: consent screen before the first sign-in, `ConsentStore` (local flag with version), reusable gate for link-account, delete-account and external links | SEQ | D3, D4, 0.3 |
+| E1 | Auth: anonymous sign-in after consent, session in Keychain and restore on launch, upgrade through `linkIdentity` with Sign in with Apple behind the gate, create `profiles` row | SEQ | A1, E0 |
 | E2 | `LocalGalleryStore`: file-based implementation of `GalleryRepository` and `StatsRepository` | PAR with E1, E3 | 0.3 |
 | E3 | `SupabaseGalleryRepository` and `SupabaseStatsRepository`: Storage upload plus row insert | PAR with E2 | A2, A3, E1 |
 | E4 | Sync engine: offline queue, retry, last-write-wins, deletion propagation (deleting a painting relocks its template), uploads through a background `URLSession` | SEQ | E2, E3 |
@@ -120,8 +124,8 @@ Assumptions: planning starts Wednesday 4 November, which leaves 12 days. The exi
 | Wed | 4 Nov | Decisions and skeleton | 0.1, 0.2 |
 | Thu | 5 Nov | Contracts, start lanes | 0.3, then start A1, B1, C1, D4 |
 | Fri | 6 Nov | Wave 1 in parallel | A1 to A3, B1 to B3, C1 to C2, D1 to D4 |
-| Sat | 7 Nov | Wave 1 in parallel | A4, C3, finish B and D; Wave 1 merge |
-| Sun | 8 Nov | Perf gate and auth | C4, E1, E2 |
+| Sat | 7 Nov | Wave 1 in parallel | A4, A5, C3, finish B and D; Wave 1 merge |
+| Sun | 8 Nov | Perf gate and auth | C4, E0, E1, E2 |
 | Mon | 9 Nov | Backend bridge | E3, F1 |
 | Tue | 10 Nov | Critters and sync | F2 to F5 in parallel, E4 |
 | Wed | 11 Nov | Pages in parallel | G1, G2, G3, G4 |
@@ -145,7 +149,7 @@ Drop in this order, keeping the core flow (paint, save, gallery, report, sync) i
 
 1. I2 NCA model.
 2. I1 Timelapse.
-3. A5 daily quest edge function (roll the quest on the client from a seeded pool).
+3. A6 cleanup job for anonymous users and tombstones. A5 `delete-account` is required and is not cut.
 4. G3 3D gallery hall (ship the 2D grid only).
 5. Review page polish (G2), keeping only grab and release.
 
