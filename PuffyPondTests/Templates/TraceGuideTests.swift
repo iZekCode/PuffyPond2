@@ -26,7 +26,7 @@ struct TraceGuideTests {
         #expect(g.legs.count == 2)
         #expect(g.legs[0].direction == .northEast)
         #expect(g.legs[1].direction == .southEast)
-        #expect(g.legs[0].text.hasPrefix("Ayo mulai dari sini!"))
+        #expect(g.legs[0].text.hasPrefix("Yuk mulai dari sini!"))
         #expect(g.legs[0].text.contains("naik"))
         #expect(g.legs[1].text.contains("turun"))
     }
@@ -37,11 +37,58 @@ struct TraceGuideTests {
             TraceGuide.sentence(direction: d, isShort: short, previous: after, isFirst: first,
                                 startsShape: first, isLast: last)
         }
-        #expect(say(.north, first: true) == "Ayo mulai dari sini! Naik ke atas!")
-        #expect(say(.south, after: .north) == "Sekarang turun ke bawah!")
+        #expect(say(.north, first: true) == "Yuk mulai dari sini! Naik ke atas ya!")
+        #expect(say(.south, after: .north) == "Sekarang turun ke bawah ya!")
         #expect(say(.southEast, after: .south) == "Turun ke kanan lagi!")
         #expect(say(.south, short: true, after: .southEast) == "Turun sedikit lagi!")
-        #expect(say(.east, short: true, after: .north) == "Lalu sedikit ke kanan!")
+        #expect(say(.east, short: true, after: .north) == "Yuk, geser sedikit ke kanan!")
+    }
+
+    @Test func theSameStepIsSaidInDifferentWays() {
+        let ways = Set((0..<6).map {
+            TraceGuide.sentence(direction: .south, isShort: false, previous: .north, isFirst: false,
+                                startsShape: false, isLast: false, variant: $0)
+        })
+        #expect(ways.count > 3)
+        #expect(ways.allSatisfy { $0.contains("turun ke bawah") })
+    }
+
+    @Test func speechIsCutIntoSentences() {
+        #expect(GuideVoice.sentences(in: "Bagus! Nah, turun ke bawah ya!") == ["Bagus!", "Nah, turun ke bawah ya!"])
+        #expect(GuideVoice.sentences(in: "Tanpa tanda") == ["Tanpa tanda"])
+    }
+
+    @Test func clipNamesAreReadableFileNames() {
+        #expect(GuideVoice.clipName(for: "Ayo, geser ke kanan!") == "guide-ayo-geser-ke-kanan")
+        #expect(GuideVoice.clipName(for: "Hore, hebat sekali!") == "guide-hore-hebat-sekali")
+    }
+
+    /// `tools/voice/units.txt` is what the clip maker records: it must hold every sentence the guide can say.
+    @Test func theVoiceScriptCoversEverySentence() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        guard let text = try? String(contentsOf: root.appendingPathComponent("tools/voice/units.txt"),
+                                     encoding: .utf8) else { return }   // not readable where the tests run
+        let script = Set(text.split(separator: "\n").map(String.init))
+        var needed = Set(GuideVoice.sentences(in: TraceGuide.finishText))
+        let flags = [(false, false, false), (true, true, false), (false, true, false), (false, false, true),
+                     (false, true, true), (true, true, true)]
+        let previousOptions: [TraceGuide.Direction?] = [nil] + TraceGuide.Direction.allCases.map { Optional($0) }
+        for direction in TraceGuide.Direction.allCases {
+            for short in [false, true] {
+                for previous in previousOptions {
+                    for (first, starts, last) in flags where previous == nil || !(first || starts) {
+                        for variant in 0..<18 {
+                            let line = TraceGuide.sentence(direction: direction, isShort: short, previous: previous,
+                                                           isFirst: first, startsShape: starts, isLast: last,
+                                                           variant: variant)
+                            needed.formUnion(GuideVoice.sentences(in: line))
+                        }
+                    }
+                }
+            }
+        }
+        #expect(needed.subtracting(script).isEmpty, "Missing from tools/voice/units.txt: \(needed.subtracting(script).sorted())")
     }
 
     @Test func theBrushMovesTheGuideAlong() {
@@ -94,7 +141,7 @@ struct TraceGuideTests {
         #expect(g.legs.count == 2)
         #expect(g.legs[0].path == 0)
         #expect(g.legs[1].path == 1)
-        #expect(g.legs[1].text.hasPrefix("Bagian berikutnya!"))
+        #expect(g.legs[1].text.lowercased().contains("bagian berikutnya"))
     }
 
     @Test func theArrowPointsTheWayOfTheLine() {

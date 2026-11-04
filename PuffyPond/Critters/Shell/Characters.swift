@@ -87,6 +87,8 @@ final class PaintPot {
 
 /// A glass bubble with the tool's little critter inside. Rub your critter in it to pick up that paint tool.
 final class CritterPot {
+    /// Bigger than a paint pot, so the little critter inside is easy to see.
+    static let radius = CanvasLayout.bubbleRadius
     let root = SCNNode()
     let target: PotTarget
     let resident: Critter
@@ -108,29 +110,29 @@ final class CritterPot {
         glass.shininess = 0.9
         glass.transparencyMode = .aOne
         glass.writesToDepthBuffer = false
-        bubble = Toybox.node(SCNSphere(radius: CGFloat(PaintPot.radius)), glass)
+        bubble = Toybox.node(SCNSphere(radius: CGFloat(Self.radius)), glass)
         root.addChildNode(bubble)
         // A little lavender stand so the bubble reads against the white canvas.
         let stand = Toybox.balloon(SIMD3(0.55, 0.5, 0.9), wobble: 0, roughness: 0.25)
-        root.addChildNode(Toybox.node(SCNTorus(ringRadius: 0.14, pipeRadius: 0.035), stand, at: SIMD3(0, -0.19, 0)))
+        root.addChildNode(Toybox.node(SCNTorus(ringRadius: 0.19, pipeRadius: 0.04), stand, at: SIMD3(0, -Self.radius + 0.01, 0)))
 
         let ringMaterial = SCNMaterial()
         ringMaterial.lightingModel = .constant
         ringMaterial.diffuse.contents = PlatformColor.white
-        progressRing = SCNNode(geometry: SCNTorus(ringRadius: 0.27, pipeRadius: 0.022))
+        progressRing = SCNNode(geometry: SCNTorus(ringRadius: CGFloat(Self.radius + 0.07), pipeRadius: 0.022))
         progressRing.geometry?.materials = [ringMaterial]
         progressRing.simdEulerAngles = SIMD3(Float.pi / 2, 0, 0)
         progressRing.simdScale = SIMD3(repeating: 0.001)
         root.addChildNode(progressRing)
 
-        halo = SCNNode(geometry: SCNTorus(ringRadius: 0.22, pipeRadius: 0.014))
+        halo = SCNNode(geometry: SCNTorus(ringRadius: CGFloat(Self.radius + 0.02), pipeRadius: 0.014))
         halo.geometry?.materials = [ringMaterial]
-        halo.simdPosition = SIMD3(0, -0.17, 0)
+        halo.simdPosition = SIMD3(0, -Self.radius + 0.03, 0)
         root.addChildNode(halo)
 
         // The little resident drifts around inside the bubble (added to the scene by the playground).
         resident = tool.critterKind.make(color: tool.critterKind.signatureColor, at: position)
-        resident.sizeScale = 0.5
+        resident.sizeScale = 0.72
     }
 
     /// The resident's scene node.

@@ -1,0 +1,174 @@
+Ayo, geser ke kanan!
+Ayo, geser ke kiri!
+Ayo, geser sedikit ke kanan!
+Ayo, geser sedikit ke kiri!
+Ayo, naik ke atas!
+Ayo, naik ke kanan!
+Ayo, naik ke kiri!
+Ayo, naik sedikit ke atas!
+Ayo, naik sedikit ke kanan!
+Ayo, naik sedikit ke kiri!
+Ayo, turun ke bawah!
+Ayo, turun ke kanan!
+Ayo, turun ke kiri!
+Ayo, turun sedikit ke bawah!
+Ayo, turun sedikit ke kanan!
+Ayo, turun sedikit ke kiri!
+Bagian berikutnya!
+Bagus!
+Garisnya sudah selesai!
+Geser ke kanan lagi ya!
+Geser ke kanan lagi!
+Geser ke kanan ya!
+Geser ke kiri lagi ya!
+Geser ke kiri lagi!
+Geser ke kiri ya!
+Geser sedikit ke kanan lagi ya!
+Geser sedikit ke kanan lagi!
+Geser sedikit ke kanan ya!
+Geser sedikit ke kiri lagi ya!
+Geser sedikit ke kiri lagi!
+Geser sedikit ke kiri ya!
+Hampir selesai!
+Hebat!
+Hore, hebat sekali!
+Lalu geser ke kanan ya!
+Lalu geser ke kiri ya!
+Lalu geser sedikit ke kanan ya!
+Lalu geser sedikit ke kiri ya!
+Lalu naik ke atas ya!
+Lalu naik ke kanan ya!
+Lalu naik ke kiri ya!
+Lalu naik sedikit ke atas ya!
+Lalu naik sedikit ke kanan ya!
+Lalu naik sedikit ke kiri ya!
+Lalu turun ke bawah ya!
+Lalu turun ke kanan ya!
+Lalu turun ke kiri ya!
+Lalu turun sedikit ke bawah ya!
+Lalu turun sedikit ke kanan ya!
+Lalu turun sedikit ke kiri ya!
+Mantap!
+Nah, geser ke kanan!
+Nah, geser ke kiri!
+Nah, geser sedikit ke kanan!
+Nah, geser sedikit ke kiri!
+Nah, naik ke atas!
+Nah, naik ke kanan!
+Nah, naik ke kiri!
+Nah, naik sedikit ke atas!
+Nah, naik sedikit ke kanan!
+Nah, naik sedikit ke kiri!
+Nah, sekarang geser ke kanan!
+Nah, sekarang geser ke kiri!
+Nah, sekarang geser sedikit ke kanan!
+Nah, sekarang geser sedikit ke kiri!
+Nah, sekarang naik ke atas!
+Nah, sekarang naik ke kanan!
+Nah, sekarang naik ke kiri!
+Nah, sekarang naik sedikit ke atas!
+Nah, sekarang naik sedikit ke kanan!
+Nah, sekarang naik sedikit ke kiri!
+Nah, sekarang turun ke bawah!
+Nah, sekarang turun ke kanan!
+Nah, sekarang turun ke kiri!
+Nah, sekarang turun sedikit ke bawah!
+Nah, sekarang turun sedikit ke kanan!
+Nah, sekarang turun sedikit ke kiri!
+Nah, turun ke bawah!
+Nah, turun ke kanan!
+Nah, turun ke kiri!
+Nah, turun sedikit ke bawah!
+Nah, turun sedikit ke kanan!
+Nah, turun sedikit ke kiri!
+Naik ke atas lagi ya!
+Naik ke atas lagi!
+Naik ke atas ya!
+Naik ke kanan lagi ya!
+Naik ke kanan lagi!
+Naik ke kanan ya!
+Naik ke kiri lagi ya!
+Naik ke kiri lagi!
+Naik ke kiri ya!
+Naik sedikit ke atas ya!
+Naik sedikit ke kanan ya!
+Naik sedikit ke kiri ya!
+Naik sedikit lagi ya!
+Naik sedikit lagi!
+Pindah ke bagian berikutnya ya!
+Sedikit lagi selesai!
+Sekarang geser ke kanan ya!
+Sekarang geser ke kiri ya!
+Sekarang geser sedikit ke kanan ya!
+Sekarang geser sedikit ke kiri ya!
+Sekarang naik ke atas ya!
+Sekarang naik ke kanan ya!
+Sekarang naik ke kiri ya!
+Sekarang naik sedikit ke atas ya!
+Sekarang naik sedikit ke kanan ya!
+Sekarang naik sedikit ke kiri ya!
+Sekarang turun ke bawah ya!
+Sekarang turun ke kanan ya!
+Sekarang turun ke kiri ya!
+Sekarang turun sedikit ke bawah ya!
+Sekarang turun sedikit ke kanan ya!
+Sekarang turun sedikit ke kiri ya!
+Terus geser ke kanan!
+Terus geser ke kiri!
+Terus geser sedikit ke kanan!
+Terus geser sedikit ke kiri!
+Terus naik ke atas!
+Terus naik ke kanan!
+Terus naik ke kiri!
+Terus naik sedikit ke atas!
+Terus naik sedikit ke kanan!
+Terus naik sedikit ke kiri!
+Terus turun ke bawah!
+Terus turun ke kanan!
+Terus turun ke kiri!
+Terus turun sedikit ke bawah!
+Terus turun sedikit ke kanan!
+Terus turun sedikit ke kiri!
+Terus, geser ke kanan lagi!
+Terus, geser ke kiri lagi!
+Terus, geser sedikit ke kanan lagi!
+Terus, geser sedikit ke kiri lagi!
+Terus, naik ke atas lagi!
+Terus, naik ke kanan lagi!
+Terus, naik ke kiri lagi!
+Terus, naik sedikit lagi!
+Terus, turun ke bawah lagi!
+Terus, turun ke kanan lagi!
+Terus, turun ke kiri lagi!
+Terus, turun sedikit lagi!
+Turun ke bawah lagi ya!
+Turun ke bawah lagi!
+Turun ke bawah ya!
+Turun ke kanan lagi ya!
+Turun ke kanan lagi!
+Turun ke kanan ya!
+Turun ke kiri lagi ya!
+Turun ke kiri lagi!
+Turun ke kiri ya!
+Turun sedikit ke bawah ya!
+Turun sedikit ke kanan ya!
+Turun sedikit ke kiri ya!
+Turun sedikit lagi ya!
+Turun sedikit lagi!
+Yuk mulai dari sini!
+Yuk, geser ke kanan!
+Yuk, geser ke kiri!
+Yuk, geser sedikit ke kanan!
+Yuk, geser sedikit ke kiri!
+Yuk, naik ke atas!
+Yuk, naik ke kanan!
+Yuk, naik ke kiri!
+Yuk, naik sedikit ke atas!
+Yuk, naik sedikit ke kanan!
+Yuk, naik sedikit ke kiri!
+Yuk, turun ke bawah!
+Yuk, turun ke kanan!
+Yuk, turun ke kiri!
+Yuk, turun sedikit ke bawah!
+Yuk, turun sedikit ke kanan!
+Yuk, turun sedikit ke kiri!

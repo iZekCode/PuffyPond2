@@ -172,12 +172,14 @@ struct GardenCastTests {
             let visible = playground.visibleHalfSize(atZ: Playground.canvasZ)
             // The whole canvas is on screen, not cropped by a window edge ...
             #expect(visible.x >= canvas.x && visible.y >= canvas.y, "\(size)")
-            // ... and the pots and bubbles stand beside it, not over it.
+            // ... and the pots and bubbles stand beside it or above it, not over it.
+            let canvasTop = CanvasLayout.canvasCenter.y + canvas.y
             for pot in playground.pots {
-                #expect(pot.root.simdPosition.x - PaintPot.radius > canvas.x, "\(size)")
+                let p = pot.root.simdPosition
+                #expect(p.x - PaintPot.radius > canvas.x || p.y - PaintPot.radius > canvasTop, "\(size)")
             }
             for pot in playground.critterPots {
-                #expect(pot.root.simdPosition.x + PaintPot.radius < -canvas.x, "\(size)")
+                #expect(pot.root.simdPosition.x + CanvasLayout.bubbleRadius < -canvas.x, "\(size)")
             }
         }
     }
@@ -190,10 +192,13 @@ struct GardenCastTests {
             #expect(!playground.pots.isEmpty && !playground.critterPots.isEmpty)
             for pot in playground.pots {
                 #expect(pot.root.simdPosition.x + PaintPot.radius <= visible.x, "\(size)")
+                #expect(pot.root.simdPosition.y + PaintPot.radius <= CanvasLayout.cameraY + visible.y, "\(size)")
                 #expect(pot.root.simdPosition.x > 0)
             }
+            #expect(playground.pots.filter { $0.root.simdPosition.y > CanvasLayout.canvasCenter.y + Playground.canvasSize.y * 0.5 }.count
+                    == CanvasLayout.topPotCount)
             for pot in playground.critterPots {
-                #expect(pot.root.simdPosition.x - PaintPot.radius >= -visible.x, "\(size)")
+                #expect(pot.root.simdPosition.x - CanvasLayout.bubbleRadius >= -visible.x, "\(size)")
                 #expect(pot.root.simdPosition.x < 0)
             }
         }

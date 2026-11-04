@@ -103,11 +103,12 @@ final class EaselScene {
 
         scene.rootNode.addChildNode(paint)
         // Two columns just outside the canvas, so dipping never smears the painting:
-        // paint pots down the right (rub a critter in one to pick up its color),
+        // paint pots above the top-right corner and down the right (rub a critter in one to pick up its color),
         // critter bubbles down the left (rub one to become that brush animal, or to pick up that paint tool).
         let potColors = Paint.potOrder
         for (k, colorIndex) in potColors.enumerated() {
-            let pot = PaintPot(colorIndex: colorIndex, at: SIMD3(CanvasLayout.shelfX, CanvasLayout.columnY(k, of: potColors.count), 0.3))
+            let spot = CanvasLayout.potPosition(k, of: potColors.count)
+            let pot = PaintPot(colorIndex: colorIndex, at: SIMD3(spot.x, spot.y, CanvasLayout.potZ))
             scene.rootNode.addChildNode(pot.root)
             pots.append(pot)
         }
@@ -134,14 +135,18 @@ final class EaselScene {
 
     /// Stands the paint pots in a column beside the right edge of the canvas and the bubbles beside the left edge.
     private func placeShelves() {
-        for pot in pots { pot.root.simdPosition.x = CanvasLayout.shelfX }
+        for (k, pot) in pots.enumerated() {
+            let spot = CanvasLayout.potPosition(k, of: pots.count)
+            pot.root.simdPosition.x = spot.x
+            pot.root.simdPosition.y = spot.y
+        }
         for pot in critterPots { pot.root.simdPosition.x = -CanvasLayout.shelfX }
     }
 
     /// Whether `p` (canvas plane) is under a pot or bubble: rubbing one must not paint or erase behind it.
     func isOverShelf(_ p: SIMD2<Float>) -> Bool {
         pots.contains { CanvasLayout.touches(p, potAt: $0.root.simdPosition) }
-            || critterPots.contains { CanvasLayout.touches(p, potAt: $0.root.simdPosition) }
+            || critterPots.contains { CanvasLayout.touches(p, potAt: $0.root.simdPosition, radius: CanvasLayout.bubbleRadius) }
     }
 
     /// Puts the camera back at rest, nudged up to `jolt` in a random direction (the shake after a pop).

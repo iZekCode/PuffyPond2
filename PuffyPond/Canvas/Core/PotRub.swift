@@ -63,7 +63,7 @@ enum PotRub {
            pot.target != .color(rubber.colorIndex) {
             return pot
         }
-        if let pot = toolPots.first(where: { CanvasLayout.touches(rubber.position, potAt: $0.position) }),
+        if let pot = toolPots.first(where: { CanvasLayout.touches(rubber.position, potAt: $0.position, radius: CanvasLayout.bubbleRadius) }),
            pot.target != .tool(rubber.tool) {
             return pot
         }

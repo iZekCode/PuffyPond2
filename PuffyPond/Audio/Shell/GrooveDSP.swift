@@ -24,6 +24,7 @@ nonisolated enum Sfx: UInt8, Sendable, CaseIterable {
     case poof      // a soft spore puff (b = pan)
     case ooze      // a gloopy rising bubble while a brush is held still (a = hold 0…1, b = pan)
     case note      // a timelapse note (a = place on the pentatonic scale 0…1, b = pan, c = NoteTimbre)
+    case pour      // thick paint pouring out of a held brush: a wet rush with bubbles (a = hold 0…1, b = pan)
 }
 
 /// Which tune the background music plays.
@@ -485,6 +486,20 @@ nonisolated final class GrooveDSP: @unchecked Sendable {
                   vibrato: (0.1, 16))
             start(.fm, top * 2, peak: 0.06, decay: 0.12, at: Int(0.05 * sampleRate), pan: pan, fm: (2.5, 1.5, 0.05))
             start(.noise, 0, peak: 0.05, decay: 0.1, at: 0, pan: pan, filter: .bandPass(700, q: 1.5, sr: sampleRate))
+        case .pour:
+            // Played every ~0.1 s while held: overlapping washes of filtered noise make one running stream,
+            // and a random glug or droplet now and then makes it sound like real liquid.
+            let s = min(max(e.a, 0), 1)
+            let wob = noise()
+            start(.noise, 0, peak: 0.08 + 0.07 * s, decay: 0.3, at: 0, pan: pan, attack: 0.05,
+                  filter: .bandPass(480 + 220 * s + 160 * wob, q: 1.2, sr: sampleRate))
+            start(.noise, 0, peak: 0.035, decay: 0.16, at: 0, pan: pan, attack: 0.03,
+                  filter: .bandPass(1800 + 500 * wob, q: 2.5, sr: sampleRate))
+            if noise() > 0.1 {
+                let f = 240 + 200 * (noise() + 1) * 0.5 + 140 * s
+                start(.sine, f, peak: 0.11, decay: 0.09, at: Int((noise() + 1) * 0.04 * sampleRate), pan: pan,
+                      attack: 0.004, glideFrom: f * 0.5, glideTime: 0.05)
+            }
         case .note:
             let i = min(max(Int((e.a * Float(Self.noteScale.count - 1)).rounded()), 0), Self.noteScale.count - 1)
             let f = Self.hz(Self.noteScale[i])

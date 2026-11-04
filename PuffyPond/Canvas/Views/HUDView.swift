@@ -10,6 +10,7 @@ struct HUDView: View {
 
     @Environment(\.uiScale) private var scale
     @State private var confirmingHome = false
+    @State private var showingVoiceSettings = false
 
     /// The iPad is wide and short: the title and the two buddy chips share one row so the hint fits
     /// in the free strip above the canvas.
@@ -211,6 +212,10 @@ struct HUDView: View {
                             tint: playground.guideVoiceOn ? .orange : .gray) {
                     playground.toggleGuideVoice()
                 }
+                if playground.guideVoiceOn {
+                    RoundButton(symbol: "slider.horizontal.3", tint: .purple) { showingVoiceSettings.toggle() }
+                        .popover(isPresented: $showingVoiceSettings) { GuideVoicePanel(voice: playground.voice) }
+                }
             }
             RoundButton(symbol: playground.showCameraPreview ? "video.fill" : "video.slash.fill", tint: .teal) {
                 playground.showCameraPreview.toggle()
@@ -301,6 +306,94 @@ struct RoundButton: View {
                 .background(tint.opacity(faded ? 0.45 : 1).gradient, in: Circle())
                 .overlay(Circle().stroke(.white.opacity(faded ? 0.5 : 1), lineWidth: 2.5))
                 .shadow(color: tint.opacity(faded ? 0.15 : 0.4), radius: 6, y: 3)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Which voice, how fast, how bright: opens from the purple button next to the megaphone.
+private struct GuideVoicePanel: View {
+    let voice: GuideVoice
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Suara arahan")
+                .font(.system(size: 20, weight: .heavy, design: .rounded))
+            if GuideVoice.hasClips {
+                Text("Memakai rekaman suara.")
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+            } else {
+                group("Suara") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        voiceRow("Otomatis (terbaik)", selected: voice.voiceID == nil) { voice.voiceID = nil }
+                        ForEach(GuideVoice.indonesianVoices, id: \.identifier) { v in
+                            voiceRow("\(v.name) · \(GuideVoice.qualityLabel(v))", selected: voice.voiceID == v.identifier) {
+                                voice.voiceID = v.identifier
+                            }
+                        }
+                    }
+                }
+                group("Kecepatan") {
+                    HStack(spacing: 8) {
+                        ForEach(GuideVoice.Pace.allCases) { pace in
+                            chip(pace.label, selected: voice.pace == pace) { voice.pace = pace }
+                        }
+                    }
+                }
+                group("Nada") {
+                    HStack(spacing: 8) {
+                        ForEach(GuideVoice.Tone.allCases) { tone in
+                            chip(tone.label, selected: voice.tone == tone) { voice.tone = tone }
+                        }
+                    }
+                }
+                Text("Suara yang lebih natural bisa diunduh di Pengaturan > Aksesibilitas > Konten Terucap > Suara.")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .foregroundStyle(Color(red: 0.25, green: 0.2, blue: 0.35))
+        .padding(18)
+        .frame(width: 300, alignment: .leading)
+        #if os(iOS)
+        .presentationCompactAdaptation(.popover)
+        #endif
+    }
+
+    private func group<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.system(size: 14, weight: .heavy, design: .rounded)).foregroundStyle(.secondary)
+            content()
+        }
+    }
+
+    private func chip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            action()
+            voice.sample()
+        } label: {
+            Text(title)
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .foregroundStyle(selected ? .white : Color(red: 0.25, green: 0.2, blue: 0.35))
+                .background(selected ? Color.purple : Color.purple.opacity(0.12), in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func voiceRow(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            action()
+            voice.sample()
+        } label: {
+            HStack {
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(selected ? Color.purple : .secondary)
+                Text(title).font(.system(size: 15, weight: .semibold, design: .rounded))
+                Spacer(minLength: 0)
+            }
         }
         .buttonStyle(.plain)
     }

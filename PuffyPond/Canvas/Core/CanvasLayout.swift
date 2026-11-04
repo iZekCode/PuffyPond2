@@ -11,7 +11,15 @@ struct CanvasLayout {
     /// The pot and bubble columns sit just outside the canvas's left and right edges.
     static let shelfX: Float = canvasSize.x * 0.5 + 0.38
     static let shelfSpacing: Float = 0.62
+    /// Paint pots: `topPotCount` stand in a row above the canvas's top-right corner, the rest go down the right side,
+    /// spread over the canvas height, so the arms have to reach up, out and down for a color.
+    static let topPotCount = 2
+    static let topPotY: Float = canvasCenter.y + canvasSize.y * 0.5 + 0.36
+    static let topPotGap: Float = 0.75
+    static let sidePotSpacing: Float = 0.9
     static let potRadius: Float = 0.2
+    /// The critter bubbles on the left are bigger, so the little critter inside is easy to see.
+    static let bubbleRadius: Float = 0.27
     static let strokeRadius: Float = 0.085
     static let paintHoverZ: Float = 0.24        // how high the brush animal hovers while painting
     static let brushSizeRange: ClosedRange<Float> = 0.6...2.4
@@ -26,8 +34,11 @@ struct CanvasLayout {
         guard width > 0, height > 0 else { return }
         aspect = width / height
         let needHalfH = Self.canvasSize.y * 0.5 * 1.04
-        let needHalfW = (Self.shelfX + Self.potRadius + 0.3) * 1.04   // the columns stand nearer the camera than the canvas
-        cameraDistance = Self.canvasZ + max(needHalfH / Self.tanHalfFOV, needHalfW / (Self.tanHalfFOV * aspect))
+        let needHalfW = (Self.shelfX + max(Self.potRadius, Self.bubbleRadius) + 0.3) * 1.04   // the columns stand nearer the camera than the canvas
+        // The pots above the canvas (and their rub ring) stand at the pots' depth.
+        let needPotsH = (Self.topPotY + 0.32 - Self.cameraY) * 1.04
+        cameraDistance = max(Self.canvasZ + max(needHalfH / Self.tanHalfFOV, needHalfW / (Self.tanHalfFOV * aspect)),
+                             Self.potZ + needPotsH / Self.tanHalfFOV)
     }
 
     /// Visible half-size of the view at depth z.
@@ -62,14 +73,29 @@ struct CanvasLayout {
         return canvasZ + (paintHoverZ - canvasZ) * max(brushSize ?? 1, 1)
     }
 
+    /// How far the pots and bubbles stand in front of the canvas.
+    static let potZ: Float = 0.3
+
+    /// Where paint pot `k` of `count` stands (x, y): the first `topPotCount` in a row above the top-right corner
+    /// (the last of them straight above the side column), the rest down the right side.
+    static func potPosition(_ k: Int, of count: Int) -> SIMD2<Float> {
+        let top = min(topPotCount, count)
+        if k < top {
+            return SIMD2(shelfX - Float(top - 1 - k) * topPotGap, topPotY)
+        }
+        let side = count - top
+        let i = k - top
+        return SIMD2(shelfX, canvasCenter.y - 0.1 + (Float(side - 1) / 2 - Float(i)) * sidePotSpacing)
+    }
+
     /// Height of slot `k` in a column of `count` pots or bubbles, centred on the canvas.
     static func columnY(_ k: Int, of count: Int) -> Float {
         canvasCenter.y + (Float(count - 1) / 2 - Float(k)) * shelfSpacing
     }
 
     /// Whether `p` (canvas plane) is on the pot or bubble standing at `center`.
-    static func touches(_ p: SIMD2<Float>, potAt center: SIMD3<Float>) -> Bool {
-        simd_distance(p, SIMD2(center.x, center.y + 0.04)) < potRadius + 0.14
+    static func touches(_ p: SIMD2<Float>, potAt center: SIMD3<Float>, radius: Float = CanvasLayout.potRadius) -> Bool {
+        simd_distance(p, SIMD2(center.x, center.y + 0.04)) < radius + 0.14
     }
 
     /// Where a brush at `p` lays paint, clamped inside the canvas edge; nil when it is off the canvas.

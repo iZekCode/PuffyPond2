@@ -19,9 +19,9 @@ final class LimbBrush {
     private static let trailSpeed: ClosedRange<Float> = 0.35...1.4
     /// Holding still for this long (seconds) starts the paint oozing out; it keeps growing for `oozeGrowth` seconds.
     private static let oozeDelay: Float = 0.15
-    private static let oozeGrowth: Float = 4
+    private static let oozeGrowth: Float = 3
     /// How fast the oozing paint flows outward (world units/s; slow enough that the texture grows fully).
-    private static let oozeSpeed: Float = 0.28
+    private static let oozeSpeed: Float = 0.36
 
     /// How long it has been held still while pressing, as 0…1 (nil while it moves or isn't pressing).
     var holdProgress: Float? {
@@ -65,7 +65,8 @@ final class LimbBrush {
         let ooze = smoothStep(Self.oozeDelay, Self.oozeDelay + 0.35, holdTime)
         let swell = min(max(holdTime - Self.oozeDelay, 0), Self.oozeGrowth)
         var style = BrushStyle.wash
-        if ooze > 0 { style.amount = 0.05 + 0.1 * ooze }
+        // Lots of paint: it keeps welling up the longer you hold.
+        if ooze > 0 { style.amount = 0.12 + 0.18 * ooze + 0.05 * swell }
         var result: [BrushDab] = []
         for c in bundle.contacts {
             guard ooze > 0 else {
@@ -74,8 +75,14 @@ final class LimbBrush {
             }
             let away = (c.a + c.b) * 0.5 - head
             let outward = simd_length(away) > 1e-4 ? simd_normalize(away) : SIMD2<Float>(0, 1)
-            result.append(BrushDab(from: c.a, to: c.b, radius: c.radius * (1 + 0.45 * swell), speed: Self.oozeSpeed,
-                                   style: style, drag: outward * Self.oozeSpeed * frameDT * ooze))
+            let radius = c.radius * (1 + 0.8 * swell)
+            let drag = outward * Self.oozeSpeed * frameDT * ooze
+            result.append(BrushDab(from: c.a, to: c.b, radius: radius, speed: Self.oozeSpeed, style: style, drag: drag))
+            // And it gushes out past the tip of every leg, further the longer you hold.
+            let tip = simd_distance(c.a, head) > simd_distance(c.b, head) ? c.a : c.b
+            let reach = (0.08 + 0.12 * swell) * ooze
+            result.append(BrushDab(from: tip, to: tip + outward * reach, radius: radius * 0.9, speed: Self.oozeSpeed,
+                                   style: style, drag: drag))
         }
         return result
     }

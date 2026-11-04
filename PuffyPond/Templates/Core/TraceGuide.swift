@@ -77,7 +77,7 @@ nonisolated struct TraceGuide {
     /// The arrow sits this many samples ahead of the brush.
     static let arrowLead = 4
 
-    static let finishText = "Hebat sekali! Garisnya sudah selesai!"
+    static let finishText = "Hore, hebat sekali! Garisnya sudah selesai!"
 
     // MARK: State
 
@@ -178,15 +178,16 @@ nonisolated struct TraceGuide {
             let length = Float(item.end - item.start) * Self.spacing
             let text = Self.sentence(direction: item.direction, isShort: length < Self.shortLength,
                                      previous: previous, isFirst: k == 0, startsShape: !sameShape,
-                                     isLast: k == all.count - 1)
+                                     isLast: k == all.count - 1, variant: k)
             legs.append(Leg(path: item.path, start: item.start, end: item.end, direction: item.direction, text: text))
         }
         return legs
     }
 
-    /// "Ayo mulai dari sini! Naik ke atas!", "Sekarang turun ke bawah!", "Turun sedikit lagi!" …
+    /// "Yuk mulai dari sini! Naik ke atas ya!", "Nah, sekarang turun ke bawah!", "Turun sedikit lagi!" …
+    /// `variant` (the step's number) picks among a few ways to say the same thing, so it never sounds like a script.
     static func sentence(direction: Direction, isShort: Bool, previous: Direction?, isFirst: Bool,
-                         startsShape: Bool, isLast: Bool) -> String {
+                         startsShape: Bool, isLast: Bool, variant: Int = 0) -> String {
         let again = previous?.group == direction.group
 
         var parts: [String] = []
@@ -195,27 +196,36 @@ nonisolated struct TraceGuide {
             if isShort { parts.append("sedikit") }
             if !(again && isShort) { parts.append(direction.tail) }
         } else {
+            parts.append("geser")
             if isShort { parts.append("sedikit") }
             parts.append(direction.tail)
         }
         if again { parts.append("lagi") }
+        let core = parts.joined(separator: " ")
+        let capital = core.prefix(1).uppercased() + core.dropFirst()
 
-        var connective = ""
+        let frames: [String]
         if let previous, !again {
             let reversed = (previous.group == .up && direction.group == .down)
                 || (previous.group == .down && direction.group == .up)
                 || (previous.group == .left && direction.group == .right)
                 || (previous.group == .right && direction.group == .left)
-            connective = reversed ? "sekarang " : "lalu "
+            frames = reversed
+                ? ["Sekarang \(core) ya!", "Nah, sekarang \(core)!", "Terus \(core)!"]
+                : ["Yuk, \(core)!", "Lalu \(core) ya!", "Nah, \(core)!"]
+        } else if again {
+            frames = ["\(capital)!", "\(capital) ya!", "Terus, \(core)!"]
+        } else {
+            frames = ["\(capital) ya!", "Ayo, \(core)!"]
         }
+        let body = frames[variant % frames.count]
 
-        var intro = ""
-        if isFirst { intro = "Ayo mulai dari sini! " }
-        else if startsShape { intro = "Bagian berikutnya! " }
-        else if isLast { intro = "Sedikit lagi selesai! " }
-
-        let phrase = connective + parts.joined(separator: " ")
-        return intro + phrase.prefix(1).uppercased() + phrase.dropFirst() + "!"
+        if isFirst { return "Yuk mulai dari sini! " + body }
+        if startsShape { return ["Bagian berikutnya!", "Pindah ke bagian berikutnya ya!"][variant % 2] + " " + body }
+        if isLast { return ["Sedikit lagi selesai!", "Hampir selesai!"][variant % 2] + " " + body }
+        // Every third step gets a cheer.
+        if variant % 3 == 2 { return ["Bagus!", "Hebat!", "Mantap!"][(variant / 3) % 3] + " " + body }
+        return body
     }
 
     // MARK: Geometry

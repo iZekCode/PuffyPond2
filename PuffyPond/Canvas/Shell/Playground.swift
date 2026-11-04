@@ -76,13 +76,15 @@ final class Playground {
     @ObservationIgnored private(set) var buddies: [Buddy] = []
     @ObservationIgnored private var lastSlurp: Double = 0
     @ObservationIgnored private var lastHoldSound: Double = 0
+    @ObservationIgnored private var lastPourSound: Double = 0
     @ObservationIgnored private var strokeBook = StrokeBook()
     /// The dotted animal to trace, if one is on the canvas.
     @ObservationIgnored private(set) var template: TemplateOutline?
     /// Follows the brush along the outline: which direction to say next, and where the arrow goes.
     @ObservationIgnored private var guide: TraceGuide?
     @ObservationIgnored private var guideArrow: GuideArrow?
-    @ObservationIgnored private let voice = GuideVoice(muted: !GuideVoice.savedOn)
+    /// Reads the directions aloud; the HUD menu changes its voice, pace and tone.
+    @ObservationIgnored let voice = GuideVoice(muted: !GuideVoice.savedOn)
     /// Seconds since the guide last spoke or the brush last made progress; negative while waiting to say hello.
     @ObservationIgnored private var guideQuiet: Float = 0
     @ObservationIgnored private var guideRepeats = 0
@@ -315,9 +317,16 @@ final class Playground {
             brush: buddy.critter.kind)
         strokeBook.stamped(slot: slot, at: p)
         if buddy.tool.usesColor { advanceGuide(at: p) }
-        if let hold = buddy.critter.holdProgress, now - lastHoldSound > 0.45 {
-            lastHoldSound = now
-            audio.play(.ooze, a: hold, pan: panFor(p.x))
+        if let hold = buddy.critter.holdProgress {
+            if now - lastHoldSound > 0.45 {
+                lastHoldSound = now
+                audio.play(.ooze, a: hold, pan: panFor(p.x))
+            }
+            // A steady pour of paint under the gloopy bubbles.
+            if now - lastPourSound > 0.1 {
+                lastPourSound = now
+                audio.play(.pour, a: hold, pan: panFor(p.x))
+            }
         }
         // The blender only moves paint that's already there: it doesn't start a stroke of its own.
         if buddy.tool == .blender {
