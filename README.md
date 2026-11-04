@@ -106,7 +106,8 @@ Paths in the table are relative to `PuffyPond/`.
 | `Input/Shell/HandTracker.swift` | Camera + Vision hand pose (2 hands) and body pose (only while a page needs it), on device |
 | `Input/Core/HandPose.swift`, `Input/Shell/HandInput.swift`, `Input/Core/OneEuroFilter.swift` | Palm tracking, open/fist with hysteresis, smoothing + prediction |
 | `Canvas/Core/PaintTool.swift` | The four tools and the dabs each one lays |
-| `Canvas/Shell/Playground.swift` | The easel: world, buddies, painting, erasing, pots and bubbles, stats recording |
+| `Canvas/Shell/Playground.swift` | The easel: buddies, painting, erasing, pots and bubbles, stats recording |
+| `Canvas/Shell/EaselScene.swift`, `CanvasPhotoBooth.swift` | The studio around the easel (camera, lights, linen canvas, pot and bubble columns); the booth that photographs the finished canvas |
 | `Critters/Core/CritterKind.swift`, `Springs.swift`, `Face.swift`, `BuddyMode.swift` | The cast, brush dabs, springs, moods and faces, what a hand's buddy is doing |
 | `Critters/Shell/Critter.swift`, `Characters.swift`, `LimbBundle.swift` | Character base (body rig, face nodes), pots, bubbles, buddies, springy limbs, the shared limb brush |
 | `Critters/Shell/Ladybug.swift`, `Butterfly.swift`, `Mushroom.swift`, `Snail.swift` | The four garden paint characters; `LimbBrush.swift` is the leg brush the ladybug uses |

@@ -52,9 +52,12 @@ final class Playground {
     var colorFlash: ColorFlash?
 
     // MARK: World
-    @ObservationIgnored let effects = Effects(scene: SCNScene())
+    @ObservationIgnored let effects: Effects
+    @ObservationIgnored private let easel: EaselScene
     var scene: SCNScene { effects.scene }
-    @ObservationIgnored let cameraNode = SCNNode()
+    var cameraNode: SCNNode { easel.cameraNode }
+    var pots: [PaintPot] { easel.pots }
+    var critterPots: [CritterPot] { easel.critterPots }
     @ObservationIgnored let audio = GrooveEngine()
     @ObservationIgnored private let input = HandInput()
     @ObservationIgnored private let frameDriver = FrameDriver()
@@ -62,26 +65,19 @@ final class Playground {
     @ObservationIgnored private var lastSlurp: Double = 0
     @ObservationIgnored private var lastHoldSound: Double = 0
     @ObservationIgnored private var strokeBook = StrokeBook()
-    @ObservationIgnored private(set) var pots: [PaintPot] = []
-    @ObservationIgnored private(set) var critterPots: [CritterPot] = []
     /// The dotted animal to trace, if one is on the canvas.
     @ObservationIgnored private(set) var template: TemplateOutline?
     /// What you actually see: wet, textured paint on the canvas.
-    @ObservationIgnored private let paintLayer = PaintLayer(center: SIMD2(0, 0.1), size: Playground.canvasSize,
-                                                            z: Playground.canvasZ + 0.0015)
+    @ObservationIgnored private let paintLayer: PaintLayer
     @ObservationIgnored private let timelapse = TimelapseRecorder()
     @ObservationIgnored private var frameDT: Float = 1.0 / 60.0
     @ObservationIgnored private var lastGurgle: [Int: Double] = [:]
     @ObservationIgnored private var flashCounter = 0
     @ObservationIgnored private var shake: Float = 0
-    @ObservationIgnored private let canvasNode = SCNNode()
-    @ObservationIgnored private var canvasBoard: SCNNode?
-    @ObservationIgnored private var studioLights: [SCNNode] = []
     /// Movement stats of the current canvas session (camera hands and body only).
     @ObservationIgnored private var recorder = SessionRecorder()
 
     // Layout (see `CanvasLayout`)
-    @ObservationIgnored private var canvasLayout = CanvasLayout()
     static let canvasSize = CanvasLayout.canvasSize
     static let canvasZ = CanvasLayout.canvasZ
     static let shelfX = CanvasLayout.shelfX
@@ -100,7 +96,13 @@ final class Playground {
     @ObservationIgnored private var pointerPrevious: SIMD2<Float>?
 
     init() {
-        buildWorld()
+        let effects = Effects(scene: SCNScene())
+        let paintLayer = PaintLayer(center: CanvasLayout.canvasCenter, size: CanvasLayout.canvasSize,
+                                    z: CanvasLayout.canvasZ + 0.0015)
+        self.effects = effects
+        self.paintLayer = paintLayer
+        easel = EaselScene(scene: effects.scene, paint: paintLayer.node)
+        addBuddies()
         frameDriver.onFrame = { [weak self] dt in self?.tick(dt: Float(dt)) }
     }
 
@@ -118,146 +120,33 @@ final class Playground {
         audio.setMuted(!musicOn)
     }
 
-    // MARK: - World building
+    // Lighting knobs, kept here for the timelapse replay (see `EaselScene`).
+    static let keyIntensity = EaselScene.keyIntensity
+    static let fillIntensity = EaselScene.fillIntensity
+    static let environmentIntensity = EaselScene.environmentIntensity
+    static let keyPosition = EaselScene.keyPosition
+    static let keyTarget = EaselScene.keyTarget
+    static let keyInnerAngle = EaselScene.keyInnerAngle
+    static let keyOuterAngle = EaselScene.keyOuterAngle
 
-    // Lighting knobs. Brightness: keyIntensity, fillIntensity, environmentIntensity, exposureOffset (EV, lower is darker).
-    // Direction: keyPosition (x left/right, y up, z toward the camera) and keyTarget (the point it aims at).
-    // Spread: keyInnerAngle/keyOuterAngle (wider is more even, narrower is a vignette).
-    static let keyIntensity: CGFloat = 300
-    static let fillIntensity: CGFloat = 220
-    static let environmentIntensity: CGFloat = 0.7
-    private static let exposureOffset: CGFloat = -0.5
-    static let keyPosition = SIMD3<Float>(0, 7, 6)
-    static let keyTarget = SIMD3<Float>(0, 0, 0)
-    static let keyInnerAngle: CGFloat = 70
-    static let keyOuterAngle: CGFloat = 110
-
-    private func buildWorld() {
-        // A painter's studio: soft window light in an out-of-focus room.
-        scene.background.contents = Studio.backdrop()
-        scene.background.intensity = 1.7          // the room photo, brought up to the camera's exposure
-        scene.lightingEnvironment.contents = Studio.environment()
-        scene.lightingEnvironment.intensity = Self.environmentIntensity
-
-        let camera = SCNCamera()
-        camera.fieldOfView = 34
-        camera.zNear = 0.1
-        camera.zFar = 50
-        // Photographic look: tone-mapped HDR, contact shadows, a soft lens vignette and a hint of bloom.
-        camera.wantsHDR = true
-        camera.wantsExposureAdaptation = false
-        camera.exposureOffset = Self.exposureOffset
-        camera.minimumExposure = -2
-        camera.maximumExposure = 2
-        camera.screenSpaceAmbientOcclusionIntensity = 0   // no contact shadows under the pots and brush animals
-        camera.vignettingIntensity = 0.35
-        camera.vignettingPower = 0.9
-        camera.bloomIntensity = 0.12
-        camera.bloomThreshold = 0.95
-        camera.bloomBlurRadius = 8
-        cameraNode.camera = camera
-        cameraNode.simdPosition = SIMD3(0, CanvasLayout.cameraY, canvasLayout.cameraDistance)
-        scene.rootNode.addChildNode(cameraNode)
-
-        // Overhead light from the top centre: a neutral spot that lights the canvas almost evenly (like Splash
-        // Canvas's far lights), with the normal map showing the paint ridges (no cast shadows).
-        let key = SCNLight()
-        key.type = .spot
-        key.intensity = Self.keyIntensity
-        key.color = PlatformColor(red: 1, green: 1, blue: 1, alpha: 1)
-        key.spotInnerAngle = Self.keyInnerAngle
-        key.spotOuterAngle = Self.keyOuterAngle
-        key.attenuationStartDistance = 4
-        key.attenuationEndDistance = 40
-        key.attenuationFalloffExponent = 0
-        key.castsShadow = false
-        key.shadowMode = .deferred
-        key.shadowRadius = 14
-        key.shadowSampleCount = 24
-        key.shadowColor = PlatformColor(red: 0.12, green: 0.1, blue: 0.14, alpha: 0.45)
-        key.shadowMapSize = CGSize(width: 4096, height: 4096)
-        key.zNear = 1
-        key.zFar = 30
-        let keyNode = SCNNode()
-        keyNode.light = key
-        keyNode.simdPosition = Self.keyPosition
-        keyNode.simdLook(at: Self.keyTarget)
-        scene.rootNode.addChildNode(keyNode)
-        studioLights.append(keyNode)
-
-        // Neutral bounce light from the room.
-        let fill = SCNLight()
-        fill.type = .ambient
-        fill.intensity = Self.fillIntensity
-        fill.color = PlatformColor(red: 1, green: 1, blue: 1, alpha: 1)
-        let fillNode = SCNNode()
-        fillNode.light = fill
-        scene.rootNode.addChildNode(fillNode)
-        studioLights.append(fillNode)
-
-        // Stretched linen canvas (deep, like a gallery-wrapped canvas) on a wooden studio easel.
-        let size = Self.canvasSize
-        let linen = Studio.canvasMaterial(repeats: size / Studio.weaveTileSize)
-        let depth: Float = 0.16
-        let board = Toybox.node(SCNBox(width: CGFloat(size.x), height: CGFloat(size.y), length: CGFloat(depth),
-                                       chamferRadius: 0.012), linen, at: SIMD3(0, 0, Self.canvasZ - depth / 2))
-        canvasNode.addChildNode(board)
-        canvasBoard = board
-        // No easel frame: the canvas stands free, with the pot and bubble columns beside it.
-        canvasNode.simdPosition = SIMD3(0, 0.1, 0)
-        scene.rootNode.addChildNode(canvasNode)
-
-        scene.rootNode.addChildNode(paintLayer.node)
-        // Two columns just outside the canvas, so dipping never smears the painting:
-        // paint pots down the right (rub a critter in one to pick up its color),
-        // critter bubbles down the left (rub one to become that brush animal, or to pick up that paint tool).
-        let potColors = Paint.potOrder
-        for (k, colorIndex) in potColors.enumerated() {
-            let pot = PaintPot(colorIndex: colorIndex, at: SIMD3(Self.shelfX, CanvasLayout.columnY(k, of: potColors.count), 0.3))
-            scene.rootNode.addChildNode(pot.root)
-            pots.append(pot)
-        }
-        for (k, tool) in PaintTool.allCases.enumerated() {
-            let y = CanvasLayout.columnY(k, of: PaintTool.allCases.count)
-            critterPots.append(CritterPot(tool: tool, at: SIMD3(-Self.shelfX, y, 0.3)))
-        }
-        for pot in critterPots {
-            scene.rootNode.addChildNode(pot.root)
-            scene.rootNode.addChildNode(pot.residentRoot)
-        }
-
+    private func addBuddies() {
         for slot in 0..<2 {
             let start = SIMD3<Float>(slot == 0 ? -1.2 : 1.2, -0.9, 0.5)
             let buddy = Buddy(slot: slot, colorIndex: buddyColors[slot], kind: .ladybug, start: start)
             scene.rootNode.addChildNode(buddy.critter.root)
             buddies.append(buddy)
         }
-        layout(size: CGSize(width: 1600, height: 1000))
     }
 
     /// Fits the whole canvas and the two columns beside it (paint pots on the right, bubbles on the left) into any
     /// window shape, with a little room around them, so nothing is hidden behind a pot or a bubble.
-    func layout(size: CGSize) {
-        guard size.width > 0, size.height > 0 else { return }
-        canvasLayout.fit(width: Float(size.width), height: Float(size.height))
-        cameraNode.simdPosition = SIMD3(0, CanvasLayout.cameraY, canvasLayout.cameraDistance)
-        placeShelves()
-    }
-
-    /// Stands the paint pots in a column beside the right edge of the canvas and the bubbles beside the left edge.
-    private func placeShelves() {
-        for pot in pots { pot.root.simdPosition.x = Self.shelfX }
-        for pot in critterPots { pot.root.simdPosition.x = -Self.shelfX }
-    }
+    func layout(size: CGSize) { easel.fit(size: size) }
 
     /// Whether `p` (canvas plane) is under a pot or bubble: rubbing one must not paint or erase behind it.
-    func isOverShelf(_ p: SIMD2<Float>) -> Bool {
-        pots.contains { CanvasLayout.touches(p, potAt: $0.root.simdPosition) }
-            || critterPots.contains { CanvasLayout.touches(p, potAt: $0.root.simdPosition) }
-    }
+    func isOverShelf(_ p: SIMD2<Float>) -> Bool { easel.isOverShelf(p) }
 
     /// Visible half-size of the view at depth z.
-    func visibleHalfSize(atZ z: Float) -> SIMD2<Float> { canvasLayout.visibleHalfSize(atZ: z) }
+    func visibleHalfSize(atZ z: Float) -> SIMD2<Float> { easel.layout.visibleHalfSize(atZ: z) }
 
     // MARK: - Input
 
@@ -325,8 +214,8 @@ final class Playground {
             let buddyZ = CanvasLayout.buddyZ(painting: mode == .paint,
                                              brushSize: buddy.critter.usesSizeSlider ? brushSize : nil)
             if buddy.critter.usesSizeSlider { buddy.critter.sizeScale = brushSize }
-            let target = hand.map { canvasLayout.worldPoint($0.position, z: buddyZ) }
-                ?? canvasLayout.idleTarget(slot: buddy.slot, clock: clock, z: buddyZ)
+            let target = hand.map { easel.layout.worldPoint($0.position, z: buddyZ) }
+                ?? easel.layout.idleTarget(slot: buddy.slot, clock: clock, z: buddyZ)
             buddy.critter.update(dt: dt, target: target, visible: true,
                                  painting: mode == .paint || mode == .erase, beatPulse: beatPulse)
 
@@ -373,8 +262,7 @@ final class Playground {
         effects.update(dt: dt)
         shake = max(0, shake - dt * 4)
         let jolt = shake * shake * 0.05
-        cameraNode.simdPosition = SIMD3(Float.random(in: -jolt...jolt), CanvasLayout.cameraY + Float.random(in: -jolt...jolt),
-                                        canvasLayout.cameraDistance)
+        easel.shakeCamera(jolt)
 
         // Music swells with how much you move.
         energy = FrameTiming.energy(energy, movement: movement, dt: dt)
@@ -383,7 +271,7 @@ final class Playground {
         publishHUD(dt: dt, hands: hands, drawing: drawingNow, erasing: erasingNow, rubbing: rubbing)
     }
 
-    private func panFor(_ x: Float) -> Float { canvasLayout.pan(forX: x) }
+    private func panFor(_ x: Float) -> Float { easel.layout.pan(forX: x) }
 
     // MARK: - Painting
 
@@ -478,72 +366,13 @@ final class Playground {
             return nil
         }
         for slot in strokeBook.activeSlots { finishStroke(slot: slot) }
-        guard let photo = photographCanvas() else {
+        guard let photo = easel.photoBooth(paint: paintLayer.node)?.photos() else {
             audio.play(.fizzle)
             return nil
         }
         audio.play(.fanfare)
         for buddy in buddies { buddy.critter.react(.happy, for: 1.2) }
         return photo
-    }
-
-    /// Renders the canvas head-on in a little photo booth: copies of the board and the live paint,
-    /// the studio's own lights, no critters, pots or tracing guide in the way.
-    private func photographCanvas(pixels width: CGFloat = 1920) -> CanvasPhotos? {
-        guard let whole = photograph(board: true, paint: true, pixels: width),
-              let canvas = photograph(board: true, paint: false, pixels: width),
-              let onBlack = photograph(board: false, paint: true, background: .black, pixels: width),
-              let onWhite = photograph(board: false, paint: true, background: .white, pixels: width),
-              let blackLevel = backdropLevel(.black), let whiteLevel = backdropLevel(.white),
-              let paint = PaintMatte.extract(onBlack: onBlack, onWhite: onWhite, blackLevel: blackLevel,
-                                             whiteLevel: whiteLevel, floor: PaintMatte.sheenFloor) else { return nil }
-        return CanvasPhotos(whole: whole, canvas: canvas, paint: paint)
-    }
-
-    /// How bright a plain backdrop comes out in the booth, whose exposure can dim it.
-    private func backdropLevel(_ color: PlatformColor) -> Double? {
-        photograph(board: false, paint: false, background: color, pixels: 16).flatMap(PaintMatte.level)
-    }
-
-    /// One shot of the photo booth. Paint alone goes over a plain `background` (see `PaintMatte`).
-    private func photograph(board showBoard: Bool, paint showPaint: Bool, background: PlatformColor? = nil,
-                            pixels width: CGFloat) -> CGImage? {
-        guard let canvasBoard else { return nil }
-        let booth = SCNScene()
-        if let background { booth.background.contents = background }
-        booth.lightingEnvironment.contents = scene.lightingEnvironment.contents
-        booth.lightingEnvironment.intensity = scene.lightingEnvironment.intensity
-        if showBoard {
-            let board = canvasBoard.clone()
-            board.simdTransform = canvasBoard.simdWorldTransform
-            booth.rootNode.addChildNode(board)
-        }
-        if showPaint { booth.rootNode.addChildNode(paintLayer.node.clone()) }
-        for light in studioLights { booth.rootNode.addChildNode(light.clone()) }
-
-        let size = Self.canvasSize
-        let camera = SCNCamera()
-        camera.usesOrthographicProjection = true
-        camera.orthographicScale = Double(size.y * 0.5 * 0.99)   // a hair inside the chamfered edge
-        camera.zNear = 0.1
-        camera.zFar = 20
-        if let studio = cameraNode.camera {
-            camera.wantsHDR = studio.wantsHDR
-            camera.wantsExposureAdaptation = false
-            camera.exposureOffset = studio.exposureOffset
-            camera.minimumExposure = studio.minimumExposure
-            camera.maximumExposure = studio.maximumExposure
-        }
-        let lens = SCNNode()
-        lens.camera = camera
-        lens.simdPosition = SIMD3(0, 0.1, 5)
-        booth.rootNode.addChildNode(lens)
-
-        let renderer = SCNRenderer(device: MTLCreateSystemDefaultDevice(), options: nil)
-        renderer.scene = booth
-        renderer.pointOfView = lens
-        let pixels = CGSize(width: width, height: width * CGFloat(size.y / size.x))
-        return renderer.snapshot(atTime: 0, with: pixels, antialiasingMode: .multisampling4X).cgImageValue
     }
 
     /// Wipes the paint, strokes and tracing guide off the easel.
