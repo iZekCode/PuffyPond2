@@ -1,8 +1,8 @@
 import SceneKit
 import simd
 
-/// Palette knife: a slow, heavy snail that lays wide, flat sheets of paint with ridged edges and
-/// shoves the wet paint it slides through. Its shell and eye stalks lag and wobble behind it.
+/// Blender: a slow, heavy snail that carries the blender tool (its brush is `PaintTool.blender`) and smudges the
+/// wet paint it slides through. Its shell and eye stalks lag and wobble behind it.
 final class Snail: Critter {
     private let shellPivot = SCNNode()
     private var shellLag = Spring3(.zero)
@@ -84,14 +84,5 @@ final class Snail: Critter {
             let l = stalks[i].lag.value
             stalks[i].pivot.simdEulerAngles = SIMD3(l.y * 1.2, 0, -l.x * 2.2 + (Float(i) * 2 - 1) * -0.15)
         }
-    }
-
-    override func dabs(from a: SIMD2<Float>, to b: SIMD2<Float>, radius: Float, speed: Float) -> [BrushDab] {
-        // The blade lies across the direction of travel: a wide sheet, crisp ridged edges.
-        let d = b - a
-        let angle = simd_length(d) > 1e-5 ? atan2(d.y, d.x) + Float.pi / 2 : Float.pi / 2
-        var style = BrushStyle(push: 0.95, bristles: 0.1, nibAngle: angle, nibAspect: 1.6, knife: 1)
-        style.amount = 0.02 + 0.2 * smoothStep(0.002, 0.02, simd_length(d))
-        return [BrushDab(from: a, to: b, radius: radius * 1.9, speed: speed, style: style)]
     }
 }
