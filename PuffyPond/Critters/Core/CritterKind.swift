@@ -4,18 +4,18 @@ import simd
 /// recordings, so they stay put when a character is removed.
 enum CritterKind: Int, CaseIterable, Equatable {
     case snail = 1
-    case ladybug = 7, butterfly = 8, mushroom = 9
+    case ladybug = 7, butterfly = 8, frog = 10
 
-    /// The cast in tool-column order (butterfly brush, ladybug brush, eraser, blender).
-    static let gardenCast: [CritterKind] = [.butterfly, .ladybug, .mushroom, .snail]
+    /// The cast along the bottom of the canvas, left to right. One character, one colour.
+    static let gardenCast: [CritterKind] = [.ladybug, .butterfly, .frog, .snail]
 
-    /// Its own color while it waits in a critter bubble.
+    /// Its own colour: the only paint it ever lays.
     var signatureColor: SIMD3<Float> {
         switch self {
-        case .snail: return Paint.colors[2]
-        case .ladybug: return Paint.colors[0]
-        case .butterfly: return Paint.colors[1]
-        case .mushroom: return SIMD3(0.98, 0.53, 0.72)
+        case .ladybug: return Paint.colors[0]      // red
+        case .butterfly: return Paint.colors[1]    // blue
+        case .frog: return Paint.colors[4]         // green
+        case .snail: return Paint.colors[3]        // orange
         }
     }
 }

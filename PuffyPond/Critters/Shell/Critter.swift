@@ -7,7 +7,7 @@ extension CritterKind {
         case .snail: return Snail(color: color, at: start)
         case .ladybug: return Ladybug(color: color, at: start)
         case .butterfly: return Butterfly(color: color, at: start)
-        case .mushroom: return Mushroom(color: color, at: start)
+        case .frog: return Frog(color: color, at: start)
         }
     }
 }
@@ -29,8 +29,11 @@ class Critter {
     /// While rubbing a paint pot, the body previews the new color.
     var colorPreview: (color: SIMD3<Float>, amount: Float)?
     var position: Spring3
-    /// Overall size (the little ones sitting in the critter pots are smaller).
+    /// Overall size.
     var sizeScale: Float = 1
+    /// 0 = awake … 1 = fast asleep: eyes closed, colours muted, and all the little motions (bobbing, flapping,
+    /// swaying, the beat) slowed to almost nothing. The characters waiting at the bottom sleep until a buddy comes near.
+    var sleepiness: Float = 0
     var lean = SIMD3<Float>.zero
     var squash = Spring3(SIMD3(1, 1, 1))
     private(set) var presence = Spring1(0)
@@ -142,10 +145,14 @@ class Critter {
 
     // MARK: Per frame
 
-    func update(dt: Float, target: SIMD3<Float>, visible: Bool, painting: Bool, beatPulse: Float) {
+    func update(dt rawDT: Float, target: SIMD3<Float>, visible: Bool, painting: Bool, beatPulse rawBeat: Float) {
+        // Asleep, everything secondary runs at a crawl and the beat doesn't reach it.
+        let pace = 1 - 0.95 * sleepiness
+        let dt = rawDT * pace
+        let beatPulse = rawBeat * (1 - sleepiness)
         clock += dt
         presence.step(to: visible ? 1 : 0, stiffness: 160, damping: 14, dt: dt)
-        position.step(to: target, stiffness: followStiffness, damping: followDamping, dt: dt)
+        position.step(to: target, stiffness: followStiffness, damping: followDamping, dt: rawDT)
         let v = position.velocity
 
         let leanGoal = SIMD3(max(-0.45, min(0.45, -v.y * 0.1)),
@@ -167,6 +174,7 @@ class Critter {
 
         var shown = color
         if let preview = colorPreview { shown = mix(color, preview.color, preview.amount) }
+        shown = mix(shown, SIMD3(0.84, 0.82, 0.78), 0.55 * sleepiness)   // muted while asleep
         displayedColor += (shown - displayedColor) * min(1, dt * 10)
         bodyMaterial.diffuse.contents = Paint.platform(displayedColor)
         accentMaterial.diffuse.contents = Paint.platform(displayedColor * (1 - accentLift) + SIMD3(repeating: accentLift))
@@ -175,9 +183,9 @@ class Critter {
             blinkStart = clock
             nextBlink = Float.random(in: 2...5)
         }
-        let lid = Toybox.blinkScale(clock - blinkStart) * (1 - face.squint * 0.8)
-        let gaze = SIMD2(max(-0.8, min(0.8, v.x * 0.3)),
-                         max(-0.8, min(0.8, v.y * 0.3)) + (mood == .surprised ? 0.4 : 0)) + gazeBias
+        let lid = Toybox.blinkScale(clock - blinkStart) * (1 - face.squint * 0.8) * (1 - 0.93 * sleepiness)
+        let gaze = (SIMD2(max(-0.8, min(0.8, v.x * 0.3)),
+                          max(-0.8, min(0.8, v.y * 0.3)) + (mood == .surprised ? 0.4 : 0)) + gazeBias) * (1 - sleepiness)
         for (i, eye) in eyes.enumerated() {
             eye.root.simdScale = SIMD3(face.eyeScale, lid * face.eyeScale, 1)
             eye.pupil.isHidden = face.squint > 0.6
@@ -194,7 +202,7 @@ class Critter {
         }
 
         let scale = currentScale * (painting ? 1.08 : 1)
-        bodyNode.simdPosition = position.value + SIMD3(0, bob, 0)
+        bodyNode.simdPosition = position.value + SIMD3(0, bob * (1 - sleepiness), 0)
         bodyNode.simdScale = SIMD3(repeating: scale)
         if facesMotion {
             leanNode.simdOrientation = headingOrientation * Self.orientation(euler: lean)

@@ -9,25 +9,19 @@ struct HandControlTests {
     }
 
     @Test func openHandNeverPaints() {
-        for tool in PaintTool.allCases {
-            #expect(BuddyMode.mode(for: .open, tool: tool) == .roam)
-        }
-        #expect(BuddyMode.mode(for: nil, tool: .brush) == .idle)
+        #expect(BuddyMode.mode(for: .open) == .roam)
+        #expect(BuddyMode.mode(for: nil) == .idle)
     }
 
-    @Test func fistPaintsWithCurrentTool() {
-        for tool in PaintTool.allCases where tool != .eraser {
-            #expect(BuddyMode.mode(for: .fist, tool: tool) == .paint)
-        }
-        #expect(BuddyMode.mode(for: .fist, tool: .eraser) == .erase)
+    @Test func fistPaintsWithTheCharactersBrush() {
+        #expect(BuddyMode.mode(for: .fist) == .paint)
 
-        // The paint itself comes from the tool.
+        // The paint itself comes from the character.
         let a = SIMD2<Float>(0, 0), b = SIMD2<Float>(0.1, 0)
-        let wing = PaintTool.wingBrush.dabs(from: a, to: b, radius: 0.085, speed: 1)
-        #expect(!wing.isEmpty && wing.allSatisfy { $0.style.nca == 1 && $0.style.runs == 0 })
-        let blend = PaintTool.blender.dabs(from: a, to: b, radius: 0.085, speed: 1)
-        #expect(!blend.isEmpty && blend.allSatisfy { $0.style.blend == 1 && $0.style.amount == 0 })
-        #expect(PaintTool.eraser.dabs(from: a, to: b, radius: 0.085, speed: 1).isEmpty)
+        for tool in PaintTool.allCases {
+            let dabs = tool.dabs(from: a, to: b, radius: 0.085, speed: 1)
+            #expect(!dabs.isEmpty && dabs.allSatisfy { $0.style.nca == 1 && $0.style.runs == 0 }, "\(tool)")
+        }
     }
 
     @Test func fistEntersAfterTwoFramesAndLeavesAfterThree() {

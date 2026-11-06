@@ -1,8 +1,8 @@
 import SceneKit
 import simd
 
-/// The studio around the easel: the camera, the lights, the linen canvas, and the paint pot and critter bubble
-/// columns beside it. The camera backs off until all of it fits the window (see `CanvasLayout`).
+/// The scene: the camera, the lights, the linen canvas (which fills the whole window) and the four characters
+/// floating along its bottom edge (see `CanvasLayout`).
 final class EaselScene {
     // Lighting knobs. Brightness: keyIntensity, fillIntensity, environmentIntensity, exposureOffset (EV, lower is darker).
     // Direction: keyPosition (x left/right, y up, z toward the camera) and keyTarget (the point it aims at).
@@ -18,8 +18,7 @@ final class EaselScene {
 
     let scene: SCNScene
     let cameraNode = SCNNode()
-    private(set) var pots: [PaintPot] = []
-    private(set) var critterPots: [CritterPot] = []
+    private(set) var perches: [CharacterPerch] = []
     private(set) var layout = CanvasLayout()
     private let canvasNode = SCNNode()
     private var canvasBoard: SCNNode?
@@ -27,9 +26,8 @@ final class EaselScene {
 
     init(scene: SCNScene, paint: SCNNode) {
         self.scene = scene
-        // A painter's studio: soft window light in an out-of-focus room.
-        scene.background.contents = Studio.backdrop()
-        scene.background.intensity = 1.7          // the room photo, brought up to the camera's exposure
+        // The canvas fills the window, so no room around it: a plain linen colour shows if a pixel ever falls outside.
+        scene.background.contents = PlatformColor(red: 0.93, green: 0.92, blue: 0.9, alpha: 1)
         scene.lightingEnvironment.contents = Studio.environment()
         scene.lightingEnvironment.intensity = Self.environmentIntensity
 
@@ -44,7 +42,7 @@ final class EaselScene {
         camera.minimumExposure = -2
         camera.maximumExposure = 2
         camera.screenSpaceAmbientOcclusionIntensity = 0   // no contact shadows under the pots and brush animals
-        camera.vignettingIntensity = 0.35
+        camera.vignettingIntensity = 0
         camera.vignettingPower = 0.9
         camera.bloomIntensity = 0.12
         camera.bloomThreshold = 0.95
@@ -97,56 +95,41 @@ final class EaselScene {
                                        chamferRadius: 0.012), linen, at: SIMD3(0, 0, CanvasLayout.canvasZ - depth / 2))
         canvasNode.addChildNode(board)
         canvasBoard = board
-        // No easel frame: the canvas stands free, with the pot and bubble columns beside it.
         canvasNode.simdPosition = SIMD3(0, 0.1, 0)
         scene.rootNode.addChildNode(canvasNode)
 
         scene.rootNode.addChildNode(paint)
-        // Two columns just outside the canvas, so dipping never smears the painting:
-        // paint pots above the top-right corner and down the right (rub a critter in one to pick up its color),
-        // critter bubbles down the left (rub one to become that brush animal, or to pick up that paint tool).
-        let potColors = Paint.potOrder
-        for (k, colorIndex) in potColors.enumerated() {
-            let spot = CanvasLayout.potPosition(k, of: potColors.count)
-            let pot = PaintPot(colorIndex: colorIndex, at: SIMD3(spot.x, spot.y, CanvasLayout.potZ))
-            scene.rootNode.addChildNode(pot.root)
-            pots.append(pot)
+        // The four characters float in a row along the bottom: rub a buddy over one to become it.
+        for tool in PaintTool.allCases {
+            perches.append(CharacterPerch(tool: tool, at: SIMD3(0, 0, CanvasLayout.characterZ)))
         }
-        for (k, tool) in PaintTool.allCases.enumerated() {
-            let y = CanvasLayout.bubbleY(k, of: PaintTool.allCases.count)
-            critterPots.append(CritterPot(tool: tool, at: SIMD3(-CanvasLayout.bubbleShelfX, y, CanvasLayout.potZ)))
-        }
-        for pot in critterPots {
-            scene.rootNode.addChildNode(pot.root)
-            scene.rootNode.addChildNode(pot.residentRoot)
+        for perch in perches {
+            scene.rootNode.addChildNode(perch.root)
+            scene.rootNode.addChildNode(perch.residentRoot)
         }
 
         fit(size: CGSize(width: 1600, height: 1000))
     }
 
-    /// Fits the whole canvas and the two columns beside it (paint pots on the right, bubbles on the left) into any
-    /// window shape, with a little room around them, so nothing is hidden behind a pot or a bubble.
+    /// Fills any window shape with canvas and lines the four characters up along its bottom edge.
     func fit(size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
         layout.fit(width: Float(size.width), height: Float(size.height))
         cameraNode.simdPosition = SIMD3(0, CanvasLayout.cameraY, layout.cameraDistance)
-        placeShelves()
+        placePerches()
     }
 
-    /// Stands the paint pots in a column beside the right edge of the canvas and the bubbles beside the left edge.
-    private func placeShelves() {
-        for (k, pot) in pots.enumerated() {
-            let spot = CanvasLayout.potPosition(k, of: pots.count)
-            pot.root.simdPosition.x = spot.x
-            pot.root.simdPosition.y = spot.y
+    private func placePerches() {
+        let slots = layout.characterSlots(count: perches.count)
+        for (perch, slot) in zip(perches, slots) {
+            perch.root.simdPosition.x = slot.x
+            perch.root.simdPosition.y = slot.y
         }
-        for pot in critterPots { pot.root.simdPosition.x = -CanvasLayout.bubbleShelfX }
     }
 
-    /// Whether `p` (canvas plane) is under a pot or bubble: rubbing one must not paint or erase behind it.
+    /// Whether `p` (canvas plane) is under a waiting character: rubbing one must not paint behind it.
     func isOverShelf(_ p: SIMD2<Float>) -> Bool {
-        pots.contains { CanvasLayout.touches(p, potAt: $0.root.simdPosition) }
-            || critterPots.contains { CanvasLayout.touches(p, potAt: $0.root.simdPosition, radius: CanvasLayout.bubbleRadius) }
+        perches.contains { CanvasLayout.touches(p, characterAt: $0.root.simdPosition) }
     }
 
     /// Puts the camera back at rest, nudged up to `jolt` in a random direction (the shake after a pop).

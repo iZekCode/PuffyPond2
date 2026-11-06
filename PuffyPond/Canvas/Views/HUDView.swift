@@ -1,7 +1,8 @@
 import SwiftUI
 import AVFoundation
 
-/// Light, friendly overlay: a hint bubble, camera preview, and a few buttons.
+/// The overlay on the full-screen canvas: a settings menu (top left), the eye that shows the camera's view of the
+/// player (top right), and the tracing direction while an outline is on the canvas. No titles or hint bubbles.
 struct HUDView: View {
     @Bindable var playground: Playground
     let previewLayer: CameraPreviewLayer
@@ -9,59 +10,56 @@ struct HUDView: View {
     let goHome: () -> Void
 
     @Environment(\.uiScale) private var scale
-    @State private var confirmingHome = false
+    @State private var showingSettings = false
     @State private var showingVoiceSettings = false
-
-    /// The iPad is wide and short: the title and the two buddy chips share one row so the hint fits
-    /// in the free strip above the canvas.
-    private var onePieceHeader: Bool { Platform.isPad }
+    @State private var confirmingHome = false
+    @State private var confirmingRestart = false
 
     var body: some View {
         ZStack {
-            if !playground.focusMode {
-                VStack(spacing: 10 * scale) {
-                    if onePieceHeader {
-                        HStack(alignment: .center, spacing: 24 * scale) {
-                            colorChip(slot: 0).frame(maxWidth: .infinity, alignment: .trailing)
-                            title
-                            colorChip(slot: 1).frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .padding(.horizontal, 24 * scale)
-                        hintBubble
-                        guideBubble
-                    } else {
-                        title
-                        hintBubble
-                        guideBubble
-                        colorChips
-                    }
-                    Spacer()
-                }
-                .padding(.top, (onePieceHeader ? 8 : 14) * scale)
-                .frame(maxWidth: .infinity)
-                .allowsHitTesting(false)
-
-                VStack {
-                    Spacer()
-                    HStack(alignment: .bottom) {
-                        if playground.showCameraPreview && playground.cameraStatus == .running {
-                            cameraPreview
-                        }
-                        Spacer()
-                        controls
-                    }
-                }
-                .padding(16 * scale)
-
-                if playground.showGuide {
-                    GuideCard { withAnimation(.easeOut(duration: 0.3)) { playground.showGuide = false } }
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                }
-                if playground.cameraStatus == .denied || playground.cameraStatus == .unavailable {
-                    CameraNotice(denied: playground.cameraStatus == .denied)
-                }
+            // Guide text for the dotted outline (only while tracing).
+            VStack {
+                guideBubble
+                Spacer()
             }
-            focusButton
+            .padding(.top, 16 * scale)
+            .frame(maxWidth: .infinity)
+            .allowsHitTesting(false)
+
+            // Top left: settings.
+            VStack {
+                HStack {
+                    settingsButton
+                    Spacer()
+                }
+                Spacer()
+            }
+            .padding(16 * scale)
+
+            // Top right: the eye, and the camera's view under it.
+            VStack(alignment: .trailing, spacing: 10 * scale) {
+                HStack {
+                    Spacer()
+                    RoundButton(symbol: playground.showCameraPreview ? "eye.fill" : "eye.slash.fill",
+                                tint: playground.showCameraPreview ? .teal : .gray) {
+                        withAnimation(.easeInOut(duration: 0.2)) { playground.showCameraPreview.toggle() }
+                    }
+                }
+                if playground.showCameraPreview && playground.cameraStatus == .running {
+                    cameraPreview.transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .topTrailing)))
+                }
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(16 * scale)
+
+            if playground.showGuide {
+                GuideCard { withAnimation(.easeOut(duration: 0.3)) { playground.showGuide = false } }
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            }
+            if playground.cameraStatus == .denied || playground.cameraStatus == .unavailable {
+                CameraNotice(denied: playground.cameraStatus == .denied)
+            }
         }
         .confirmationDialog("Keluar tanpa menyimpan?", isPresented: $confirmingHome, titleVisibility: .visible) {
             Button("Keluar", role: .destructive, action: goHome)
@@ -69,54 +67,125 @@ struct HUDView: View {
         } message: {
             Text("Lukisan ini belum disimpan.")
         }
-    }
-
-    private var title: some View {
-        Text("Puffy Pond")
-            .font(.system(size: 30 * scale, weight: .black, design: .rounded))
-            .foregroundStyle(
-                LinearGradient(colors: [Color(red: 1, green: 0.45, blue: 0.3),
-                                        Color(red: 0.95, green: 0.35, blue: 0.65),
-                                        Color(red: 0.4, green: 0.55, blue: 1)],
-                               startPoint: .leading, endPoint: .trailing))
-            .shadow(color: .white, radius: 0, x: 0, y: 2)
-            .shadow(color: .black.opacity(0.15), radius: 6, y: 3)
-            .fixedSize()
-    }
-
-    // MARK: Hint
-
-    private var hintContent: (symbol: String, text: String) {
-        switch playground.hint {
-        case .starting: return ("camera.fill", "Membangunkan kamera…")
-        case .raiseHands: return ("hand.raised.fill", "Angkat kedua tanganmu — satu teman cat akan mengikuti setiap tangan")
-        case .roaming: return ("hand.raised.fill", "Kepalkan tangan untuk melukis · gosok pot untuk ganti warna, gosok gelembung untuk alat baru")
-        case .pickingColor: return ("drop.fill", "Gosok, gosok, gosok! Geser melewati pot supaya warnanya meresap")
-        case .drawing: return ("paintbrush.pointed.fill", "Wuuss! Tetap kepalkan tanganmu dan ayunkan lenganmu")
-        case .erasing: return ("cloud.fill", "Pof jamur! Tetap kepalkan tanganmu untuk meniup cat sampai hilang")
-        case .readyToHang: return ("photo.artframe", "Sudah selesai? Ketuk Simpan gambar")
-        case .tracing: return ("scribble.variable", "Kepalkan tangan dan ikuti garis putus-putus · jamur akan meniupnya hilang")
-        case .touchMode: return ("hand.draw.fill", "Seret untuk menggambar · ketuk Simpan gambar kalau sudah selesai")
+        .confirmationDialog("Ulangi kanvas?", isPresented: $confirmingRestart, titleVisibility: .visible) {
+            Button("Ulangi", role: .destructive) { playground.clearAll() }
+            Button("Batal", role: .cancel) {}
+        } message: {
+            Text("Semua cat di kanvas akan dihapus.")
         }
     }
 
-    private var hintBubble: some View {
-        HStack(spacing: 10 * scale) {
-            Image(systemName: hintContent.symbol)
-                .font(.system(size: 16 * scale, weight: .bold))
-                .symbolEffect(.bounce, value: playground.hint)
-                .frame(width: 30 * scale, height: 30 * scale)
-            Text(hintContent.text)
-                .font(.system(size: 17 * scale, weight: .bold, design: .rounded))
+    // MARK: Settings
+
+    private var settingsButton: some View {
+        RoundButton(symbol: "gearshape.fill", tint: .indigo) { showingSettings.toggle() }
+            .popover(isPresented: $showingSettings, arrowEdge: .top) { settingsPanel }
+    }
+
+    /// Grouped from what you tweak most to what leaves the page: size, sound, canvas, help, and last of all quit.
+    private var settingsPanel: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Pengaturan")
+                .font(.system(size: 22, weight: .black, design: .rounded))
+
+            settingsGroup("Kuas") {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Label("Ukuran karakter", systemImage: "slider.horizontal.3")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                        Spacer()
+                        Text(String(format: "%.1f×", playground.brushSize))
+                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack(spacing: 8) {
+                        Image(systemName: "circle.fill").font(.system(size: 7)).foregroundStyle(.secondary)
+                        Slider(value: $playground.brushSize, in: Playground.brushSizeRange)
+                        Image(systemName: "circle.fill").font(.system(size: 17)).foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            settingsGroup("Suara") {
+                Toggle(isOn: Binding(get: { playground.musicOn }, set: { _ in playground.toggleMusic() })) {
+                    Label("Musik & efek suara", systemImage: playground.musicOn ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                }
+                if playground.guideText != nil {
+                    Toggle(isOn: Binding(get: { playground.guideVoiceOn }, set: { _ in playground.toggleGuideVoice() })) {
+                        Label("Suara arahan", systemImage: "megaphone.fill")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                    }
+                    if playground.guideVoiceOn {
+                        actionRow("Atur suara arahan", symbol: "waveform", tint: .purple) { showingVoiceSettings.toggle() }
+                            .popover(isPresented: $showingVoiceSettings) { GuideVoicePanel(voice: playground.voice) }
+                    }
+                }
+            }
+
+            settingsGroup("Kanvas") {
+                actionRow("Simpan gambar", symbol: "photo.artframe", tint: .pink, enabled: playground.hasDrawing) {
+                    showingSettings = false
+                    saveImage()
+                }
+                actionRow("Ulangi kanvas", symbol: "arrow.counterclockwise", tint: .orange, enabled: playground.hasDrawing) {
+                    showingSettings = false
+                    confirmingRestart = true
+                }
+            }
+
+            settingsGroup("Bantuan") {
+                actionRow("Panduan", symbol: "questionmark.circle.fill", tint: .blue) {
+                    showingSettings = false
+                    withAnimation { playground.showGuide = true }
+                }
+            }
+
+            actionRow("Keluar ke beranda", symbol: "house.fill", tint: .red) {
+                showingSettings = false
+                if playground.hasDrawing { confirmingHome = true } else { goHome() }
+            }
         }
-        .padding(.horizontal, 18 * scale)
-        .padding(.vertical, 10 * scale)
-        .background(.white.opacity(0.85), in: Capsule())
-        .overlay(Capsule().stroke(.white, lineWidth: 2))
-        .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
         .foregroundStyle(Color(red: 0.25, green: 0.2, blue: 0.35))
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: playground.hint)
+        .padding(20)
+        .frame(width: 320)
+        #if os(iOS)
+        .presentationCompactAdaptation(.popover)
+        #endif
     }
+
+    private func settingsGroup<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title.uppercased())
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 12) { content() }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+    }
+
+    private func actionRow(_ title: String, symbol: String, tint: Color, enabled: Bool = true,
+                           action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: symbol)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .background(tint.gradient, in: Circle())
+                Text(title).font(.system(size: 15, weight: .bold, design: .rounded))
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.4)
+    }
+
+    // MARK: Tracing direction
 
     /// What to do next along the dotted outline, in words. Stays on screen when the spoken directions are muted.
     @ViewBuilder
@@ -137,138 +206,10 @@ struct HUDView: View {
         }
     }
 
-    // MARK: Buddy colors
-
-    /// Each buddy's current paint and brush animal, so it's always clear what you'll draw with.
-    private var colorChips: some View {
-        HStack(spacing: 10 * scale) {
-            colorChip(slot: 0)
-            colorChip(slot: 1)
-        }
-    }
-
-    private func colorChip(slot: Int) -> some View {
-        let index = slot < playground.buddyColors.count ? playground.buddyColors[slot] : slot
-        let colorName = Paint.names[index % Paint.names.count]
-        let tool = slot < playground.buddyTools.count ? playground.buddyTools[slot] : .brush
-        let symbol = tool.symbol
-        let label = tool.usesColor ? "\(tool.name) \(colorName)" : tool.name
-        var tint = Paint.swiftUI(Paint.colors[index % Paint.colors.count])
-        if !tool.usesColor { tint = Color(red: 0.55, green: 0.5, blue: 0.7) }
-        return HStack(spacing: 8 * scale) {
-            Image(systemName: symbol)
-                .font(.system(size: 15 * scale, weight: .bold))
-            Text(label)
-                .font(.system(size: 14 * scale, weight: .heavy, design: .rounded))
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 12 * scale)
-        .padding(.vertical, 7 * scale)
-        .background(tint.gradient, in: Capsule())
-        .overlay(Capsule().stroke(.white, lineWidth: 2))
-        .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
-        .symbolEffect(.bounce, value: index)
-        .symbolEffect(.bounce, value: tool)
-        .phaseAnimator([1.0, 1.18, 1.0], trigger: index) { view, scale in
-            view.scaleEffect(scale)
-        } animation: { _ in .spring(response: 0.22, dampingFraction: 0.5) }
-        .animation(.easeInOut(duration: 0.25), value: index)
-    }
-
-    // MARK: Controls
-
-    /// The eye: hides the HUD so only the canvas, the pots, the bubbles and the brush characters show. It stays on
-    /// screen, faded, to bring the HUD back. (Faded with colors: view opacity below 1 stops it taking clicks over the 3D view.)
-    private var focusButton: some View {
-        VStack {
-            Spacer()
-            HStack {
-                Spacer()
-                RoundButton(symbol: playground.focusMode ? "eye.slash.fill" : "eye.fill", tint: .gray, faded: playground.focusMode) {
-                    withAnimation(.easeInOut(duration: 0.25)) { playground.focusMode.toggle() }
-                }
-            }
-        }
-        .padding(16 * scale)
-    }
-
-    private var controls: some View {
-        HStack(spacing: 10 * scale) {
-            brushSizeSlider
-            RoundButton(symbol: "house.fill", tint: .green) {
-                if playground.hasDrawing { confirmingHome = true } else { goHome() }
-            }
-            #if os(iOS)
-            RoundButton(symbol: playground.pointerErases ? "cloud.fill" : "paintbrush.pointed.fill",
-                        tint: playground.pointerErases ? .orange : .blue) {
-                playground.pointerErases.toggle()
-            }
-            #endif
-            RoundButton(symbol: playground.musicOn ? "speaker.wave.2.fill" : "speaker.slash.fill", tint: .purple) {
-                playground.toggleMusic()
-            }
-            if playground.guideText != nil {
-                RoundButton(symbol: playground.guideVoiceOn ? "megaphone.fill" : "megaphone",
-                            tint: playground.guideVoiceOn ? .orange : .gray) {
-                    playground.toggleGuideVoice()
-                }
-                if playground.guideVoiceOn {
-                    RoundButton(symbol: "slider.horizontal.3", tint: .purple) { showingVoiceSettings.toggle() }
-                        .popover(isPresented: $showingVoiceSettings) { GuideVoicePanel(voice: playground.voice) }
-                }
-            }
-            RoundButton(symbol: playground.showCameraPreview ? "video.fill" : "video.slash.fill", tint: .teal) {
-                playground.showCameraPreview.toggle()
-            }
-            RoundButton(symbol: "questionmark", tint: .indigo) {
-                withAnimation { playground.showGuide = true }
-            }
-            RoundButton(symbol: "arrow.counterclockwise", tint: .red) { playground.clearAll() }
-            if playground.hasDrawing {
-                saveButton.transition(.scale.combined(with: .opacity))
-            }
-        }
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: playground.hasDrawing)
-        .padding(.trailing, 56 * scale)   // room for the eye button
-    }
-
-    /// How big the ladybug is: bigger paints a wider stroke.
-    private var brushSizeSlider: some View {
-        HStack(spacing: 8 * scale) {
-            Image(systemName: "circle.fill").font(.system(size: 8 * scale)).foregroundStyle(.secondary)
-            Slider(value: $playground.brushSize, in: Playground.brushSizeRange)
-                .frame(width: 130 * scale)
-            Image(systemName: "circle.fill").font(.system(size: 20 * scale)).foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 14 * scale)
-        .frame(height: 46 * scale)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().stroke(.white, lineWidth: 2.5))
-    }
-
-    private var saveButton: some View {
-        Button(action: saveImage) {
-            HStack(spacing: 8 * scale) {
-                Image(systemName: "photo.artframe")
-                    .font(.system(size: 18 * scale, weight: .bold))
-                Text("Simpan gambar")
-                    .font(.system(size: 18 * scale, weight: .heavy, design: .rounded))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 18 * scale)
-            .frame(height: 46 * scale)
-            .background(Color.pink.gradient, in: Capsule())
-            .overlay(Capsule().stroke(.white, lineWidth: 2.5))
-            .shadow(color: Color.pink.opacity(0.4), radius: 6, y: 3)
-        }
-        .buttonStyle(.plain)
-    }
-
     // MARK: Camera preview
 
     private var cameraPreview: some View {
-        // The strip under the canvas on a landscape iPad is short, so the preview is too.
-        let height: CGFloat = Platform.isPad ? 88 : 110
+        let height: CGFloat = (Platform.isPad ? 110 : 120) * scale
         let width = height * max(playground.imageAspect, 0.3)
         return ZStack {
             CameraPreview(previewLayer: previewLayer)
@@ -413,17 +354,17 @@ private struct GuideCard: View {
 
     private let rows: [Row] = [
         Row(symbol: "hand.raised.fill", color: .orange, title: "Tangan terbuka = bergerak",
-            detail: "Setiap tangan punya teman cat yang mengikutimu ke mana-mana. Tangan terbuka tidak pernah melukis."),
+            detail: "Setiap tangan punya satu teman cat yang mengikutimu ke mana-mana. Tangan terbuka tidak pernah melukis."),
         Row(symbol: "paintbrush.pointed.fill", color: .blue, title: "Kepalan = melukis",
             detail: "Kepalkan tanganmu lalu ayunkan lenganmu. Buka tangan untuk berhenti."),
-        Row(symbol: "drop.fill", color: .mint, title: "Gosok pot cat = warna baru",
-            detail: "Geser temanmu bolak-balik melewati pot di sebelah kanan sampai warnanya meresap."),
-        Row(symbol: "sparkles", color: .indigo, title: "Gosok gelembung = alat baru",
-            detail: "Kuas kupu-kupu (biru, hijau, ungu), kuas kepik (merah, jingga, kuning), penghapus jamur, pencampur siput."),
-        Row(symbol: "cloud.fill", color: .pink, title: "Jamur = penghapus",
-            detail: "Pilih gelembung jamur lalu kepalkan tangan untuk meniup cat sampai hilang. Garis putus-putusnya tetap ada."),
+        Row(symbol: "sparkles", color: .green, title: "Satu teman, satu warna",
+            detail: "Kepik merah, kupu-kupu biru, katak hijau, dan siput jingga. Gosok temanmu di atas salah satunya untuk berganti."),
+        Row(symbol: "gearshape.fill", color: .indigo, title: "Pengaturan di pojok kiri atas",
+            detail: "Atur ukuran, suara, ulangi kanvas, simpan gambar, atau keluar."),
+        Row(symbol: "eye.fill", color: .teal, title: "Mata di pojok kanan atas",
+            detail: "Lihat dirimu lewat kamera depan untuk memastikan tanganmu terlihat."),
         Row(symbol: "photo.artframe", color: .purple, title: "Sudah selesai? Simpan!",
-            detail: "Ketuk Simpan gambar untuk melihatnya dulu, lalu gantung di galeri supaya para hewan bisa mengaguminya."),
+            detail: "Buka Pengaturan lalu pilih Simpan gambar untuk melihatnya dulu, lalu gantung di galeri."),
     ]
 
     var body: some View {

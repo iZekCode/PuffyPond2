@@ -134,7 +134,7 @@ struct PlaygroundView: NSViewRepresentable {
     func updateNSView(_ nsView: PlaygroundSCNView, context: Context) {}
 }
 
-/// Mouse drag paints with the left buddy (hold ⌥ or right-drag to erase).
+/// Mouse drag paints with the left buddy.
 final class PlaygroundSCNView: SCNView {
     weak var playground: Playground?
 
@@ -154,24 +154,11 @@ final class PlaygroundSCNView: SCNView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        playground?.pointerErases = event.modifierFlags.contains(.option)
         playground?.pointerBegan(normalized(event))
     }
 
     override func mouseDragged(with event: NSEvent) { playground?.pointerMoved(normalized(event)) }
     override func mouseUp(with event: NSEvent) { playground?.pointerEnded() }
-
-    override func rightMouseDown(with event: NSEvent) {
-        playground?.pointerErases = true
-        playground?.pointerBegan(normalized(event))
-    }
-
-    override func rightMouseDragged(with event: NSEvent) { playground?.pointerMoved(normalized(event)) }
-
-    override func rightMouseUp(with event: NSEvent) {
-        playground?.pointerEnded()
-        playground?.pointerErases = false
-    }
 }
 
 /// Shows the tracker's shared camera layer. Only one host holds it at a time: the newest one takes it.
@@ -224,7 +211,7 @@ struct PlaygroundView: UIViewRepresentable {
     func updateUIView(_ uiView: PlaygroundSCNView, context: Context) {}
 }
 
-/// One finger paints with the left buddy; the HUD toggles erasing.
+/// One finger paints with the left buddy.
 final class PlaygroundSCNView: SCNView {
     weak var playground: Playground?
 

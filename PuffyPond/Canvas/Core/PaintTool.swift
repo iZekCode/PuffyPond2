@@ -1,53 +1,51 @@
 import simd
 
-/// The four paint characters of the fist controls. Each one is its own animal and paints its own way. The
-/// butterfly and the ladybug are both brushes; they differ in their colours (`Paint.palette(for:)`).
+/// The four paint characters. Each one is its own animal with its own single colour and paints its own way.
 enum PaintTool: Int, CaseIterable, Equatable {
-    case wingBrush, brush, eraser, blender
+    case ladybug, butterfly, frog, snail
 
     var name: String {
         switch self {
-        case .wingBrush: return "Kuas sayap"
-        case .brush: return "Kuas"
-        case .eraser: return "Penghapus"
-        case .blender: return "Pencampur"
-        }
-    }
-
-    var symbol: String {
-        switch self {
-        case .wingBrush: return "paintbrush.fill"
-        case .brush: return "paintbrush.pointed.fill"
-        case .eraser: return "star.fill"
-        case .blender: return "tornado"
+        case .ladybug: return "Kepik"
+        case .butterfly: return "Kupu-kupu"
+        case .frog: return "Katak"
+        case .snail: return "Siput"
         }
     }
 
     /// The critter that carries this tool.
     var critterKind: CritterKind {
         switch self {
-        case .wingBrush: return .butterfly
-        case .brush: return .ladybug
-        case .eraser: return .mushroom
-        case .blender: return .snail
+        case .ladybug: return .ladybug
+        case .butterfly: return .butterfly
+        case .frog: return .frog
+        case .snail: return .snail
         }
     }
 
-    /// Eraser and blender lay no paint of their own, so the paint pots don't matter to them.
-    var usesColor: Bool { self != .eraser && self != .blender }
+    /// The character's one colour: an index into `Paint.colors` (red, blue, green, orange).
+    var colorIndex: Int {
+        switch self {
+        case .ladybug: return 0
+        case .butterfly: return 1
+        case .frog: return 4
+        case .snail: return 3
+        }
+    }
+
+    var color: SIMD3<Float> { Paint.colors[colorIndex] }
 
     /// Paint for this frame's segment a → b of the character's path across the canvas.
+    /// (The ladybug paints with its legs too, so the playground asks the critter itself for its dabs.)
     func dabs(from a: SIMD2<Float>, to b: SIMD2<Float>, radius: Float, speed: Float) -> [BrushDab] {
         switch self {
-        case .wingBrush:
-            // The butterfly's brush: one round, textured stroke, a touch broader than a single limb.
-            return [BrushDab(from: a, to: b, radius: radius * 1.15, speed: speed, style: .wash)]
-        case .brush:
+        case .ladybug, .frog:
             return [BrushDab(from: a, to: b, radius: radius, speed: speed, style: .wash)]
-        case .eraser:
-            return []
-        case .blender:
-            return [BrushDab(from: a, to: b, radius: radius * 1.6, speed: speed, style: .blend)]
+        case .butterfly:
+            // Round, textured stroke, a touch broader than a single limb.
+            return [BrushDab(from: a, to: b, radius: radius * 1.15, speed: speed, style: .wash)]
+        case .snail:
+            return [BrushDab(from: a, to: b, radius: radius * 1.3, speed: speed, style: .wash)]
         }
     }
 }

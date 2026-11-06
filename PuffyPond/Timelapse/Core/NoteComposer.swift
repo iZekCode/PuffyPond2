@@ -10,6 +10,7 @@ enum NoteTimbre: Int, CaseIterable {
         case .butterfly: self = .bell
         case .ladybug: self = .pluck
         case .snail: self = .marimba
+        case .frog: self = .xylophone
         default: self = .xylophone
         }
     }

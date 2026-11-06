@@ -5,21 +5,19 @@ import simd
 @testable import PuffyPond
 
 @MainActor
-struct FocusModeTests {
+struct CanvasSceneTests {
     private func makePlayground() -> Playground {
         let playground = Playground()
         playground.layout(size: CGSize(width: 1600, height: 1000))
         return playground
     }
 
-    @Test func focusModeKeepsThePotsAndBubbles() {
+    @Test func fourCharactersWaitAlongTheBottom() {
         let playground = makePlayground()
-        playground.focusMode = true
-        #expect(playground.pots.count == 6 && playground.pots.allSatisfy { !$0.root.isHidden })
-        #expect(playground.critterPots.count == 4)
-        #expect(playground.critterPots.allSatisfy { !$0.root.isHidden && !$0.residentRoot.isHidden })
-        let pot = playground.pots[0].root.simdPosition
-        #expect(playground.isOverShelf(SIMD2(pot.x, pot.y)))
+        #expect(playground.perches.count == 4)
+        #expect(playground.perches.allSatisfy { !$0.root.isHidden && !$0.residentRoot.isHidden })
+        let first = playground.perches[0].root.simdPosition
+        #expect(playground.isOverShelf(SIMD2(first.x, first.y)))
     }
 
     @Test func canvasSceneCastsNoShadows() {
@@ -34,9 +32,8 @@ struct FocusModeTests {
     }
 
     #if os(macOS)
-    /// Clicks the eye over the real 3D view, like the app does: the second click used to fall through to the
-    /// 3D view because the dimmed button had view opacity below 1.
-    @Test func eyeButtonTogglesRepeatedlyOverThe3DView() {
+    /// Clicks the eye over the real 3D view, like the app does: it sits top right and shows or hides the camera view.
+    @Test func eyeButtonTogglesTheCameraViewRepeatedlyOverThe3DView() {
         let playground = makePlayground()
         playground.showGuide = false
         let tracker = HandTracker()
@@ -54,7 +51,7 @@ struct FocusModeTests {
         host.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.3))
 
-        let eye = CGPoint(x: 1600 - 16 - 23, y: 16 + 23)     // bottom right corner
+        let eye = CGPoint(x: 1600 - 16 - 23, y: 1000 - 16 - 23)     // top right corner (AppKit's y points up)
         var states: [Bool] = []
         for _ in 0..<4 {
             for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
@@ -65,9 +62,9 @@ struct FocusModeTests {
                 window.sendEvent(event)
             }
             RunLoop.main.run(until: Date().addingTimeInterval(0.4))
-            states.append(playground.focusMode)
+            states.append(playground.showCameraPreview)
         }
-        #expect(states == [true, false, true, false])
+        #expect(states == [false, true, false, true])
     }
     #endif
 }

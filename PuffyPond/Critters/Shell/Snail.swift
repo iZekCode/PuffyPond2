@@ -1,8 +1,8 @@
 import SceneKit
 import simd
 
-/// Blender: a slow, heavy snail that carries the blender tool (its brush is `PaintTool.blender`) and smudges the
-/// wet paint it slides through. Its shell and eye stalks lag and wobble behind it.
+/// A slow, heavy orange snail: it oozes after your hand and lays a broad wet stroke. Its shell and eye stalks lag
+/// and wobble behind it.
 final class Snail: Critter {
     private let shellPivot = SCNNode()
     private var shellLag = Spring3(.zero)
@@ -61,9 +61,9 @@ final class Snail: Critter {
     override var followStiffness: Float { 38 }
     override var followDamping: Float { 12 }
     override var leanAmount: Float { 0.4 }
-    // Built in profile (facing +x): turn it to face the camera at rest, and back to the side when it moves.
+    // Built in profile (facing +x): it always shows its side, head to the right at rest, and turns to face the way it travels.
     override var facesMotion: Bool { true }
-    override var heading: Heading { Heading(idle: -Float.pi / 2, right: -0.35, left: -Float.pi + 0.35) }
+    override var heading: Heading { Heading(idle: -0.35, right: -0.35, left: -Float.pi + 0.35) }
     override var bob: Float { sin(clock * 1.3) * 0.01 }
 
     override func flare(_ amount: Float) {

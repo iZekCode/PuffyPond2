@@ -11,13 +11,33 @@ struct CanvasLayoutTests {
         return layout
     }
 
-    @Test func canvasAndColumnsFitEveryWindowShape() {
+    @Test func canvasFillsEveryWindowShape() {
         for (w, h) in [(1600, 1000), (1000, 1000), (2400, 1000), (1000, 1600)] as [(Float, Float)] {
             let layout = fitted(w, h)
-            let canvasHalf = layout.visibleHalfSize(atZ: CanvasLayout.canvasZ)
-            #expect(canvasHalf.y >= CanvasLayout.canvasSize.y * 0.5)
-            let columnsHalf = layout.visibleHalfSize(atZ: 0.3)
-            #expect(columnsHalf.x >= CanvasLayout.shelfX + CanvasLayout.potRadius)
+            let half = layout.visibleHalfSize(atZ: CanvasLayout.canvasZ)
+            // The view never shows more than the canvas, and the canvas touches the window edges on the tighter side.
+            #expect(half.x <= CanvasLayout.canvasSize.x * 0.5 + 1e-4)
+            #expect(half.y <= CanvasLayout.canvasSize.y * 0.5 + 1e-4)
+            #expect(abs(half.x - CanvasLayout.canvasSize.x * 0.5) < 1e-3 || abs(half.y - CanvasLayout.canvasSize.y * 0.5) < 1e-3)
+        }
+    }
+
+    @Test func charactersStandInARowAlongTheBottom() {
+        for (w, h) in [(1600, 1000), (1000, 1000), (2400, 1000), (1000, 1600)] as [(Float, Float)] {
+            let layout = fitted(w, h)
+            let slots = layout.characterSlots(count: 4)
+            let view = layout.visibleHalfSize(atZ: CanvasLayout.characterZ)
+            #expect(slots.count == 4)
+            #expect(Set(slots.map(\.y)).count == 1)
+            #expect(slots.map(\.x) == slots.map(\.x).sorted())
+            #expect(abs(slots.map(\.x).reduce(0, +)) < 1e-4)
+            for slot in slots {
+                #expect(abs(slot.x) + CanvasLayout.characterRadius <= view.x + 1e-4)
+                #expect(slot.y < CanvasLayout.cameraY)
+                // The centre is on screen, the lower part tucks below the bottom edge.
+                #expect(slot.y > CanvasLayout.cameraY - view.y)
+                #expect(slot.y - CanvasLayout.characterRadius < CanvasLayout.cameraY - view.y)
+            }
         }
     }
 
@@ -62,7 +82,7 @@ struct CanvasLayoutTests {
         let half = CanvasLayout.canvasSize * 0.5 - SIMD2(repeating: CanvasLayout.strokeRadius)
         let justOver = CanvasLayout.brushPoint(center + SIMD2(half.x + 0.03, 0))
         #expect(justOver == center + SIMD2(half.x, 0))
-        #expect(CanvasLayout.brushPoint(SIMD2(CanvasLayout.shelfX, center.y)) == nil)
+        #expect(CanvasLayout.brushPoint(SIMD2(CanvasLayout.canvasSize.x, center.y)) == nil)
     }
 
     @Test func canvasUVCoversTheCanvasTopDown() {
@@ -72,18 +92,12 @@ struct CanvasLayoutTests {
         #expect(CanvasLayout.canvasUV(topLeft) == SIMD2(0, 0))
         let middle = CanvasLayout.canvasUV(SIMD3(center.x, center.y, 0))
         #expect(middle.map { simd_distance($0, SIMD2(0.5, 0.5)) < 1e-5 } == true)
-        #expect(CanvasLayout.canvasUV(SIMD3(CanvasLayout.shelfX, center.y, 0)) == nil)
+        #expect(CanvasLayout.canvasUV(SIMD3(CanvasLayout.canvasSize.x, center.y, 0)) == nil)
     }
 
-    @Test func columnsAreCentredOnTheCanvas() {
-        let ys = (0..<4).map { CanvasLayout.columnY($0, of: 4) }
-        #expect(abs((ys.first! + ys.last!) / 2 - CanvasLayout.canvasCenter.y) < 1e-5)
-        #expect(ys == ys.sorted(by: >))
-    }
-
-    @Test func touchingAPotNeedsToBeOnIt() {
-        let pot = SIMD3<Float>(CanvasLayout.shelfX, 0.5, 0.3)
-        #expect(CanvasLayout.touches(SIMD2(pot.x, pot.y), potAt: pot))
-        #expect(!CanvasLayout.touches(SIMD2(pot.x - 1, pot.y), potAt: pot))
+    @Test func touchingACharacterNeedsToBeOnIt() {
+        let spot = SIMD3<Float>(0.5, -1.5, CanvasLayout.characterZ)
+        #expect(CanvasLayout.touches(SIMD2(spot.x, spot.y), characterAt: spot))
+        #expect(!CanvasLayout.touches(SIMD2(spot.x - 1.5, spot.y), characterAt: spot))
     }
 }

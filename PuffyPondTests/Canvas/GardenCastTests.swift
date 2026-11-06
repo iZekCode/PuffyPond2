@@ -7,22 +7,28 @@ import simd
 struct GardenCastTests {
     private let hover = SIMD3<Float>(0, 0, Playground.paintHoverZ)
 
-    // MARK: Tool column
+    // MARK: Characters
 
-    @Test func toolColumnHasFourTools() {
-        #expect(PaintTool.allCases == [.wingBrush, .brush, .eraser, .blender])
+    @Test func fourCharactersOneColourEach() {
+        #expect(PaintTool.allCases == [.ladybug, .butterfly, .frog, .snail])
+        #expect(PaintTool.ladybug.color == Paint.colors[0])      // red
+        #expect(PaintTool.butterfly.color == Paint.colors[1])    // blue
+        #expect(PaintTool.frog.color == Paint.colors[4])  // green
+        #expect(PaintTool.snail.color == Paint.colors[3])        // orange
+        #expect(Set(PaintTool.allCases.map(\.colorIndex)).count == 4)
     }
 
     @Test func toolsMapToTheCast() {
-        #expect(PaintTool.wingBrush.critterKind == .butterfly)
-        #expect(PaintTool.brush.critterKind == .ladybug)
-        #expect(PaintTool.eraser.critterKind == .mushroom)
-        #expect(PaintTool.blender.critterKind == .snail)
+        #expect(PaintTool.ladybug.critterKind == .ladybug)
+        #expect(PaintTool.butterfly.critterKind == .butterfly)
+        #expect(PaintTool.frog.critterKind == .frog)
+        #expect(PaintTool.snail.critterKind == .snail)
     }
 
-    @Test func gardenCastIsTheToolColumn() {
+    @Test func gardenCastIsTheCharacterRow() {
         #expect(CritterKind.gardenCast == PaintTool.allCases.map(\.critterKind))
         #expect(CritterKind.gardenCast.count == 4)
+        #expect(CritterKind.gardenCast.map(\.signatureColor) == PaintTool.allCases.map(\.color))
     }
 
     @Test func gardenCastLooksDistinct() {
@@ -50,7 +56,7 @@ struct GardenCastTests {
         #expect(CritterKind.snail.rawValue == 1)
         #expect(CritterKind.ladybug.rawValue == 7)
         #expect(CritterKind.butterfly.rawValue == 8)
-        #expect(CritterKind.mushroom.rawValue == 9)
+        #expect(CritterKind.frog.rawValue == 10)
     }
 
     // MARK: Ladybug (brush)
@@ -77,11 +83,6 @@ struct GardenCastTests {
             #expect(dab.from.x.isFinite && dab.from.y.isFinite && dab.to.x.isFinite && dab.to.y.isFinite)
         }
         #expect(bug.bodyNode.simdPosition.x.isFinite)
-    }
-
-    @Test func limbBrushUsesTheSizeSlider() {
-        #expect(Ladybug(color: Paint.colors[0], at: .zero).usesSizeSlider)
-        #expect(!Snail(color: Paint.colors[0], at: .zero).usesSizeSlider)
     }
 
     @Test func ladybugWingsFlapWithTheBeat() {
@@ -122,41 +123,29 @@ struct GardenCastTests {
         #expect(seen.allSatisfy { $0 >= 0 && $0 <= 1 })
     }
 
-    // MARK: Mushroom (eraser)
+    // MARK: Frog
 
-    @Test func scrubbedPuffsSpores() {
-        let shroom = Mushroom(color: Paint.colors[3], at: .zero)
-        #expect(shroom.puff == 0)
-        shroom.scrubbed()
-        LimbBrushTests.settle(shroom, frames: 5, target: .zero, painting: true)
-        #expect(shroom.puff > 0)
+    @Test func frogIsBuiltByKind() {
+        let critter = CritterKind.frog.make(color: Paint.colors[4], at: .zero)
+        #expect(critter is Frog)
+        #expect(critter.kind == .frog)
     }
 
-    @Test func mushroomSurvivesATeleport() {
-        let shroom = Mushroom(color: Paint.colors[3], at: .zero)
-        LimbBrushTests.settle(shroom, frames: 30, target: hover, painting: true)
-        LimbBrushTests.settle(shroom, frames: 30, target: SIMD3(3, 0, 0.4), painting: true)
-        let p = shroom.bodyNode.simdPosition
-        #expect(p.x.isFinite && p.y.isFinite && p.z.isFinite)
+    @Test func everyCharacterPaintsSomething() {
+        for tool in PaintTool.allCases {
+            let dabs = tool.dabs(from: .zero, to: SIMD2(0.1, 0), radius: 0.085, speed: 1)
+            #expect(!dabs.isEmpty && dabs.allSatisfy { $0.style.nca == 1 && $0.style.blend == 0 }, "\(tool)")
+        }
     }
 
-    // MARK: Eraser plumbing
-
-    @Test func eraserIsTheMushroom() {
-        let buddy = Buddy(slot: 0, colorIndex: 0, kind: .ladybug, start: .zero)
-        let old = buddy.equip(.eraser)
+    @Test func buddyTurnsIntoTheCharacterAndItsColour() {
+        let buddy = Buddy(slot: 0, tool: .ladybug, start: .zero)
+        #expect(buddy.color == Paint.colors[0])
+        let old = buddy.equip(.frog)
         #expect(old is Ladybug)
-        #expect(buddy.critter is Mushroom)
-        #expect(buddy.eraseRadius == Mushroom.eraseRadius)
-    }
-
-    @Test func pointerEraserEquipsTheMushroom() {
-        let playground = Playground()
-        playground.pointerErases = true
-        let buddy = playground.buddies[0]
-        #expect(buddy.critter is Mushroom)
-        playground.pointerErases = false
-        #expect(playground.buddies[0].critter is Ladybug)
+        #expect(buddy.critter is Frog)
+        #expect(buddy.color == Paint.colors[4])
+        #expect(buddy.equip(.frog) == nil)
     }
 
     // MARK: Full-screen canvas
@@ -164,54 +153,62 @@ struct GardenCastTests {
     private static let windows: [CGSize] = [CGSize(width: 1600, height: 1000), CGSize(width: 1024, height: 768),
                                             CGSize(width: 2400, height: 1000), CGSize(width: 900, height: 1200)]
 
-    @Test func wholeCanvasStaysInViewWithRoomBesideIt() {
+    @Test func canvasFillsTheWindowAndCharactersFloatInsideIt() {
         for size in Self.windows {
             let playground = Playground()
             playground.layout(size: size)
             let canvas = Playground.canvasSize * 0.5
             let visible = playground.visibleHalfSize(atZ: Playground.canvasZ)
-            // The whole canvas is on screen, not cropped by a window edge ...
-            #expect(visible.x >= canvas.x && visible.y >= canvas.y, "\(size)")
-            // ... and the pots and bubbles stand beside it or above it, not over it.
-            let canvasTop = CanvasLayout.canvasCenter.y + canvas.y
-            for pot in playground.pots {
-                let p = pot.root.simdPosition
-                #expect(p.x - PaintPot.radius > canvas.x || p.y - PaintPot.radius > canvasTop, "\(size)")
-            }
-            for pot in playground.critterPots {
-                #expect(pot.root.simdPosition.x + CanvasLayout.bubbleRadius < -canvas.x, "\(size)")
-            }
-        }
-    }
-
-    @Test func potsAndBubblesFloatInsideTheView() {
-        for size in Self.windows {
-            let playground = Playground()
-            playground.layout(size: size)
-            let visible = playground.visibleHalfSize(atZ: 0.3)
-            #expect(!playground.pots.isEmpty && !playground.critterPots.isEmpty)
-            for pot in playground.pots {
-                #expect(pot.root.simdPosition.x + PaintPot.radius <= visible.x, "\(size)")
-                #expect(pot.root.simdPosition.y + PaintPot.radius <= CanvasLayout.cameraY + visible.y, "\(size)")
-                #expect(pot.root.simdPosition.x > 0)
-            }
-            #expect(playground.pots.filter { $0.root.simdPosition.y > CanvasLayout.canvasCenter.y + Playground.canvasSize.y * 0.5 }.count
-                    == CanvasLayout.topPotCount)
-            for pot in playground.critterPots {
-                #expect(pot.root.simdPosition.x - CanvasLayout.bubbleRadius >= -visible.x, "\(size)")
-                #expect(pot.root.simdPosition.x < 0)
+            // Nothing but canvas is on screen, edge to edge ...
+            #expect(visible.x <= canvas.x + 1e-3 && visible.y <= canvas.y + 1e-3, "\(size)")
+            // ... and the four characters float in one row inside the view, near the bottom.
+            let floating = playground.visibleHalfSize(atZ: CanvasLayout.characterZ)
+            #expect(playground.perches.count == 4)
+            let ys = Set(playground.perches.map { $0.root.simdPosition.y })
+            #expect(ys.count == 1, "\(size)")
+            for perch in playground.perches {
+                let p = perch.root.simdPosition
+                #expect(abs(p.x) + CanvasLayout.characterRadius <= floating.x + 1e-3, "\(size)")
+                #expect(p.y < CanvasLayout.cameraY, "\(size)")
             }
         }
     }
 
-    @Test func nothingPaintsUnderAPotOrBubble() {
+    @Test func waitingCharactersUseTheCharacterScale() {
+        let playground = Playground()
+        for perch in playground.perches { #expect(perch.resident.sizeScale == CanvasLayout.characterScale) }
+    }
+
+    @Test func waitingCharactersSleepUntilABuddyComesNear() {
         let playground = Playground()
         playground.layout(size: Self.windows[0])
-        let pot = playground.pots[0].root.simdPosition
-        #expect(playground.isOverShelf(SIMD2(pot.x, pot.y)))
-        let bubble = playground.critterPots[0].root.simdPosition
-        #expect(playground.isOverShelf(SIMD2(bubble.x, bubble.y)))
-        #expect(!playground.isOverShelf(SIMD2(0, 0.1)))
+        for perch in playground.perches {
+            for _ in 0..<120 { perch.update(dt: 1.0 / 60, beatPulse: 0.5, rubProgress: 0, buddyDistance: 10) }
+            #expect(perch.resident.sleepiness > 0.95, "\(perch.tool) sleeps")
+            for _ in 0..<120 { perch.update(dt: 1.0 / 60, beatPulse: 0.5, rubProgress: 0, buddyDistance: 0.2) }
+            #expect(perch.resident.sleepiness < 0.05, "\(perch.tool) wakes")
+            for _ in 0..<180 { perch.update(dt: 1.0 / 60, beatPulse: 0.5, rubProgress: 0, buddyDistance: 10) }
+            #expect(perch.resident.sleepiness > 0.95, "\(perch.tool) sleeps again")
+        }
+    }
+
+    @Test func aSleepingCharacterHoldsStill() {
+        for tool in PaintTool.allCases {
+            let critter = tool.critterKind.make(color: tool.color, at: .zero)
+            critter.sleepiness = 1
+            LimbBrushTests.settle(critter, frames: 60, target: .zero, painting: false)
+            let before = critter.bodyNode.simdPosition
+            for _ in 0..<120 { critter.update(dt: 1.0 / 60, target: .zero, visible: true, painting: false, beatPulse: 1) }
+            #expect(simd_distance(critter.bodyNode.simdPosition, before) < 0.01, "\(tool) moved \(simd_distance(critter.bodyNode.simdPosition, before))")
+        }
+    }
+
+    @Test func nothingPaintsUnderAWaitingCharacter() {
+        let playground = Playground()
+        playground.layout(size: Self.windows[0])
+        let spot = playground.perches[0].root.simdPosition
+        #expect(playground.isOverShelf(SIMD2(spot.x, spot.y)))
+        #expect(!playground.isOverShelf(SIMD2(0, 0.6)))
     }
 
     // MARK: Facing the way it travels
@@ -231,9 +228,8 @@ struct GardenCastTests {
     }
 
     @Test func gardenCastTurnsSidewaysWhileTravelingAndBackWhenStill() {
-        // Ladybug, mushroom and snail turn their heads to the side; the butterfly (wings to the camera) banks.
-        let fronts: [CritterKind: SIMD3<Float>] = [.ladybug: SIMD3(0, 0, 1), .mushroom: SIMD3(0, 0, 1),
-                                                    .butterfly: SIMD3(0, 1, 0), .snail: SIMD3(1, 0, 0)]
+        // The ladybug turns its head to the side; the butterfly (wings to the camera) banks.
+        let fronts: [CritterKind: SIMD3<Float>] = [.ladybug: SIMD3(0, 0, 1), .butterfly: SIMD3(0, 1, 0)]
         for (kind, front) in fronts {
             let critter = kind.make(color: kind.signatureColor, at: .zero)
             drive(critter, vx: 0, frames: 90)
@@ -250,9 +246,20 @@ struct GardenCastTests {
         }
     }
 
+    @Test func snailAlwaysShowsItsSide() {
+        let snail = CritterKind.snail.make(color: PaintTool.snail.color, at: .zero)
+        let front = SIMD3<Float>(1, 0, 0)    // built in profile, head toward +x
+        drive(snail, vx: 0, frames: 90)
+        #expect(facing(snail, front: front).x > 0.8, "rests in profile, head to the right")
+        drive(snail, vx: -2, frames: 150)
+        #expect(facing(snail, front: front).x < -0.8, "heads left")
+        drive(snail, vx: 2, frames: 150)
+        #expect(facing(snail, front: front).x > 0.8, "heads right")
+    }
+
     @Test func turnedCharactersAreTippedTowardTheCamera() {
         // Seen from above and the side, not edge-on: the top of the body tips toward the viewer.
-        for kind in [CritterKind.ladybug, .mushroom, .snail] {
+        for kind in [CritterKind.ladybug, .snail] {
             let critter = kind.make(color: kind.signatureColor, at: .zero)
             drive(critter, vx: 2, frames: 90)
             #expect(critter.leanNode.simdOrientation.act(SIMD3(0, 1, 0)).z > 0.3, "\(kind)")
